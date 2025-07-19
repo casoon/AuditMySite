@@ -1,6 +1,6 @@
 {
   "name": "@casoon/auditmysite",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "description": "A comprehensive command-line tool for automated accessibility, security, performance, and SEO testing using Playwright and pa11y, based on sitemap URLs",
   "main": "dist/index.js",
   "bin": {

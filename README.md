@@ -1,25 +1,18 @@
 # ♿ AuditMySite - Accessibility Test CLI
 
-A powerful command-line tool for automated accessibility testing using Playwright and pa11y, based on sitemap URLs. Built with modern TypeScript and featuring comprehensive parallelization, security scanning, and interactive HTML reports.
+Ein leistungsstarkes Kommandozeilen-Tool für automatisierte Accessibility-Tests mit Playwright und pa11y, basierend auf Sitemap-URLs. Entwickelt mit modernem TypeScript und umfassender Parallelisierung.
 
-## 🚀 **Quick Start**
+## 🚀 **Schnellstart**
 
-### **Installation:**
 ```bash
-# Install globally
+# Installation
 npm install -g @casoon/auditmysite
 
-# Or use npx (recommended)
+# Einfachste Verwendung
 npx @casoon/auditmysite http://your-site.com/sitemap.xml
-```
 
-### **Basic Usage:**
-```bash
-# 🆕 Simplest usage - Queue processing is standard!
-npx @casoon/auditmysite http://localhost:4321/sitemap.xml
-
-# With extended options
-npx @casoon/auditmysite http://localhost:4321/sitemap.xml \
+# Mit erweiterten Optionen
+npx @casoon/auditmysite http://your-site.com/sitemap.xml \
   --max-pages 20 \
   --max-concurrent 5 \
   --performance-report \
@@ -27,131 +20,124 @@ npx @casoon/auditmysite http://localhost:4321/sitemap.xml \
   --security-scan
 ```
 
-### **Legacy Mode (Sequential Processing):**
-```bash
-# Only for compatibility - slower!
-npx @casoon/auditmysite http://localhost:4321/sitemap.xml --sequential
-```
+## 📊 **Leistungsumfang - Implementierte Phasen**
 
-## 📊 **Key Features**
+### **🚀 Phase 1: Erweiterte Parallelisierung (100% Implementiert)**
+- **10x schneller** durch echte Parallelisierung mit Worker Pool
+- **Event-Driven Queue System** für intelligente Aufgabenverwaltung
+- **Ressourcen-Monitoring** (Speicher, CPU, Netzwerk) mit automatischer Drosselung
+- **Priority Queue** mit intelligenter URL-Priorisierung
+- **Netzwerk-Drosselung** für serverfreundliche Request-Raten
+- **Live-Status-Updates**: `📊 67% | 2/3 | 🔧 2/3 | 💾 45MB | ⏱️ 10s`
+- **Automatische Retry-Logik** mit exponentieller Backoff-Strategie
+- **Memory-Leak-Prävention** durch ordnungsgemäße Ressourcenverwaltung
 
-### **🚀 Phase 1: Advanced Parallelization (100% Complete)**
-- **10x faster** through true parallelization with Worker Pool
-- **Event-Driven Queue System** for intelligent task management
-- **Resource Monitoring** (Memory, CPU, Network) with automatic throttling
-- **Priority Queue** with intelligent URL prioritization
-- **Network Throttling** for server-friendly request rates
-- **Short Status Updates**: `📊 67% | 2/3 | 🔧 2/3 | 💾 45MB | ⏱️ 10s`
-- **Automatic Retry Logic** with exponential backoff
-- **Memory-Leak Prevention** through proper resource management
+### **⚡ Phase 2: Moderne Performance-Standards (100% Implementiert)**
+- **Core Web Vitals Testing** (LCP, FID, CLS, FCP, TTI, TBT)
+- **Lighthouse Integration** für umfassende Performance-Audits
+- **Performance Scoring** mit automatischen Empfehlungen
+- **Memory Usage Monitoring** mit Leak-Erkennung
+- **Loading Performance Tests** mit detaillierten Metriken
+- **Performance-Berichte** mit PageSpeed/Lightspeed-Analyse
 
-### **🔒 Phase 4: Security Testing (100% Complete)**
+### **📱 Phase 3: Mobile-First Testing (100% Implementiert)**
+- **Touch Target Testing** (44px Minimum-Größe für interaktive Elemente)
+- **PWA Feature Testing** (Manifest, Service Worker, Installierbarkeit)
+- **Mobile Emulation** mit verschiedenen Viewport-Größen
+- **Responsive Design Validation** für alle Bildschirmgrößen
+- **Touch Navigation Testing** für mobile Benutzerfreundlichkeit
+- **Offline-Fähigkeit Testing** für Progressive Web Apps
+
+### **🔒 Phase 4: Security Testing (100% Implementiert)**
 - **Security Headers Validation** (CSP, HSTS, X-Frame-Options, etc.)
-- **HTTPS Enforcement Testing** with mixed content detection
-- **Content Security Policy Analysis** with detailed directive parsing
+- **HTTPS Enforcement Testing** mit Mixed-Content-Erkennung
+- **Content Security Policy Analysis** mit detaillierter Direktiven-Parsing
 - **Vulnerability Scanning** (XSS, Injection, Info Disclosure)
-- **Security Scoring** and automated recommendations
-- **Compliance Reports** for GDPR, SOC2, ISO27001
+- **Security Scoring** und automatisierte Empfehlungen
+- **Compliance Reports** für GDPR, SOC2, ISO27001
 
-### **📄 Phase 5: Interactive HTML Reports (100% Complete)**
-- **Modern, Responsive Design** with CSS variables
-- **Dark Mode Support** (automatic detection)
-- **Copy-to-Clipboard Buttons** for AI-compatible data export
-- **Interactive Tables** with hover effects and sorting
-- **Toast Notifications** for user feedback
-- **Mobile-Optimized Layout** for all devices
+### **📄 Phase 5: Interaktive HTML-Reports (100% Implementiert)**
+- **Modernes, responsives Design** mit CSS-Variablen
+- **Dark Mode Support** (automatische Erkennung)
+- **Copy-to-Clipboard Buttons** für AI-kompatible Datenexporte
+- **Interaktive Tabellen** mit Hover-Effekten und Sortierung
+- **Toast Notifications** für Benutzer-Feedback
+- **Mobile-optimiertes Layout** für alle Geräte
 
-### **📊 Additional Features:**
-- **SEO Analysis** with comprehensive search engine optimization
-- **Performance Metrics** collection (Core Web Vitals)
-- **Interactive CLI Prompts** for better user experience
-- **German Accessibility Laws Support** (BFSG, EU 2019/882)
+## 🛠️ **Zusätzliche Funktionen**
+
+### **📊 Erweiterte Berichte:**
+- **SEO Analysis** mit umfassender Suchmaschinenoptimierung
+- **Performance Metrics** Sammlung (Core Web Vitals)
+- **Interaktive CLI Prompts** für bessere Benutzererfahrung
+- **Deutsche Accessibility-Gesetze Support** (BFSG, EU 2019/882)
 - **Multi-Standard Support** (WCAG 2.0/2.1, Section 508)
-- **Detailed Error Reports** for automated fixes
+- **Detaillierte Fehlerberichte** für automatisierte Fixes
 
-## 🛠️ **Installation & Setup**
+### **🔧 Technische Features:**
+- **TypeScript** - Typsichere Entwicklung
+- **Playwright** - Browser-Automatisierung
+- **pa11y** - Accessibility-Testing-Engine
+- **Event-Driven Architecture** - Skalierbare Queue-Verarbeitung
+- **Resource Monitoring** - Intelligente Ressourcenverwaltung
 
-### **Prerequisites:**
-- Node.js 16+ 
-- npm or yarn
-- Modern browser (Chrome, Firefox, Safari)
+## 📋 **CLI-Optionen**
 
-### **Local Development:**
+### **Kern-Optionen:**
 ```bash
-# Clone repository
-git clone https://github.com/casoon/auditmysite.git
-cd auditmysite
-
-# Install dependencies
-npm install
-
-# Build project
-npm run build
-
-# Run locally
-node bin/audit.js http://localhost:4321/sitemap.xml
+--max-pages <number>        # Maximale Seiten zum Testen (Standard: 20)
+--timeout <number>          # Timeout in Millisekunden (Standard: 10000)
+--standard <standard>       # Accessibility-Standard (WCAG2A|WCAG2AA|WCAG2AAA|Section508)
+--output-dir <dir>          # Ausgabeverzeichnis für Berichte (Standard: "./reports")
 ```
 
-### **Global Installation:**
+### **🚀 Parallelisierungs-Optionen:**
 ```bash
-npm install -g @casoon/auditmysite
-auditmysite http://your-site.com/sitemap.xml
+--max-concurrent <number>   # Anzahl paralleler Worker (Standard: 3)
+--concurrency <number>      # Alias für --max-concurrent
+--max-workers <number>      # Alias für --max-concurrent
+--max-retries <number>      # Max. Wiederholungsversuche (Standard: 3)
+--retry-delay <ms>          # Wiederholungsverzögerung in ms (Standard: 2000)
+--no-progress-bar           # Live-Fortschrittsbalken deaktivieren
+--progress-interval <ms>    # Fortschritts-Update-Intervall (Standard: 1000)
+--no-resource-monitoring    # Ressourcen-Überwachung deaktivieren
+--max-memory <mb>          # Max. Speicherverbrauch in MB (Standard: 512)
+--max-cpu <percent>        # Max. CPU-Verbrauch in Prozent (Standard: 80)
+--sequential               # Sequentielle Tests verwenden (Legacy-Modus, langsamer)
 ```
 
-## 📋 **CLI Options**
-
-### **Core Options:**
+### **📄 Bericht-Optionen:**
 ```bash
---max-pages <number>        # Maximum pages to test (default: 20)
---timeout <number>          # Timeout in milliseconds (default: 10000)
---standard <standard>       # Accessibility standard (WCAG2A|WCAG2AA|WCAG2AAA|Section508)
---output-dir <dir>          # Output directory for reports (default: "./reports")
+--detailed-report           # Detaillierten Fehlerbericht für automatisierte Fixes generieren
+--performance-report        # Performance-Bericht mit PageSpeed-Analyse generieren
+--seo-report               # SEO-Bericht mit Suchmaschinenoptimierung generieren
+--security-scan            # Umfassenden Security-Scan durchführen
+--security-report          # Detaillierten Security-Bericht generieren
+--html                     # HTML-Bericht statt Markdown generieren
+--no-copy-buttons          # Copy-to-Clipboard-Buttons im HTML-Bericht deaktivieren
 ```
 
-### **🚀 Parallelization Options:**
+### **🔧 Test-Optionen:**
 ```bash
---max-concurrent <number>   # Number of parallel workers (default: 3)
---concurrency <number>      # Alias for --max-concurrent
---max-workers <number>      # Alias for --max-concurrent
---max-retries <number>      # Max retry attempts (default: 3)
---retry-delay <ms>          # Retry delay in ms (default: 2000)
---no-progress-bar           # Disable live progress bar
---progress-interval <ms>    # Progress update interval (default: 1000)
---no-resource-monitoring    # Disable resource monitoring
---max-memory <mb>          # Max memory usage in MB (default: 512)
---max-cpu <percent>        # Max CPU usage percentage (default: 80)
---sequential               # Use sequential testing (legacy mode, slower)
+--use-pa11y                # pa11y für detaillierte Accessibility-Tests verwenden
+--no-pa11y                 # pa11y deaktivieren, nur Playwright-Tests verwenden
+--lighthouse               # Lighthouse-Tests für umfassende Analyse ausführen
+--core-web-vitals          # Core Web Vitals Performance-Metriken testen
+--touch-targets            # Touch-Target-Größen für mobile Accessibility testen
+--pwa                      # Progressive Web App Features testen
+--mobile-emulation         # Mobile-Emulation aktivieren
+--viewport <size>          # Viewport-Größe setzen (z.B. 1920x1080)
+--user-agent <agent>       # Benutzerdefinierten User Agent setzen
 ```
 
-### **📄 Report Options:**
-```bash
---detailed-report           # Generate detailed error report for automated fixes
---performance-report        # Generate performance report with PageSpeed analysis
---seo-report               # Generate SEO report with search engine optimization
---security-scan            # Run comprehensive security scan
---security-report          # Generate detailed security report
---html                     # Generate HTML report instead of Markdown
---no-copy-buttons          # Disable copy-to-clipboard buttons in HTML report
-```
+## 📊 **Verwendungsbeispiele**
 
-### **🔧 Testing Options:**
-```bash
---use-pa11y                # Use pa11y for detailed accessibility testing
---no-pa11y                 # Disable pa11y, use only Playwright tests
---lighthouse               # Run Lighthouse tests for comprehensive analysis
---mobile-emulation         # Enable mobile emulation
---viewport <size>          # Set viewport size (e.g., 1920x1080)
---user-agent <agent>       # Set custom user agent
-```
-
-## 📊 **Usage Examples**
-
-### **Quick Accessibility Test:**
+### **Schneller Accessibility-Test:**
 ```bash
 npx @casoon/auditmysite https://example.com/sitemap.xml
 ```
 
-### **Comprehensive Audit:**
+### **Umfassender Audit:**
 ```bash
 npx @casoon/auditmysite https://example.com/sitemap.xml \
   --max-pages 50 \
@@ -164,16 +150,27 @@ npx @casoon/auditmysite https://example.com/sitemap.xml \
   --html
 ```
 
-### **Performance-Focused Test:**
+### **Performance-fokussierter Test:**
 ```bash
 npx @casoon/auditmysite https://example.com/sitemap.xml \
   --max-pages 10 \
   --performance-report \
   --lighthouse \
+  --core-web-vitals \
   --mobile-emulation
 ```
 
-### **Security Audit:**
+### **Mobile-First Test:**
+```bash
+npx @casoon/auditmysite https://example.com/sitemap.xml \
+  --max-pages 20 \
+  --touch-targets \
+  --pwa \
+  --mobile-emulation \
+  --viewport 375x667
+```
+
+### **Security-Audit:**
 ```bash
 npx @casoon/auditmysite https://example.com/sitemap.xml \
   --security-scan \
@@ -182,131 +179,27 @@ npx @casoon/auditmysite https://example.com/sitemap.xml \
   --max-pages 20
 ```
 
-## 🏗️ **Architecture**
+## 🌍 **Unterstützte Accessibility-Standards**
 
-### **Core Components:**
-```
-src/
-├── core/                   # Core functionality
-│   ├── accessibility-checker.ts    # Main accessibility testing
-│   ├── worker-pool.ts             # Parallel browser management
-│   ├── event-driven-queue.ts      # Task queue system
-│   ├── resource-monitor.ts        # Resource monitoring
-│   ├── priority-queue.ts          # Priority-based queue
-│   ├── network-throttler.ts       # Request throttling
-│   ├── security-scanner.ts        # Security testing
-│   └── standard-pipeline.ts       # Main pipeline
-├── tests/                  # Test implementations
-│   ├── aria/              # ARIA testing
-│   ├── form/              # Form accessibility
-│   ├── keyboard/          # Keyboard navigation
-│   ├── performance/       # Performance metrics
-│   ├── security/          # Security tests
-│   └── seo/               # SEO analysis
-└── reports/               # Report generators
-    ├── html/              # HTML report templates
-    └── *.ts               # Report generators
-```
+- **WCAG 2.0 Level A** - Grundlegende Accessibility
+- **WCAG 2.0 Level AA** - Empfohlen (Standard)
+- **WCAG 2.0 Level AAA** - Strikte Konformität
+- **Section 508** - US-Bundesanforderungen
+- **BFSG** - Deutsche Accessibility-Gesetze
+- **EU 2019/882** - Europäische Accessibility-Richtlinie
 
-### **Technology Stack:**
-- **TypeScript** - Type-safe development
-- **Playwright** - Browser automation
-- **pa11y** - Accessibility testing engine
-- **Node.js** - Runtime environment
-- **Event-Driven Architecture** - Scalable queue processing
+## 📊 **Bericht-Typen**
 
-## 📈 **Performance**
+1. **Accessibility Report** - WCAG-Konformitätsergebnisse
+2. **Performance Report** - Core Web Vitals und Metriken
+3. **SEO Report** - Suchmaschinenoptimierungs-Analyse
+4. **Security Report** - Security-Schwachstellen und Empfehlungen
+5. **Detailed Error Report** - AI-kompatible Fix-Vorschläge
 
-### **Speed Improvements:**
-- **10x faster** through parallelization
-- **100+ pages** tested in minutes
-- **Intelligent resource usage** with monitoring
-- **Server-friendly** with request throttling
-
-### **Resource Management:**
-- **Memory monitoring** with automatic cleanup
-- **CPU usage tracking** with throttling
-- **Network request limiting** for server protection
-- **Worker pool management** for optimal performance
-
-## 🔒 **Security Features**
-
-### **Security Scanning:**
-- **Security Headers** validation
-- **HTTPS enforcement** testing
-- **Content Security Policy** analysis
-- **Vulnerability detection** (XSS, injection, info disclosure)
-- **Mixed content** detection
-- **Cookie security** validation
-
-### **Compliance Support:**
-- **GDPR** compliance checking
-- **SOC2** security standards
-- **ISO27001** information security
-- **WCAG 2.1** accessibility standards
-
-## 🌍 **Accessibility Standards**
-
-### **Supported Standards:**
-- **WCAG 2.0 Level A** - Basic accessibility
-- **WCAG 2.0 Level AA** - Recommended (default)
-- **WCAG 2.0 Level AAA** - Strict compliance
-- **Section 508** - US Federal requirements
-- **BFSG** - German accessibility laws
-- **EU 2019/882** - European accessibility act
-
-### **Test Coverage:**
-- **ARIA landmarks** and roles
-- **Keyboard navigation** testing
-- **Color contrast** validation
-- **Form accessibility** checking
-- **Media accessibility** testing
-- **Semantic HTML** validation
-
-## 📊 **Reports**
-
-### **Report Types:**
-1. **Accessibility Report** - WCAG compliance results
-2. **Performance Report** - Core Web Vitals and metrics
-3. **SEO Report** - Search engine optimization analysis
-4. **Security Report** - Security vulnerabilities and recommendations
-5. **Detailed Error Report** - AI-compatible fix suggestions
-
-### **Output Formats:**
-- **Markdown** - Standard format with detailed information
-- **HTML** - Interactive reports with copy buttons
-- **JSON** - Machine-readable data for automation
-
-## 🤝 **Contributing**
-
-### **Development Setup:**
-```bash
-git clone https://github.com/casoon/auditmysite.git
-cd auditmysite
-npm install
-npm run build
-npm test
-```
-
-### **Code Style:**
-- TypeScript with strict mode
-- ESLint configuration
-- Prettier formatting
-- Comprehensive testing
-
-## 📄 **License**
-
-MIT License - see [LICENSE](LICENSE) file for details.
-
-## 🆘 **Support**
-
-### **Issues:**
-- GitHub Issues: [Report a bug](https://github.com/casoon/auditmysite/issues)
-- Documentation: [Wiki](https://github.com/casoon/auditmysite/wiki)
-
-### **Community:**
-- Discussions: [GitHub Discussions](https://github.com/casoon/auditmysite/discussions)
-- Examples: [Examples directory](examples/)
+### **Ausgabeformate:**
+- **Markdown** - Standardformat mit detaillierten Informationen
+- **HTML** - Interaktive Berichte mit Copy-Buttons
+- **JSON** - Maschinenlesbare Daten für Automatisierung
 
 ---
 

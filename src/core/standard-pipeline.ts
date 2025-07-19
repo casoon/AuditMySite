@@ -183,9 +183,8 @@ export class StandardPipeline {
       });
       outputFiles.push(htmlReportPath);
     } else {
-      // Markdown für Menschen (Standard)
-      const domain = new URL(options.sitemapUrl).hostname.replace(/\./g, '-');
-      const mdOutputPath = path.join(outputDir, `${domain}-accessibility-report-${dateOnly}.md`);
+      // Markdown für Menschen (Standard) - ohne Domain im Dateinamen
+      const mdOutputPath = path.join(outputDir, `accessibility-report-${dateOnly}.md`);
       await outputGenerator.generateOutput(summary, {
         format: 'markdown',
         outputFile: mdOutputPath,
@@ -258,16 +257,15 @@ export class StandardPipeline {
         try {
           const securityScanResult = await securityScanner.scanPage(page, firstUrl);
           
-          // Security-Report generieren
+          // Security-Report generieren - ohne Domain im Dateinamen
           const securityReportGenerator = new SecurityReportGenerator();
-          const domain = new URL(options.sitemapUrl).hostname.replace(/\./g, '-');
           
           if (options.outputFormat === 'html') {
-            const securityHtmlPath = path.join(outputDir, `${domain}-security-report-${dateOnly}.html`);
+            const securityHtmlPath = path.join(outputDir, `security-report-${dateOnly}.html`);
             await securityReportGenerator.generateHtmlReport(securityScanResult, securityHtmlPath);
             outputFiles.push(securityHtmlPath);
           } else {
-            const securityMdPath = path.join(outputDir, `${domain}-security-report-${dateOnly}.md`);
+            const securityMdPath = path.join(outputDir, `security-report-${dateOnly}.md`);
             await securityReportGenerator.generateMarkdownReport(securityScanResult, securityMdPath);
             outputFiles.push(securityMdPath);
           }
@@ -347,10 +345,9 @@ export class StandardPipeline {
     
     await checker.cleanup();
     
-    // Markdown-Output generieren
+    // Markdown-Output generieren - ohne Domain im Dateinamen
     const outputGenerator = new OutputGenerator();
-    const domain = new URL(options.sitemapUrl).hostname.replace(/\./g, '-');
-    const markdownFile = path.join(outputDir, `${domain}-accessibility-report-${dateOnly}.md`);
+    const markdownFile = path.join(outputDir, `accessibility-report-${dateOnly}.md`);
     
     await outputGenerator.generateOutput(summary, {
       format: 'markdown',

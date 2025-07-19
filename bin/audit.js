@@ -262,18 +262,21 @@ program
     }
     
     try {
-      // Extract domain for filename
-      const domain = new URL(sitemapUrl).hostname.replace(/\./g, '-');
+      // Extract domain and create subdirectory
+      const url = new URL(sitemapUrl);
+      const domain = url.hostname.replace(/\./g, '-');
       const timestamp = new Date().toISOString().split('T')[0]; // Date-only for overwritable files
-      const filename = `${domain}-accessibility-report-${timestamp}.md`;
       
-      // Create output directory if it doesn't exist
+      // Create subdirectory based on domain
       const fs = require('fs');
-      if (!fs.existsSync(options.outputDir)) {
-        fs.mkdirSync(options.outputDir, { recursive: true });
+      const subDir = path.join(options.outputDir, domain);
+      if (!fs.existsSync(subDir)) {
+        fs.mkdirSync(subDir, { recursive: true });
       }
       
-      const outputPath = path.join(options.outputDir, filename);
+      // Use simple filenames without domain
+      const filename = `accessibility-report-${timestamp}.md`;
+      const outputPath = path.join(subDir, filename);
       
       // Run standard pipeline
       const pipeline = new StandardPipeline();
@@ -291,7 +294,7 @@ program
         maxPages: maxPages,
         timeout: parseInt(options.timeout),
         pa11yStandard: standard,
-        outputDir: options.outputDir,
+        outputDir: subDir, // Use subdirectory instead of main output directory
         includeDetails: options.includeDetails,
         includePa11yIssues: options.includePa11y,
         generateDetailedReport: generateDetailedReport,
