@@ -19,6 +19,7 @@ export interface StandardPipelineOptions {
   generatePerformanceReport?: boolean;
   generateSeoReport?: boolean;
   generateSecurityReport?: boolean;
+  skipCspForLocalhost?: boolean;
   hideElements?: string;
   includeNotices?: boolean;
   includeWarnings?: boolean;
@@ -255,7 +256,9 @@ export class StandardPipeline {
         const page = await browser.newPage();
         
         try {
-          const securityScanResult = await securityScanner.scanPage(page, firstUrl);
+          const securityScanResult = await securityScanner.scanPage(page, firstUrl, {
+            skipCspForLocalhost: options.skipCspForLocalhost || false
+          });
           
           // Security-Report generieren - ohne Domain im Dateinamen
           const securityReportGenerator = new SecurityReportGenerator();

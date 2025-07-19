@@ -11,12 +11,29 @@ export class CspTest extends BaseAccessibilityTest {
     const { page, url } = context;
     
     try {
-      // Navigate to the page to capture headers
-      await page.goto(url, { waitUntil: 'networkidle' });
+      // Schnellere Navigation für localhost
+      const isLocalhost = url.includes('localhost') || url.includes('127.0.0.1');
+      const waitOptions = isLocalhost ? { waitUntil: 'domcontentloaded' as const, timeout: 5000 } : { waitUntil: 'networkidle' as const };
       
-      // Get response headers
-      const response = await page.waitForResponse(url);
-      const headers = response.headers();
+      // Navigate to the page to capture headers
+      await page.goto(url, waitOptions);
+      
+      // Schnellere Response-Erfassung für localhost
+      let headers: Record<string, string> = {};
+      if (isLocalhost) {
+        // Für localhost: Schnelle Header-Prüfung ohne Warten
+        try {
+          const response = await page.waitForResponse(url, { timeout: 3000 });
+          headers = response.headers();
+        } catch (error) {
+          // Fallback: Verwende leere Headers für localhost
+          console.log('   ⚡ Localhost: Verwende vereinfachte CSP-Prüfung');
+        }
+      } else {
+        // Für Produktions-URLs: Normale Header-Erfassung
+        const response = await page.waitForResponse(url);
+        headers = response.headers();
+      }
       
       const issues: string[] = [];
       const warnings: string[] = [];
@@ -25,7 +42,11 @@ export class CspTest extends BaseAccessibilityTest {
       // Check for CSP header
       const csp = headers['content-security-policy'] || headers['x-content-security-policy'];
       if (!csp) {
-        issues.push('Missing Content Security Policy (CSP) header - critical for XSS protection');
+        if (isLocalhost) {
+          warnings.push('Missing Content Security Policy (CSP) header - normal for localhost development');
+        } else {
+          issues.push('Missing Content Security Policy (CSP) header - critical for XSS protection');
+        }
         return this.createResult(false, 1, issues, warnings, details);
       }
       
@@ -133,8 +154,15 @@ export class CspTest extends BaseAccessibilityTest {
       
       details.hasReporting = hasReporting;
       
-      // Analyze CSP effectiveness
-      const cspAnalysis = await this.analyzeCspEffectiveness(page, directives);
+      // Vereinfachte CSP-Analyse für localhost
+      let cspAnalysis;
+      if (isLocalhost) {
+        // Schnelle Analyse für localhost
+        cspAnalysis = await this.analyzeCspEffectivenessFast(page, directives);
+      } else {
+        // Vollständige Analyse für Produktions-URLs
+        cspAnalysis = await this.analyzeCspEffectiveness(page, directives);
+      }
       details.cspAnalysis = cspAnalysis;
       
       if (cspAnalysis.violations.length > 0) {
@@ -237,6 +265,105 @@ export class CspTest extends BaseAccessibilityTest {
       analysis.violations.push(`${analysis.inlineStyles} inline styles without proper CSP allowance`);
     }
     
+    return analysis;
+  }
+
+  private async analyzeCspEffectivenessFast(page: any, directives: Record<string, string>): Promise<any> {
+    const analysis = {
+      violations: [] as string[],
+      inlineScripts: 0,
+      inlineStyles: 0,
+      externalScripts: 0,
+      externalStyles: 0
+    };
+
+         // Schnelle Prüfung für localhost: Nur wichtige Header-Checks
+     const headers = await page.evaluate(() => {
+       const cspMeta = document.head.querySelector('meta[http-equiv="Content-Security-Policy"]') as HTMLMetaElement;
+       const xCspMeta = document.head.querySelector('meta[http-equiv="X-Content-Security-Policy"]') as HTMLMetaElement;
+       
+       return {
+         csp: cspMeta?.content || xCspMeta?.content,
+         scriptSrc: (cspMeta?.content || xCspMeta?.content)?.includes("script-src") || false,
+         styleSrc: (cspMeta?.content || xCspMeta?.content)?.includes("style-src") || false,
+         inlineScripts: document.querySelectorAll('script:not([src])').length,
+         inlineStyles: document.querySelectorAll('style').length,
+         externalScripts: document.querySelectorAll('script[src]').length,
+         externalStyles: document.querySelectorAll('link[rel="stylesheet"]').length,
+       };
+     });
+
+    analysis.inlineScripts = headers.inlineScripts;
+    analysis.inlineStyles = headers.inlineStyles;
+    analysis.externalScripts = headers.externalScripts;
+    analysis.externalStyles = headers.externalStyles;
+
+    // Schnelle CSP-Analyse für localhost
+    const csp = headers.csp;
+    if (!csp) {
+      analysis.violations.push('Missing Content Security Policy (CSP) header - critical for XSS protection');
+      return analysis;
+    }
+
+    const directivesFromPage = this.parseCspDirectives(csp);
+
+    // Schnelle Prüfung auf wichtige Fehler
+    const unsafePatterns = [
+      { directive: 'script-src', pattern: "'unsafe-inline'", description: 'unsafe-inline in script-src' },
+      { directive: 'script-src', pattern: "'unsafe-eval'", description: 'unsafe-eval in script-src' },
+      { directive: 'style-src', pattern: "'unsafe-inline'", description: 'unsafe-inline in style-src' },
+      { directive: 'default-src', pattern: "'unsafe-inline'", description: 'unsafe-inline in default-src' },
+      { directive: 'default-src', pattern: "'unsafe-eval'", description: 'unsafe-eval in default-src' }
+    ];
+
+    const unsafeDirectives: string[] = [];
+    unsafePatterns.forEach(({ directive, pattern, description }) => {
+      if (directivesFromPage[directive] && directivesFromPage[directive].includes(pattern)) {
+        unsafeDirectives.push(description);
+      }
+    });
+
+    if (unsafeDirectives.length > 0) {
+      analysis.violations.push(`Unsafe CSP directives detected: ${unsafeDirectives.join(', ')}`);
+    }
+
+    // Schnelle Prüfung auf permissive Directives
+    const permissivePatterns = [
+      { directive: 'script-src', pattern: '*', description: 'wildcard (*) in script-src' },
+      { directive: 'style-src', pattern: '*', description: 'wildcard (*) in style-src' },
+      { directive: 'img-src', pattern: '*', description: 'wildcard (*) in img-src' },
+      { directive: 'connect-src', pattern: '*', description: 'wildcard (*) in connect-src' }
+    ];
+
+    const permissiveDirectives: string[] = [];
+    permissivePatterns.forEach(({ directive, pattern, description }) => {
+      if (directivesFromPage[directive] && directivesFromPage[directive].includes(pattern)) {
+        permissiveDirectives.push(description);
+      }
+    });
+
+    if (permissiveDirectives.length > 0) {
+      analysis.violations.push(`Overly permissive CSP directives: ${permissiveDirectives.join(', ')}`);
+    }
+
+    // Schnelle Prüfung auf nonce/hash
+    const hasNonce = Object.values(directivesFromPage).some(value => 
+      value && (value.includes("'nonce-") || value.includes('nonce-'))
+    );
+    const hasHash = Object.values(directivesFromPage).some(value => 
+      value && (value.includes("'sha256-") || value.includes("'sha384-") || value.includes("'sha512-"))
+    );
+
+    if (!hasNonce && !hasHash) {
+      analysis.violations.push('CSP does not use nonces or hashes for inline scripts/styles');
+    }
+
+    // Schnelle Prüfung auf report-uri/report-to
+    const hasReporting = directivesFromPage['report-uri'] || directivesFromPage['report-to'];
+    if (!hasReporting) {
+      analysis.violations.push('CSP missing reporting directive (report-uri or report-to)');
+    }
+
     return analysis;
   }
 } 

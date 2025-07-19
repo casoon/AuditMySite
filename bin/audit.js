@@ -46,6 +46,7 @@ program
   .option('--no-security-scan', 'Disable security scan')
   .option('--security-report', 'Generate detailed security report')
   .option('--no-security-report', 'Disable security report generation')
+  .option('--skip-csp-localhost', 'Skip CSP test for localhost (faster development testing)')
   // 🆕 pa11y-Optionen
   .option('--use-pa11y', 'Use pa11y for detailed accessibility testing (slower, more memory)')
   .option('--no-pa11y', 'Disable pa11y, use only Playwright tests (faster, less memory)')
@@ -320,6 +321,7 @@ program
         generatePerformanceReport: generatePerformanceReport,
         generateSeoReport: generateSeoReport,
         generateSecurityReport: generateSecurityReport,
+        skipCspForLocalhost: options.skipCspLocalhost,
         hideElements: options.hideElements,
         includeNotices: options.includeNotices,
         includeWarnings: options.includeWarnings,
