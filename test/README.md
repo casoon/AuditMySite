@@ -1,134 +1,134 @@
 # AuditMySite Test Framework
 
-Dieses Testframework ermöglicht es, AuditMySite systematisch zu testen und sicherzustellen, dass alle Funktionen korrekt arbeiten.
+This test framework enables systematic testing of AuditMySite to ensure all functions work correctly.
 
-## 🏗️ Architektur
+## 🏗️ Architecture
 
-### Mock-Server (`test/mock-server/server.js`)
-- Simuliert verschiedene Webseiten mit bekannten Accessibility-Problemen
-- Bietet kontrollierte Test-Szenarien
-- Läuft auf Port 3001
+### Mock Server (`test/mock-server/server.js`)
+- Simulates various websites with known accessibility problems
+- Provides controlled test scenarios
+- Runs on port 3001
 
-### Test-Suite (`test/test-suite.js`)
-- Führt AuditMySite gegen verschiedene Test-Szenarien aus
-- Validiert erwartete Ergebnisse
-- Generiert detaillierte Test-Reports
+### Test Suite (`test/test-suite.js`)
+- Runs AuditMySite against various test scenarios
+- Validates expected results
+- Generates detailed test reports
 
-### Test-Runner (`test/run-tests.js`)
-- Startet den Mock-Server automatisch
-- Führt alle Tests aus
-- Generiert finale Berichte
+### Test Runner (`test/run-tests.js`)
+- Automatically starts the mock server
+- Runs all tests
+- Generates final reports
 
-## 🧪 Test-Szenarien
+## 🧪 Test Scenarios
 
 ### 1. Perfect Page (`/perfect-page`)
-- **Ziel:** Alle Tests sollten passen
-- **Erwartung:** 100% Erfolgsrate, 0 Fehler, 0 Warnungen
+- **Goal:** All tests should pass
+- **Expectation:** 100% success rate, 0 errors, 0 warnings
 - **Tests:** Accessibility, Performance, SEO, Security
 
 ### 2. Accessibility Errors (`/accessibility-errors`)
-- **Ziel:** Spezifische Accessibility-Fehler
-- **Erwartung:** Sollte fehlschlagen mit bekannten Fehlern
-- **Probleme:**
-  - Fehlende alt-Attribute
-  - Buttons ohne aria-label
-  - Niedriger Farbkontrast
-  - Formulare ohne Labels
-  - Fehlende Heading-Struktur
-  - Leere Links
-  - Fehlende Landmarks
+- **Goal:** Specific accessibility errors
+- **Expectation:** Should fail with known errors
+- **Problems:**
+  - Missing alt attributes
+  - Buttons without aria-label
+  - Low color contrast
+  - Forms without labels
+  - Missing heading structure
+  - Empty links
+  - Missing landmarks
 
 ### 3. Performance Issues (`/performance-issues`)
-- **Ziel:** Performance-Probleme
-- **Erwartung:** Performance-Tests sollten Probleme erkennen
-- **Probleme:**
-  - Große, unoptimierte Bilder
-  - Inline-Styles
-  - Ineffiziente Scripts
+- **Goal:** Performance problems
+- **Expectation:** Performance tests should detect issues
+- **Problems:**
+  - Large, unoptimized images
+  - Inline styles
+  - Inefficient scripts
 
 ### 4. SEO Problems (`/seo-problems`)
-- **Ziel:** SEO-Probleme
-- **Erwartung:** SEO-Tests sollten Probleme erkennen
-- **Probleme:**
-  - Fehlender Titel
-  - Fehlende Meta-Beschreibung
-  - Fehlende H1
-  - Fehlende alt-Attribute
-  - Keine strukturierten Daten
+- **Goal:** SEO problems
+- **Expectation:** SEO tests should detect issues
+- **Problems:**
+  - Missing title
+  - Missing meta description
+  - Missing H1
+  - Missing alt attributes
+  - No structured data
 
 ### 5. Security Issues (`/security-issues`)
-- **Ziel:** Security-Probleme
-- **Erwartung:** Security-Tests sollten Probleme erkennen
-- **Probleme:**
-  - Unsichere Formulare
-  - Inline-Scripts
-  - Externe Ressourcen ohne Integrity
-  - Fehlende CSP
+- **Goal:** Security problems
+- **Expectation:** Security tests should detect issues
+- **Problems:**
+  - Insecure forms
+  - Inline scripts
+  - External resources without integrity
+  - Missing CSP
 
-## 🚀 Verwendung
+## 🚀 Usage
 
-### Alle Tests ausführen (mit Mock-Server)
+### Run all tests (with mock server)
 ```bash
 npm test
 ```
 
-### Service-basierte Tests (empfohlen)
+### Service-based tests (recommended)
 ```bash
-# 1. Mock-Server starten
+# 1. Start mock server
 npm run test:mock-server
 
-# 2. Service-Tests ausführen
+# 2. Run service tests
 node test/service-test-suite.js
 ```
 
-### Nur Mock-Server starten
+### Start mock server only
 ```bash
 npm run test:mock-server
 ```
 
-### Nur Test-Suite ausführen (Server muss laufen)
+### Run test suite only (server must be running)
 ```bash
 npm run test:suite
 ```
 
-### Manueller Test
+### Manual test
 ```bash
-# 1. Mock-Server starten
+# 1. Start mock server
 node test/mock-server/server.js
 
-# 2. In anderem Terminal AuditMySite testen
+# 2. Test AuditMySite in another terminal
 node bin/audit.js http://localhost:3001/sitemap.xml --max-pages 1 --non-interactive
 ```
 
-## 📊 Test-Ergebnisse
+## 📊 Test Results
 
-Das Framework generiert detaillierte Berichte:
+The framework generates detailed reports:
 
-### Test-Report
-- Anzahl bestandener/fehlgeschlagener Tests
-- Exit-Codes
-- Generierte Berichte
-- Empfehlungen
+### Test Report
+- Number of passed/failed tests
+- Exit codes
+- Generated reports
+- Recommendations
 
-### Validierung
-- Überprüfung erwarteter vs. tatsächlicher Ergebnisse
-- Erfolgsraten-Validierung
-- Fehleranzahl-Validierung
+### Validation
+- Comparison of expected vs. actual results
+- Success rate validation
+- Error count validation
 
-### Gesamtbewertung
-- **EXCELLENT:** Alle Tests bestanden und Ergebnisse valid
-- **GOOD:** Meiste Tests bestanden mit kleinen Problemen
-- **FAIR:** Einige Tests fehlgeschlagen, Aufmerksamkeit nötig
-- **POOR:** Viele Tests fehlgeschlagen, signifikante Probleme
+### Overall Assessment
+- **EXCELLENT:** All tests passed and results are valid
+- **GOOD:** Most tests passed with minor issues
+- **FAIR:** Some tests failed, attention needed
+- **POOR:** Many tests failed, significant issues detected
 
-## 🔧 Anpassung
+## 🔧 Customization
 
-### Neue Test-Szenarien hinzufügen
-1. Neue Route in `test/mock-server/server.js` hinzufügen
-2. Erwartete Ergebnisse in `test/test-suite.js` definieren
-3. Test in `runAllTests()` hinzufügen
+### Add new test scenarios
+1. Add new route in `test/mock-server/server.js`
+2. Define expected results in `test/test-suite.js`
+3. Add test in `runAllTests()`
 
-### Erwartete Ergebnisse anpassen
+### Adjust expected results
 ```javascript
 // In test/test-suite.js
 this.expectedResults = {
@@ -141,25 +141,25 @@ this.expectedResults = {
 };
 ```
 
-## 🎯 Ziele
+## 🎯 Goals
 
-1. **Kontinuierliche Validierung:** Sicherstellen, dass alle Tests funktionieren
-2. **Regression-Tests:** Erkennen von Änderungen, die Tests brechen
-3. **Qualitätssicherung:** Validierung der Berichtsqualität
-4. **Dokumentation:** Klare Erwartungen für jedes Test-Szenario
+1. **Continuous Validation:** Ensure all tests work correctly
+2. **Regression Tests:** Detect changes that break tests
+3. **Quality Assurance:** Validate report quality
+4. **Documentation:** Clear expectations for each test scenario
 
 ## 🔍 Troubleshooting
 
-### Mock-Server startet nicht
-- Port 3001 bereits belegt? → Anderen Port verwenden
-- Express nicht installiert? → `npm install express`
+### Mock server won't start
+- Port 3001 already in use? → Use different port
+- Express not installed? → `npm install express`
 
-### Tests schlagen fehl
-- Mock-Server läuft? → `npm run test:mock-server` prüfen
-- AuditMySite kompiliert? → `npm run build` ausführen
-- Erwartete Ergebnisse aktuell? → Test-Szenarien prüfen
+### Tests are failing
+- Mock server running? → Check `npm run test:mock-server`
+- AuditMySite compiled? → Run `npm run build`
+- Expected results current? → Check test scenarios
 
-### Unerwartete Ergebnisse
-- Test-Szenarien überprüfen
-- Erwartete Ergebnisse anpassen
-- AuditMySite-Logik prüfen 
+### Unexpected results
+- Review test scenarios
+- Adjust expected results
+- Check AuditMySite logic 
