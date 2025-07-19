@@ -73,8 +73,21 @@ program
   // 🆕 Non-Interactive Modus für automatisierte Tests
   .option('--non-interactive', 'Skip all interactive prompts and use defaults (for CI/CD)')
   .action(async (sitemapUrl, options) => {
-    console.log('🚀 Starting Accessibility Test...');
-    console.log(`📄 Sitemap: ${sitemapUrl}`);
+    // Exit Codes für CI/CD Integration
+    const EXIT_CODES = {
+      SUCCESS: 0,
+      ERRORS_FOUND: 1,
+      CRITICAL_ERRORS: 2,
+      SYSTEM_ERROR: 3
+    };
+
+    let exitCode = EXIT_CODES.SUCCESS;
+    let hasErrors = false;
+    let hasCriticalErrors = false;
+
+    try {
+      console.log('🚀 Starting Accessibility Test...');
+      console.log(`📄 Sitemap: ${sitemapUrl}`);
     
     // Handle alias options for parallel workers
     let maxConcurrent = options.maxConcurrent;
@@ -369,11 +382,28 @@ program
           });
         }
         
+        // Exit Code Logic basierend auf Ergebnissen
+        if (summary.totalErrors > 0) {
+          hasErrors = true;
+          exitCode = EXIT_CODES.ERRORS_FOUND;
+        }
+        
         if (summary.failedPages > 0) {
+          hasCriticalErrors = true;
+          exitCode = EXIT_CODES.CRITICAL_ERRORS;
           console.log(`⚠️  ${summary.failedPages} pages failed accessibility tests`);
-          process.exit(1);
         }
       } else {
+        // Exit Code Logic für non-Markdown Output
+        if (summary.totalErrors > 0) {
+          hasErrors = true;
+          exitCode = EXIT_CODES.ERRORS_FOUND;
+        }
+        
+        if (summary.failedPages > 0) {
+          hasCriticalErrors = true;
+          exitCode = EXIT_CODES.CRITICAL_ERRORS;
+        }
         console.log('');
         console.log('✅ Test completed successfully!');
         console.log(`📊 Results:`);
@@ -399,7 +429,17 @@ program
       
     } catch (error) {
       console.error('❌ Error during test:', error.message);
-      process.exit(1);
+      exitCode = EXIT_CODES.SYSTEM_ERROR;
+    } finally {
+      // Final Exit Code Logging
+      console.log('');
+      console.log('📊 Exit Summary:');
+      console.log(`   - Exit Code: ${exitCode}`);
+      console.log(`   - Status: ${exitCode === EXIT_CODES.SUCCESS ? 'SUCCESS' : exitCode === EXIT_CODES.ERRORS_FOUND ? 'ERRORS_FOUND' : exitCode === EXIT_CODES.CRITICAL_ERRORS ? 'CRITICAL_ERRORS' : 'SYSTEM_ERROR'}`);
+      console.log(`   - Has Errors: ${hasErrors ? 'Yes' : 'No'}`);
+      console.log(`   - Has Critical Errors: ${hasCriticalErrors ? 'Yes' : 'No'}`);
+      
+      process.exit(exitCode);
     }
   });
 

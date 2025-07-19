@@ -1,6 +1,8 @@
 import { TestSummary, AccessibilityResult } from '../types';
 import * as fs from 'fs';
 import * as path from 'path';
+import { JsonGenerator } from './json-generator';
+import { CsvGenerator } from './csv-generator';
 
 export interface OutputOptions {
   format: 'json' | 'csv' | 'markdown' | 'html';
@@ -99,40 +101,19 @@ export class OutputGenerator {
   }
   
   private generateJSON(data: any, options: OutputOptions): string {
-    return JSON.stringify(data, null, 2);
+    const jsonGenerator = new JsonGenerator();
+    return jsonGenerator.generateJson(data, {
+      includeDetails: options.includeDetails,
+      pretty: true
+    });
   }
   
   private generateCSV(data: any, options: OutputOptions): string {
-    const lines: string[] = [];
-    
-    // Header
-    lines.push('URL,Title,Status,LoadTime,Errors,Warnings,ImagesWithoutAlt,ButtonsWithoutLabel,HeadingsCount,Pa11yScore,PerformanceScore,KeyboardNavigation,ColorContrastIssues,FocusIssues');
-    
-    // Data rows
-    data.pages.forEach((page: any) => {
-      const issues = page.issues || {};
-      const performanceScore = issues.performanceMetrics?.loadTime ? 
-        Math.max(0, 100 - Math.round(issues.performanceMetrics.loadTime / 100)) : 'N/A';
-      
-      lines.push([
-        page.url,
-        `"${page.title}"`,
-        page.status,
-        page.loadTime,
-        page.errors,
-        page.warnings,
-        issues.imagesWithoutAlt || 0,
-        issues.buttonsWithoutLabel || 0,
-        issues.headingsCount || 0,
-        issues.pa11yScore || 'N/A',
-        performanceScore,
-        issues.keyboardNavigation?.length || 0,
-        issues.colorContrastIssues?.length || 0,
-        issues.focusManagementIssues?.length || 0
-      ].join(','));
+    const csvGenerator = new CsvGenerator();
+    return csvGenerator.generateCsv(data, {
+      includeDetails: options.includeDetails,
+      includeHeaders: true
     });
-    
-    return lines.join('\n');
   }
   
   private generateMarkdown(data: any, options: OutputOptions): string {

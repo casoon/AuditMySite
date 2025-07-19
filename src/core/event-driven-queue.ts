@@ -382,15 +382,35 @@ export class EventDrivenQueue extends EventEmitter {
   }
 
   /**
-   * 📝 Generiert kurze Status-Nachricht
+   * 📝 Generiert kurze Status-Nachricht mit verbesserter ETA
    */
   private generateShortStatus(stats: QueueStats): string {
     const progress = Math.round(stats.progress);
     const workers = `${stats.activeWorkers}/${this.options.maxConcurrent}`;
     const memory = Math.round(stats.memoryUsage);
-    const eta = stats.estimatedTimeRemaining > 0 ? `${Math.round(stats.estimatedTimeRemaining / 1000)}s` : '?';
     
-    return `📊 ${progress}% | ${stats.completed}/${stats.total} | 🔧 ${workers} | 💾 ${memory}MB | ⏱️ ${eta}`;
+    // Verbesserte ETA-Berechnung
+    let eta = '?';
+    if (stats.estimatedTimeRemaining > 0) {
+      const seconds = Math.round(stats.estimatedTimeRemaining / 1000);
+      if (seconds < 60) {
+        eta = `${seconds}s`;
+      } else if (seconds < 3600) {
+        eta = `${Math.round(seconds / 60)}m`;
+      } else {
+        eta = `${Math.round(seconds / 3600)}h`;
+      }
+    }
+    
+    // Speed-Indicator (URLs pro Minute)
+    const speed = stats.completed > 0 && this.startTime 
+      ? Math.round((stats.completed / ((Date.now() - this.startTime.getTime()) / 60000)) * 10) / 10
+      : 0;
+    
+    // Memory-Warning
+    const memoryWarning = stats.memoryUsage > 500 ? ' ⚠️' : '';
+    
+    return `📊 ${progress}% | ${stats.completed}/${stats.total} | 🔧 ${workers} | 💾 ${memory}MB${memoryWarning} | ⏱️ ${eta} | 🚀 ${speed}/min`;
   }
 
   // Public API für Event-Listener

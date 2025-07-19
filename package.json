@@ -37,10 +37,12 @@
   "author": "casoon",
   "license": "MIT",
   "dependencies": {
+    "@types/js-yaml": "^4.0.9",
     "chalk": "^5.3.0",
     "chrome-launcher": "^1.2.0",
     "commander": "^11.1.0",
     "inquirer": "^9.2.12",
+    "js-yaml": "^4.1.0",
     "lighthouse": "^11.7.1",
     "ora": "^7.0.1",
     "pa11y": "^6.2.3",
