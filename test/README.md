@@ -2,49 +2,49 @@
 
 ## 📋 Overview
 
-Das AuditMySite Test Framework bietet umfassende Tests für Accessibility, Performance, SEO und Security mit verschiedenen Tools wie pa11y, Lighthouse und Playwright.
+The AuditMySite test framework provides comprehensive testing for accessibility, performance, SEO, and security using various tools like pa11y, Lighthouse, and Playwright.
 
-## 🎯 Test-Szenarien
+## 🎯 Test Scenarios
 
-### **Basis-Tests**
-1. **Perfect Page** (`/perfect-page`) - ✅ Erwartet: Pass
-2. **Accessibility Errors** (`/accessibility-errors`) - ❌ Erwartet: Fail
-3. **Performance Issues** (`/performance-issues`) - ❌ Erwartet: Fail
-4. **SEO Problems** (`/seo-problems`) - ❌ Erwartet: Fail
-5. **Security Issues** (`/security-issues`) - ❌ Erwartet: Fail
+### **Basic Tests**
+1. **Perfect Page** (`/perfect-page`) - ✅ Expected: Pass
+2. **Accessibility Errors** (`/accessibility-errors`) - ❌ Expected: Fail
+3. **Performance Issues** (`/performance-issues`) - ❌ Expected: Fail
+4. **SEO Problems** (`/seo-problems`) - ❌ Expected: Fail
+5. **Security Issues** (`/security-issues`) - ❌ Expected: Fail
 
-### **Erweiterte Tests**
-6. **Advanced Contrast Test** (`/advanced-contrast-test`) - ❌ Erwartet: Fail
-7. **Screen Reader Test** (`/screen-reader-test`) - ❌ Erwartet: Fail
-8. **PWA Test** (`/pwa-test`) - ❌ Erwartet: Fail
-9. **Mobile Touch Test** (`/mobile-touch-test`) - ❌ Erwartet: Fail
-10. **Advanced Security Test** (`/advanced-security-test`) - ❌ Erwartet: Fail
-11. **Core Web Vitals Test** (`/core-web-vitals-test`) - ❌ Erwartet: Fail
+### **Advanced Tests**
+6. **Advanced Contrast Test** (`/advanced-contrast-test`) - ❌ Expected: Fail
+7. **Screen Reader Test** (`/screen-reader-test`) - ❌ Expected: Fail
+8. **PWA Test** (`/pwa-test`) - ❌ Expected: Fail
+9. **Mobile Touch Test** (`/mobile-touch-test`) - ❌ Expected: Fail
+10. **Advanced Security Test** (`/advanced-security-test`) - ❌ Expected: Fail
+11. **Core Web Vitals Test** (`/core-web-vitals-test`) - ❌ Expected: Fail
 
-## 🛠️ Verwendung
+## 🛠️ Usage
 
-### **Mock-Server starten**
+### **Start Mock Server**
 ```bash
 cd test/mock-server
 node server.js
 ```
 
-### **Basis-Tests ausführen**
+### **Run Basic Tests**
 ```bash
 node test/test-suite.js
 ```
 
-### **Service-Tests ausführen**
+### **Run Service Tests**
 ```bash
 node test/service-test-suite.js
 ```
 
-### **Alle Tests ausführen**
+### **Run All Tests**
 ```bash
 node test/run-tests.js
 ```
 
-## 📁 Verzeichnisstruktur
+## 📁 Directory Structure
 
 ```
 test/
@@ -70,32 +70,32 @@ test/
 
 ## 📊 Reports
 
-Die Tests generieren automatisch Reports im `reports/` Verzeichnis:
+Tests automatically generate reports in the `reports/` directory:
 
-- **Accessibility Reports** - Detaillierte Accessibility-Analysen
-- **Performance Reports** - Performance-Metriken und Optimierungen
-- **SEO Reports** - SEO-Analysen und Verbesserungsvorschläge
-- **Security Reports** - Security-Scans und Sicherheitslücken
+- **Accessibility Reports** - Detailed accessibility analyses
+- **Performance Reports** - Performance metrics and optimizations
+- **SEO Reports** - SEO analyses and improvement suggestions
+- **Security Reports** - Security scans and vulnerabilities
 
-## 🔧 Konfiguration
+## 🔧 Configuration
 
-Die Tests verwenden die Standard-Konfiguration des AuditMySite Frameworks. Für Anpassungen siehe die Hauptdokumentation.
+Tests use the standard configuration of the AuditMySite framework. For customizations, see the main documentation.
 
-## 🤝 Beitragen
+## 🤝 Contributing
 
-### **Neue Tests hinzufügen:**
-1. HTML-Template in `mock-server/templates/` erstellen
-2. Route in `mock-server/server.js` hinzufügen
-3. Erwartete Ergebnisse in Test-Suites definieren
+### **Adding New Tests:**
+1. Create HTML template in `mock-server/templates/`
+2. Add route in `mock-server/server.js`
+3. Define expected results in test suites
 
 ### **Debugging:**
-1. Mock-Server-Logs überprüfen
-2. Test-Output analysieren
-3. Reports im `reports/` Verzeichnis prüfen
+1. Check mock server logs
+2. Analyze test output
+3. Review reports in `reports/` directory
 
 ## 📞 Support
 
-Bei Fragen oder Problemen:
-1. Mock-Server-Logs überprüfen
-2. Test-Output analysieren
-3. Issue auf GitHub erstellen 
+For questions or issues:
+1. Check mock server logs
+2. Analyze test output
+3. Create issue on GitHub 
