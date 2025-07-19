@@ -20,7 +20,7 @@ export class BrowserManager {
   }
 
   async initialize(): Promise<void> {
-    console.log('🚀 Initializing shared browser...');
+    console.log('🚀 Initialisiere geteilten Browser...');
     
     // Browser mit Remote Debugging starten
     this.browser = await chromium.launch({
@@ -47,7 +47,7 @@ export class BrowserManager {
     // WebSocket Endpoint für pa11y/Lighthouse
     this.wsEndpoint = `ws://127.0.0.1:${this.port}`;
     
-    console.log(`✅ Shared browser ready on port ${this.port}`);
+    console.log(`✅ Geteilter Browser bereit auf Port ${this.port}`);
     console.log(`🔗 WebSocket: ${this.wsEndpoint}`);
   }
 

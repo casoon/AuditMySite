@@ -89,18 +89,18 @@ export class StandardPipeline {
     await checker.initialize();
     
     console.log('🧪 Führe Accessibility-Tests aus...');
-    console.log(`   📊 Collecting performance metrics: ${options.collectPerformanceMetrics ? 'Yes' : 'No'}`);
-    console.log(`   📸 Capturing screenshots: ${options.captureScreenshots ? 'Yes' : 'No'}`);
-    console.log(`   ⌨️  Testing keyboard navigation: ${options.testKeyboardNavigation ? 'Yes' : 'No'}`);
-    console.log(`   🎨 Testing color contrast: ${options.testColorContrast ? 'Yes' : 'No'}`);
-    console.log(`   🎯 Testing focus management: ${options.testFocusManagement ? 'Yes' : 'No'}`);
-    console.log(`   🚀 Parallel testing: ${options.useSequentialTesting ? 'No' : 'Yes'}`);
+    console.log(`   📊 Performance-Metriken sammeln: ${options.collectPerformanceMetrics ? 'Ja' : 'Nein'}`);
+    console.log(`   📸 Screenshots aufnehmen: ${options.captureScreenshots ? 'Ja' : 'Nein'}`);
+    console.log(`   ⌨️  Tastaturnavigation testen: ${options.testKeyboardNavigation ? 'Ja' : 'Nein'}`);
+    console.log(`   🎨 Farbkontrast testen: ${options.testColorContrast ? 'Ja' : 'Nein'}`);
+    console.log(`   🎯 Fokus-Management testen: ${options.testFocusManagement ? 'Ja' : 'Nein'}`);
+    console.log(`   🚀 Parallele Tests: ${options.useSequentialTesting ? 'Nein' : 'Ja'}`);
     if (options.useSequentialTesting) {
-      console.log(`   📋 Using sequential testing (legacy mode)...`);
+      console.log(`   📋 Verwende sequenzielle Tests (Legacy-Modus)...`);
     } else {
-      console.log(`   🔧 Parallel workers: ${options.maxConcurrent || 3}`);
-      console.log(`   🔄 Max retries: ${options.maxRetries || 3}`);
-      console.log(`   ⏱️  Retry delay: ${options.retryDelay || 2000}ms`);
+      console.log(`   🔧 Parallele Worker: ${options.maxConcurrent || 3}`);
+      console.log(`   🔄 Max. Wiederholungen: ${options.maxRetries || 3}`);
+      console.log(`   ⏱️  Wiederholungsverzögerung: ${options.retryDelay || 2000}ms`);
     }
     
     // Tests ausführen
@@ -139,20 +139,20 @@ export class StandardPipeline {
     // Wähle zwischen Queue (Standard) und sequenzieller Verarbeitung
     let results: AccessibilityResult[];
     if (options.useSequentialTesting) {
-      console.log('📋 Using sequential testing (legacy mode)...');
+      console.log('📋 Verwende sequenzielle Tests (Legacy-Modus)...');
       results = await checker.testMultiplePages(
         limitedUrls.map(url => url.loc),
         testOptions
       );
     } else {
-      console.log('🚀 Using integrated Queue processing with short status updates (standard)...');
+      console.log('🚀 Verwende integrierte Queue-Verarbeitung mit kurzen Status-Updates (Standard)...');
       results = await checker.testMultiplePagesWithQueue(
         limitedUrls.map(url => url.loc),
         testOptions
       );
     }
     
-    console.log('\n📋 Creating test summary...');
+    console.log('\n📋 Erstelle Test-Zusammenfassung...');
     
     // Zusammenfassung erstellen
     const summary: TestSummary = {
@@ -168,7 +168,7 @@ export class StandardPipeline {
     
     await checker.cleanup();
     
-    console.log('📄 Generating output files...');
+    console.log('📄 Generiere Ausgabedateien...');
     
     // Output-Dateien generieren
     const outputGenerator = new OutputGenerator();
@@ -176,7 +176,7 @@ export class StandardPipeline {
     
     // Wähle zwischen Markdown und HTML Output
     if (options.outputFormat === 'html') {
-      console.log('   🌐 Generating HTML report...');
+      console.log('   🌐 Generiere HTML-Bericht...');
       const htmlReportGenerator = new HtmlReportGenerator();
       const htmlReportPath = await htmlReportGenerator.generateHtmlReport(summary, {
         outputDir: options.outputDir,
@@ -198,7 +198,7 @@ export class StandardPipeline {
     
     // Detailed-Report generieren (falls gewünscht)
     if (options.generateDetailedReport !== false && summary.totalErrors > 0) {
-      console.log('   📋 Generating detailed error report...');
+      console.log('   📋 Generiere detaillierten Fehlerbericht...');
       const detailedReportGenerator = new DetailedReportGenerator();
       const detailedReportPath = await detailedReportGenerator.generateDetailedReport(summary, {
         outputDir: options.outputDir,
@@ -212,7 +212,7 @@ export class StandardPipeline {
     
     // Performance-Report generieren (falls gewünscht)
     if (options.generatePerformanceReport !== false && options.collectPerformanceMetrics) {
-      console.log('   📊 Generating performance report...');
+      console.log('   📊 Generiere Performance-Bericht...');
       const performanceReportGenerator = new PerformanceReportGenerator();
       const performanceReportPath = await performanceReportGenerator.generatePerformanceReport(summary, {
         outputDir: options.outputDir,
@@ -226,7 +226,7 @@ export class StandardPipeline {
     
     // SEO-Report generieren (falls gewünscht)
     if (options.generateSeoReport !== false) {
-      console.log('   🔍 Generating SEO report...');
+      console.log('   🔍 Generiere SEO-Bericht...');
       const seoReportGenerator = new SeoReportGenerator();
       const seoReportPath = await seoReportGenerator.generateSeoReport(summary, {
         outputDir: options.outputDir,
@@ -240,7 +240,7 @@ export class StandardPipeline {
     
     // Security-Report generieren (falls gewünscht)
     if (options.generateSecurityReport !== false) {
-      console.log('   🔒 Running security scan and generating security report...');
+      console.log('   🔒 Führe Security-Scan durch und generiere Security-Bericht...');
       
       // Security Scanner initialisieren
       const securityScanner = new SecurityScanner();
@@ -248,7 +248,7 @@ export class StandardPipeline {
       // Security-Scan für die erste URL durchführen (als Beispiel)
       if (limitedUrls.length > 0) {
         const firstUrl = limitedUrls[0].loc;
-        console.log(`   🔍 Scanning ${firstUrl} for security vulnerabilities...`);
+        console.log(`   🔍 Scanne ${firstUrl} auf Sicherheitslücken...`);
         
         // Browser-Instanz für Security-Scan erstellen
         const { chromium } = require('playwright');
@@ -273,9 +273,9 @@ export class StandardPipeline {
             outputFiles.push(securityMdPath);
           }
           
-          console.log(`   ✅ Security scan completed with score: ${securityScanResult.overallScore}/100`);
+          console.log(`   ✅ Security-Scan abgeschlossen mit Score: ${securityScanResult.overallScore}/100`);
         } catch (error) {
-          console.error('   ❌ Security scan failed:', error);
+          console.error('   ❌ Security-Scan fehlgeschlagen:', error);
         } finally {
           await browser.close();
         }

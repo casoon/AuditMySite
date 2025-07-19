@@ -74,7 +74,7 @@ program
   // 🆕 Non-Interactive Modus für automatisierte Tests
   .option('--non-interactive', 'Skip all interactive prompts and use defaults (for CI/CD)')
   .action(async (sitemapUrl, options) => {
-    console.log('🚀 Starting Accessibility Test...');
+    console.log('🚀 Starte Accessibility-Test...');
     console.log(`📄 Sitemap: ${sitemapUrl}`);
     
     // Handle alias options for parallel workers
@@ -184,11 +184,11 @@ program
       });
     }
     
-    // Only show prompts if there are any to show and not in non-interactive mode
+    // Nur Prompts anzeigen, wenn welche vorhanden sind und nicht im non-interactive Modus
     if (prompts.length > 0 && !options.nonInteractive) {
       const answers = await inquirer.prompt(prompts);
       
-      // Update values from prompts (only for parameters that were prompted)
+      // Werte aus Prompts aktualisieren (nur für Parameter, die abgefragt wurden)
       if (!options.maxPages) maxPages = answers.maxPages;
       if (!options.standard) standard = answers.standard;
       if (options.detailedReport === undefined && !options.noDetailedReport) generateDetailedReport = answers.generateDetailedReport;
@@ -196,11 +196,11 @@ program
       if (options.seoReport === undefined && !options.noSeoReport) generateSeoReport = answers.generateSeoReport;
       if (options.securityReport === undefined && !options.noSecurityReport) generateSecurityReport = answers.generateSecurityReport;
     } else if (options.nonInteractive && prompts.length > 0) {
-      // In non-interactive mode, use defaults for all prompts
-      console.log('🤖 Non-interactive mode: Using default values for all prompts');
-      if (!options.maxPages) maxPages = 20; // Default to comprehensive test
-      if (!options.standard) standard = 'WCAG2AA'; // Default standard
-      // Other defaults are already set above
+      // Im non-interactive Modus Standardwerte für alle Prompts verwenden
+      console.log('🤖 Non-interactive Modus: Verwende Standardwerte für alle Prompts');
+      if (!options.maxPages) maxPages = 20; // Standard: umfassender Test
+      if (!options.standard) standard = 'WCAG2AA'; // Standard-Standard
+      // Andere Standardwerte sind bereits oben gesetzt
     }
     
     // Set default for maxPages if not provided via CLI or prompts
@@ -235,10 +235,10 @@ program
         includeCopyButtons = copyButtonsAnswer.includeCopyButtons;
       }
     } else if (options.nonInteractive && !options.html && !options.noCopyButtons) {
-      // In non-interactive mode, use markdown as default
-      console.log('🤖 Non-interactive mode: Using markdown output format');
+      // Im non-interactive Modus Markdown als Standard verwenden
+      console.log('🤖 Non-interactive Modus: Verwende Markdown-Ausgabeformat');
       outputFormat = 'markdown';
-      includeCopyButtons = false; // Not applicable for markdown
+      includeCopyButtons = false; // Nicht anwendbar für Markdown
     }
     
     // Ensure maxPages is a number
@@ -354,7 +354,7 @@ program
         timestamp: currentTimestamp
       };
       
-      console.log('🧪 Running accessibility tests...');
+      console.log('🧪 Führe Accessibility-Tests aus...');
       const { summary, outputFiles } = await pipeline.run(pipelineOptions);
       
       // Rename the output file to use domain-based naming
@@ -374,65 +374,65 @@ program
         fs.renameSync(originalFile, outputPath);
         
         console.log('');
-        console.log('✅ Test completed successfully!');
-        console.log(`📊 Results:`);
-        console.log(`   - Pages tested: ${summary.testedPages}`);
-        console.log(`   - Passed: ${summary.passedPages}`);
-        console.log(`   - Failed: ${summary.failedPages}`);
-        console.log(`   - Errors: ${summary.totalErrors}`);
-        console.log(`   - Warnings: ${summary.totalWarnings}`);
-        console.log(`   - Success rate: ${summary.testedPages > 0 ? (summary.passedPages / summary.testedPages * 100).toFixed(1) : 0}%`);
-        console.log(`📄 Markdown report: ${outputPath}`);
+        console.log('✅ Test erfolgreich abgeschlossen!');
+        console.log(`📊 Ergebnisse:`);
+        console.log(`   - Getestete Seiten: ${summary.testedPages}`);
+        console.log(`   - Bestanden: ${summary.passedPages}`);
+        console.log(`   - Fehlgeschlagen: ${summary.failedPages}`);
+        console.log(`   - Fehler: ${summary.totalErrors}`);
+        console.log(`   - Warnungen: ${summary.totalWarnings}`);
+        console.log(`   - Erfolgsrate: ${summary.testedPages > 0 ? (summary.passedPages / summary.testedPages * 100).toFixed(1) : 0}%`);
+        console.log(`📄 Markdown-Bericht: ${outputPath}`);
         
         // Zeige alle generierten Dateien an
         if (outputFiles.length > 0) {
-          console.log(`📁 Generated files:`);
+          console.log(`📁 Generierte Dateien:`);
           outputFiles.forEach(file => {
             const filename = path.basename(file);
             if (filename.includes('detailed-errors')) {
-              console.log(`   📋 Detailed Error Report: ${file}`);
+              console.log(`   📋 Detaillierter Fehlerbericht: ${file}`);
             } else if (filename.includes('performance-report')) {
-              console.log(`   📊 Performance Report: ${file}`);
+              console.log(`   📊 Performance-Bericht: ${file}`);
             } else if (filename.includes('seo-report')) {
-              console.log(`   🔍 SEO Report: ${file}`);
+              console.log(`   🔍 SEO-Bericht: ${file}`);
             } else if (filename.includes('security-report')) {
-              console.log(`   🔒 Security Report: ${file}`);
+              console.log(`   🔒 Security-Bericht: ${file}`);
             } else {
-              console.log(`   📄 Markdown Report: ${file}`);
+              console.log(`   📄 Markdown-Bericht: ${file}`);
             }
           });
         }
         
         if (summary.failedPages > 0) {
-          console.log(`⚠️  ${summary.failedPages} pages failed accessibility tests`);
+          console.log(`⚠️  ${summary.failedPages} Seiten haben die Accessibility-Tests nicht bestanden`);
           process.exit(1);
         }
       } else {
         console.log('');
-        console.log('✅ Test completed successfully!');
-        console.log(`📊 Results:`);
-        console.log(`   - Pages tested: ${summary.testedPages}`);
-        console.log(`   - Passed: ${summary.passedPages}`);
-        console.log(`   - Failed: ${summary.failedPages}`);
-        console.log(`   - Errors: ${summary.totalErrors}`);
-        console.log(`   - Warnings: ${summary.totalWarnings}`);
+        console.log('✅ Test erfolgreich abgeschlossen!');
+        console.log(`📊 Ergebnisse:`);
+        console.log(`   - Getestete Seiten: ${summary.testedPages}`);
+        console.log(`   - Bestanden: ${summary.passedPages}`);
+        console.log(`   - Fehlgeschlagen: ${summary.failedPages}`);
+        console.log(`   - Fehler: ${summary.totalErrors}`);
+        console.log(`   - Warnungen: ${summary.totalWarnings}`);
         
         // Zeige alle generierten Dateien an (auch ohne Markdown)
         if (outputFiles.length > 0) {
-          console.log(`📁 Generated files:`);
+          console.log(`📁 Generierte Dateien:`);
           outputFiles.forEach(file => {
             const filename = path.basename(file);
             if (filename.includes('detailed-errors')) {
-              console.log(`   📋 Detailed Error Report: ${file}`);
+              console.log(`   📋 Detaillierter Fehlerbericht: ${file}`);
             } else if (filename.includes('performance-report')) {
-              console.log(`   📊 Performance Report: ${file}`);
+              console.log(`   📊 Performance-Bericht: ${file}`);
             }
           });
         }
       }
       
     } catch (error) {
-      console.error('❌ Error during test:', error.message);
+      console.error('❌ Fehler während des Tests:', error.message);
       process.exit(1);
     }
   });

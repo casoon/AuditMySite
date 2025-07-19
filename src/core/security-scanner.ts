@@ -49,11 +49,11 @@ export class SecurityScanner {
 
     try {
       // Run Security Headers Test
-      console.log('🔒 Running Security Headers Test...');
+      console.log('🔒 Führe Security-Headers-Test aus...');
       results.securityHeaders = await this.securityHeadersTest.run({ page, url, options: {} });
 
       // Run HTTPS Test
-      console.log('🔐 Running HTTPS Compliance Test...');
+      console.log('🔐 Führe HTTPS-Compliance-Test aus...');
       results.https = await this.httpsTest.run({ page, url, options: {} });
 
       // Run CSP Test (optional für localhost)
@@ -67,16 +67,16 @@ export class SecurityScanner {
           details: { cspScore: 100, skipped: true }
         };
       } else {
-        console.log('🛡️ Running Content Security Policy Test...');
+        console.log('🛡️ Führe Content Security Policy Test aus...');
         results.csp = await this.cspTest.run({ page, url, options: {} });
       }
 
       // Run Vulnerability Test
-      console.log('🔍 Running Vulnerability Scan...');
+      console.log('🔍 Führe Vulnerability-Scan aus...');
       results.vulnerability = await this.vulnerabilityTest.run({ page, url, options: {} });
 
     } catch (error) {
-      console.error('Security scan failed:', error);
+      console.error('Security-Scan fehlgeschlagen:', error);
     }
 
     // Calculate overall score
