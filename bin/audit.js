@@ -94,7 +94,6 @@ program
     if (options.noSecurityReport) generateSecurityReport = false;
     
     // Set sensible defaults for all parameters if not provided
-    if (!maxPages) maxPages = 20;
     if (generateDetailedReport === undefined) generateDetailedReport = true;
     if (generatePerformanceReport === undefined) generatePerformanceReport = true;
     if (generateSeoReport === undefined) generateSeoReport = true;
@@ -194,6 +193,9 @@ program
       if (options.seoReport === undefined && !options.noSeoReport) generateSeoReport = answers.generateSeoReport;
       if (options.securityReport === undefined && !options.noSecurityReport) generateSecurityReport = answers.generateSecurityReport;
     }
+    
+    // Set default for maxPages if not provided via CLI or prompts
+    if (!maxPages) maxPages = 20;
     
     // Setze Standardwerte für Output-Format
     let outputFormat = options.html ? 'html' : 'markdown';
