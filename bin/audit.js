@@ -12,7 +12,7 @@ program
   .description('A powerful command-line tool for automated accessibility testing using Playwright and pa11y, based on sitemap URLs')
   .version('1.0.0')
   .argument('<sitemapUrl>', 'URL of the sitemap.xml to test')
-  .option('-m, --max-pages <number>', 'Maximum number of pages to test', '5')
+  .option('-m, --max-pages <number>', 'Maximum number of pages to test')
   .option('-t, --timeout <number>', 'Timeout in milliseconds', '10000')
   .option('-w, --wait-until <string>', 'Wait until (domcontentloaded|load|networkidle)', 'domcontentloaded')
   .option('-f, --filter <patterns>', 'Exclude URL patterns (comma-separated)')
