@@ -1,226 +1,101 @@
-# AuditMySite Test Framework
+# 🧪 AuditMySite Test Framework
 
-This test framework enables systematic testing of AuditMySite to ensure all functions work correctly.
+## 📋 Overview
 
-## 🏗️ Architecture
+Das AuditMySite Test Framework bietet umfassende Tests für Accessibility, Performance, SEO und Security mit verschiedenen Tools wie pa11y, Lighthouse und Playwright.
 
-### Mock Server (`test/mock-server/server.js`)
-- Simulates various websites with known accessibility problems
-- Provides controlled test scenarios
-- Runs on port 3001
+## 🎯 Test-Szenarien
 
-### Test Suite (`test/test-suite.js`)
-- Runs AuditMySite against various test scenarios
-- Validates expected results
-- Generates detailed test reports
+### **Basis-Tests**
+1. **Perfect Page** (`/perfect-page`) - ✅ Erwartet: Pass
+2. **Accessibility Errors** (`/accessibility-errors`) - ❌ Erwartet: Fail
+3. **Performance Issues** (`/performance-issues`) - ❌ Erwartet: Fail
+4. **SEO Problems** (`/seo-problems`) - ❌ Erwartet: Fail
+5. **Security Issues** (`/security-issues`) - ❌ Erwartet: Fail
 
-### Test Runner (`test/run-tests.js`)
-- Automatically starts the mock server
-- Runs all tests
-- Generates final reports
+### **Erweiterte Tests**
+6. **Advanced Contrast Test** (`/advanced-contrast-test`) - ❌ Erwartet: Fail
+7. **Screen Reader Test** (`/screen-reader-test`) - ❌ Erwartet: Fail
+8. **PWA Test** (`/pwa-test`) - ❌ Erwartet: Fail
+9. **Mobile Touch Test** (`/mobile-touch-test`) - ❌ Erwartet: Fail
+10. **Advanced Security Test** (`/advanced-security-test`) - ❌ Erwartet: Fail
+11. **Core Web Vitals Test** (`/core-web-vitals-test`) - ❌ Erwartet: Fail
 
-## 🧪 Test Scenarios
+## 🛠️ Verwendung
 
-### 1. Perfect Page (`/perfect-page`)
-- **Goal:** All tests should pass
-- **Expectation:** 100% success rate, 0 errors, 0 warnings
-- **Tests:** Accessibility, Performance, SEO, Security
-
-### 2. Accessibility Errors (`/accessibility-errors`)
-- **Goal:** Specific accessibility errors
-- **Expectation:** Should fail with known errors
-- **Problems:**
-  - Missing alt attributes
-  - Buttons without aria-label
-  - Low color contrast
-  - Forms without labels
-  - Missing heading structure
-  - Empty links
-  - Missing landmarks
-
-### 3. Performance Issues (`/performance-issues`)
-- **Goal:** Performance problems
-- **Expectation:** Performance tests should detect issues
-- **Problems:**
-  - Large, unoptimized images
-  - Inline styles
-  - Inefficient scripts
-
-### 4. SEO Problems (`/seo-problems`)
-- **Goal:** SEO problems
-- **Expectation:** SEO tests should detect issues
-- **Problems:**
-  - Missing title
-  - Missing meta description
-  - Missing H1
-  - Missing alt attributes
-  - No structured data
-
-### 5. Security Issues (`/security-issues`)
-- **Goal:** Security problems
-- **Expectation:** Security tests should detect issues
-- **Problems:**
-  - Insecure forms
-  - Inline scripts
-  - External resources without integrity
-  - Missing CSP
-
-### 6. Advanced Contrast Test (`/advanced-contrast-test`)
-- **Goal:** Detailed color contrast analysis
-- **Expectation:** Advanced contrast tests should detect issues
-- **Problems:**
-  - Very low contrast text (1.2:1 ratio)
-  - Low contrast buttons and links
-  - Background images with text overlay
-  - Different contrast levels for AA/AAA standards
-
-### 7. Screen Reader Test (`/screen-reader-test`)
-- **Goal:** Screen reader compatibility
-- **Expectation:** Screen reader tests should detect issues
-- **Problems:**
-  - Missing aria-live regions
-  - Incorrect ARIA usage
-  - Missing skip links
-  - Incorrect heading structure
-  - Missing table headers
-  - Missing list semantics
-
-### 8. PWA Test (`/pwa-test`)
-- **Goal:** Progressive Web App features
-- **Expectation:** PWA tests should detect issues
-- **Problems:**
-  - Missing manifest
-  - Missing service worker
-  - Missing HTTPS
-  - Missing app icons
-  - Missing offline functionality
-
-### 9. Mobile Touch Test (`/mobile-touch-test`)
-- **Goal:** Mobile touch target validation
-- **Expectation:** Mobile tests should detect issues
-- **Problems:**
-  - Too small touch targets (< 44px)
-  - Small navigation links
-  - Small form inputs
-  - Insufficient touch target size
-
-### 10. Advanced Security Test (`/advanced-security-test`)
-- **Goal:** Comprehensive security scanning
-- **Expectation:** Advanced security tests should detect issues
-- **Problems:**
-  - XSS vulnerabilities
-  - CSRF vulnerabilities
-  - Information disclosure
-  - Insecure external resources
-  - Missing input validation
-  - Insecure cookies
-  - Missing security headers
-
-### 11. Core Web Vitals Test (`/core-web-vitals-test`)
-- **Goal:** Performance optimization
-- **Expectation:** Performance tests should detect issues
-- **Problems:**
-  - Large images without dimensions
-  - Layout shifts
-  - Render-blocking resources
-  - Unoptimized fonts
-  - Heavy JavaScript
-
-## 🚀 Usage
-
-### Run all tests (with mock server)
+### **Mock-Server starten**
 ```bash
-npm test
+cd test/mock-server
+node server.js
 ```
 
-### Service-based tests (recommended)
+### **Basis-Tests ausführen**
 ```bash
-# 1. Start mock server
-npm run test:mock-server
+node test/test-suite.js
+```
 
-# 2. Run service tests
+### **Service-Tests ausführen**
+```bash
 node test/service-test-suite.js
 ```
 
-### Start mock server only
+### **Alle Tests ausführen**
 ```bash
-npm run test:mock-server
+node test/run-tests.js
 ```
 
-### Run test suite only (server must be running)
-```bash
-npm run test:suite
+## 📁 Verzeichnisstruktur
+
+```
+test/
+├── mock-server/
+│   ├── server.js
+│   └── templates/
+│       ├── perfect-page.html
+│       ├── accessibility-errors.html
+│       ├── performance-issues.html
+│       ├── seo-problems.html
+│       ├── security-issues.html
+│       ├── advanced-contrast-test.html
+│       ├── screen-reader-test.html
+│       ├── pwa-test.html
+│       ├── mobile-touch-test.html
+│       ├── advanced-security-test.html
+│       └── core-web-vitals-test.html
+├── test-suite.js
+├── service-test-suite.js
+├── run-tests.js
+└── README.md
 ```
 
-### Manual test
-```bash
-# 1. Start mock server
-node test/mock-server/server.js
+## 📊 Reports
 
-# 2. Test AuditMySite in another terminal
-node bin/audit.js http://localhost:3001/sitemap.xml --max-pages 1 --non-interactive
-```
+Die Tests generieren automatisch Reports im `reports/` Verzeichnis:
 
-## 📊 Test Results
+- **Accessibility Reports** - Detaillierte Accessibility-Analysen
+- **Performance Reports** - Performance-Metriken und Optimierungen
+- **SEO Reports** - SEO-Analysen und Verbesserungsvorschläge
+- **Security Reports** - Security-Scans und Sicherheitslücken
 
-The framework generates detailed reports:
+## 🔧 Konfiguration
 
-### Test Report
-- Number of passed/failed tests
-- Exit codes
-- Generated reports
-- Recommendations
+Die Tests verwenden die Standard-Konfiguration des AuditMySite Frameworks. Für Anpassungen siehe die Hauptdokumentation.
 
-### Validation
-- Comparison of expected vs. actual results
-- Success rate validation
-- Error count validation
+## 🤝 Beitragen
 
-### Overall Assessment
-- **EXCELLENT:** All tests passed and results are valid
-- **GOOD:** Most tests passed with minor issues
-- **FAIR:** Some tests failed, attention needed
-- **POOR:** Many tests failed, significant issues detected
+### **Neue Tests hinzufügen:**
+1. HTML-Template in `mock-server/templates/` erstellen
+2. Route in `mock-server/server.js` hinzufügen
+3. Erwartete Ergebnisse in Test-Suites definieren
 
-## 🔧 Customization
+### **Debugging:**
+1. Mock-Server-Logs überprüfen
+2. Test-Output analysieren
+3. Reports im `reports/` Verzeichnis prüfen
 
-### Add new test scenarios
-1. Add new route in `test/mock-server/server.js`
-2. Define expected results in `test/test-suite.js`
-3. Add test in `runAllTests()`
+## 📞 Support
 
-### Adjust expected results
-```javascript
-// In test/test-suite.js
-this.expectedResults = {
-  'new-test-page': {
-    shouldPass: false,
-    expectedErrors: 5,
-    expectedWarnings: 3,
-    expectedIssues: ['Specific issue 1', 'Specific issue 2']
-  }
-};
-```
-
-## 🎯 Goals
-
-1. **Continuous Validation:** Ensure all tests work correctly
-2. **Regression Tests:** Detect changes that break tests
-3. **Quality Assurance:** Validate report quality
-4. **Documentation:** Clear expectations for each test scenario
-
-## 🔍 Troubleshooting
-
-### Mock server won't start
-- Port 3001 already in use? → Use different port
-- Express not installed? → `npm install express`
-
-### Tests are failing
-- Mock server running? → Check `npm run test:mock-server`
-- AuditMySite compiled? → Run `npm run build`
-- Expected results current? → Check test scenarios
-
-### Unexpected results
-- Review test scenarios
-- Adjust expected results
-- Check AuditMySite logic 
+Bei Fragen oder Problemen:
+1. Mock-Server-Logs überprüfen
+2. Test-Output analysieren
+3. Issue auf GitHub erstellen 
