@@ -197,7 +197,7 @@ export class StandardPipeline {
     }
     
     // Detailed-Report generieren (falls gewünscht)
-    if (options.generateDetailedReport !== false && summary.totalErrors > 0) {
+    if (options.generateDetailedReport !== false && (summary.totalErrors > 0 || summary.totalWarnings > 0)) {
       console.log('   📋 Generiere detaillierten Fehlerbericht...');
       const detailedReportGenerator = new DetailedReportGenerator();
       const detailedReportPath = await detailedReportGenerator.generateDetailedReport(summary, {
