@@ -201,6 +201,10 @@ npx @casoon/auditmysite https://example.com/sitemap.xml \
 - **HTML** - Interactive reports with copy buttons
 - **JSON** - Machine-readable data for automation
 
+## 📄 **License**
+
+This project is licensed under the MIT License. For third-party dependencies and their licenses, see [THIRD_PARTY_LICENSES.md](THIRD_PARTY_LICENSES.md).
+
 ---
 
 ## 🇩🇪 **Deutsche Dokumentation**
