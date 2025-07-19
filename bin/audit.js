@@ -265,8 +265,26 @@ program
       // Extract domain and create subdirectory
       const url = new URL(sitemapUrl);
       const domain = url.hostname.replace(/\./g, '-');
-      const currentTimestamp = new Date().toISOString(); // Full timestamp for file content
-      const dateOnly = currentTimestamp.split('T')[0]; // Date-only for filename
+      
+      // Verwende lokale Zeitzone statt UTC
+      const now = new Date();
+      const currentTimestamp = now.toLocaleString('de-DE', {
+        timeZone: 'Europe/Berlin',
+        year: 'numeric',
+        month: '2-digit',
+        day: '2-digit',
+        hour: '2-digit',
+        minute: '2-digit',
+        second: '2-digit',
+        hour12: false
+      }).replace(/(\d{2})\.(\d{2})\.(\d{4}), (\d{2}):(\d{2}):(\d{2})/, '$3-$2-$1T$4:$5:$6+02:00');
+      
+      const dateOnly = now.toLocaleDateString('de-DE', {
+        timeZone: 'Europe/Berlin',
+        year: 'numeric',
+        month: '2-digit',
+        day: '2-digit'
+      }).split('.').reverse().join('-'); // DD.MM.YYYY -> YYYY-MM-DD
       
       // Create subdirectory based on domain
       const fs = require('fs');
