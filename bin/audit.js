@@ -100,7 +100,7 @@ program
     if (generateDetailedReport === undefined) generateDetailedReport = true;
     if (generatePerformanceReport === undefined) generatePerformanceReport = true;
     if (generateSeoReport === undefined) generateSeoReport = true;
-    if (generateSecurityReport === undefined) generateSecurityReport = true;
+    if (generateSecurityReport === undefined) generateSecurityReport = false;
     
         // Show prompts for parameters that are not set via CLI
     // Only skip prompts for parameters that are explicitly provided
@@ -180,7 +180,7 @@ program
         type: 'confirm',
         name: 'generateSecurityReport',
         message: 'Would you like to run a comprehensive security scan (headers, HTTPS, CSP, vulnerabilities)?',
-        default: true
+        default: false
       });
     }
     
