@@ -20,6 +20,8 @@ export { MediaAccessibilityTest } from './media/media-accessibility-test';
 // Performance tests
 export { PerformanceLoadingTest } from './performance/performance-loading-test';
 export { PerformanceMemoryTest } from './performance/performance-memory-test';
+export { CoreWebVitalsTest } from './performance/core-web-vitals-test';
+export { LighthouseTest } from './performance/lighthouse-test';
 
 // Validation tests
 export { ValidationErrorHandlingTest } from './validation/validation-error-handling-test';
@@ -38,6 +40,10 @@ export { HttpsTest } from './security/https-test';
 export { CspTest } from './security/csp-test';
 export { VulnerabilityTest } from './security/vulnerability-test';
 
+// Mobile tests
+export { TouchTargetTest } from './mobile/touch-target-test';
+export { PWATest } from './mobile/pwa-test';
+
 // Test categories
 export const TEST_CATEGORIES = {
   FORM: 'form',
@@ -48,7 +54,8 @@ export const TEST_CATEGORIES = {
   LANGUAGE: 'language',
   PERFORMANCE: 'performance',
   VALIDATION: 'validation',
-  SECURITY: 'security'
+  SECURITY: 'security',
+  MOBILE: 'mobile'
 } as const;
 
 // Test priorities

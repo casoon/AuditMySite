@@ -51,6 +51,9 @@ program
   .option('--no-pa11y', 'Disable pa11y, use only Playwright tests (faster, less memory)')
   // 🆕 Lighthouse-Optionen
   .option('--lighthouse', 'Run Lighthouse tests for performance, accessibility, best practices, and SEO')
+  .option('--core-web-vitals', 'Test Core Web Vitals performance metrics (LCP, FID, CLS, FCP, TTI, TBT)')
+  .option('--touch-targets', 'Test touch target sizes for mobile accessibility (44px minimum)')
+  .option('--pwa', 'Test Progressive Web App features (manifest, service worker, installability)')
   // 🚀 Parallele Test-Optionen (Queue ist jetzt Standard)
   .option('--max-concurrent <number>', 'Number of parallel workers (default: 3)', '3')
   .option('--concurrency <number>', 'Alias for --max-concurrent')
