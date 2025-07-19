@@ -65,6 +65,67 @@ This test framework enables systematic testing of AuditMySite to ensure all func
   - External resources without integrity
   - Missing CSP
 
+### 6. Advanced Contrast Test (`/advanced-contrast-test`)
+- **Goal:** Detailed color contrast analysis
+- **Expectation:** Advanced contrast tests should detect issues
+- **Problems:**
+  - Very low contrast text (1.2:1 ratio)
+  - Low contrast buttons and links
+  - Background images with text overlay
+  - Different contrast levels for AA/AAA standards
+
+### 7. Screen Reader Test (`/screen-reader-test`)
+- **Goal:** Screen reader compatibility
+- **Expectation:** Screen reader tests should detect issues
+- **Problems:**
+  - Missing aria-live regions
+  - Incorrect ARIA usage
+  - Missing skip links
+  - Incorrect heading structure
+  - Missing table headers
+  - Missing list semantics
+
+### 8. PWA Test (`/pwa-test`)
+- **Goal:** Progressive Web App features
+- **Expectation:** PWA tests should detect issues
+- **Problems:**
+  - Missing manifest
+  - Missing service worker
+  - Missing HTTPS
+  - Missing app icons
+  - Missing offline functionality
+
+### 9. Mobile Touch Test (`/mobile-touch-test`)
+- **Goal:** Mobile touch target validation
+- **Expectation:** Mobile tests should detect issues
+- **Problems:**
+  - Too small touch targets (< 44px)
+  - Small navigation links
+  - Small form inputs
+  - Insufficient touch target size
+
+### 10. Advanced Security Test (`/advanced-security-test`)
+- **Goal:** Comprehensive security scanning
+- **Expectation:** Advanced security tests should detect issues
+- **Problems:**
+  - XSS vulnerabilities
+  - CSRF vulnerabilities
+  - Information disclosure
+  - Insecure external resources
+  - Missing input validation
+  - Insecure cookies
+  - Missing security headers
+
+### 11. Core Web Vitals Test (`/core-web-vitals-test`)
+- **Goal:** Performance optimization
+- **Expectation:** Performance tests should detect issues
+- **Problems:**
+  - Large images without dimensions
+  - Layout shifts
+  - Render-blocking resources
+  - Unoptimized fonts
+  - Heavy JavaScript
+
 ## 🚀 Usage
 
 ### Run all tests (with mock server)

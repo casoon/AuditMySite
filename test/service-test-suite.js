@@ -58,6 +58,79 @@ class ServiceTestSuite {
           'External resources without integrity',
           'Missing CSP'
         ]
+      },
+      'advanced-contrast-test': {
+        shouldPass: false,
+        expectedErrors: 3,
+        expectedWarnings: 5,
+        expectedIssues: [
+          'Very low contrast text',
+          'Low contrast buttons',
+          'Low contrast links',
+          'Background image with text overlay'
+        ]
+      },
+      'screen-reader-test': {
+        shouldPass: false,
+        expectedErrors: 6,
+        expectedWarnings: 8,
+        expectedIssues: [
+          'Missing aria-live regions',
+          'Incorrect ARIA usage',
+          'Missing skip links',
+          'Incorrect heading structure',
+          'Missing table headers',
+          'Missing list semantics'
+        ]
+      },
+      'pwa-test': {
+        shouldPass: false,
+        expectedErrors: 5,
+        expectedWarnings: 7,
+        expectedIssues: [
+          'Missing manifest',
+          'Missing service worker',
+          'Missing HTTPS',
+          'Missing app icons',
+          'Missing offline functionality'
+        ]
+      },
+      'mobile-touch-test': {
+        shouldPass: false,
+        expectedErrors: 4,
+        expectedWarnings: 6,
+        expectedIssues: [
+          'Too small touch targets',
+          'Small navigation links',
+          'Small form inputs',
+          'Insufficient touch target size'
+        ]
+      },
+      'advanced-security-test': {
+        shouldPass: false,
+        expectedErrors: 7,
+        expectedWarnings: 9,
+        expectedIssues: [
+          'XSS vulnerabilities',
+          'CSRF vulnerabilities',
+          'Information disclosure',
+          'Insecure external resources',
+          'Missing input validation',
+          'Insecure cookies',
+          'Missing security headers'
+        ]
+      },
+      'core-web-vitals-test': {
+        shouldPass: false,
+        expectedErrors: 5,
+        expectedWarnings: 8,
+        expectedIssues: [
+          'Large images without dimensions',
+          'Layout shifts',
+          'Render-blocking resources',
+          'Unoptimized fonts',
+          'Heavy JavaScript'
+        ]
       }
     };
   }
@@ -147,6 +220,36 @@ class ServiceTestSuite {
         name: 'Full Sitemap Test',
         options: { maxPages: 5 },
         expectedPage: 'all'
+      },
+      {
+        name: 'Advanced Contrast Test',
+        options: { maxPages: 1 },
+        expectedPage: 'advanced-contrast-test'
+      },
+      {
+        name: 'Screen Reader Test',
+        options: { maxPages: 1 },
+        expectedPage: 'screen-reader-test'
+      },
+      {
+        name: 'PWA Test',
+        options: { maxPages: 1 },
+        expectedPage: 'pwa-test'
+      },
+      {
+        name: 'Mobile Touch Test',
+        options: { maxPages: 1 },
+        expectedPage: 'mobile-touch-test'
+      },
+      {
+        name: 'Advanced Security Test',
+        options: { maxPages: 1 },
+        expectedPage: 'advanced-security-test'
+      },
+      {
+        name: 'Core Web Vitals Test',
+        options: { maxPages: 1 },
+        expectedPage: 'core-web-vitals-test'
       }
     ];
 
