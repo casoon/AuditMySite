@@ -70,6 +70,8 @@ program
   // 🆕 Output-Format-Optionen
   .option('--html', 'Generate HTML report instead of Markdown')
   .option('--no-copy-buttons', 'Disable copy-to-clipboard buttons in HTML report')
+  // 🆕 Non-Interactive Modus für automatisierte Tests
+  .option('--non-interactive', 'Skip all interactive prompts and use defaults (for CI/CD)')
   .action(async (sitemapUrl, options) => {
     console.log('🚀 Starting Accessibility Test...');
     console.log(`📄 Sitemap: ${sitemapUrl}`);
@@ -181,8 +183,8 @@ program
       });
     }
     
-    // Only show prompts if there are any to show
-    if (prompts.length > 0) {
+    // Only show prompts if there are any to show and not in non-interactive mode
+    if (prompts.length > 0 && !options.nonInteractive) {
       const answers = await inquirer.prompt(prompts);
       
       // Update values from prompts (only for parameters that were prompted)
@@ -192,6 +194,12 @@ program
       if (options.performanceReport === undefined && !options.noPerformanceReport) generatePerformanceReport = answers.generatePerformanceReport;
       if (options.seoReport === undefined && !options.noSeoReport) generateSeoReport = answers.generateSeoReport;
       if (options.securityReport === undefined && !options.noSecurityReport) generateSecurityReport = answers.generateSecurityReport;
+    } else if (options.nonInteractive && prompts.length > 0) {
+      // In non-interactive mode, use defaults for all prompts
+      console.log('🤖 Non-interactive mode: Using default values for all prompts');
+      if (!options.maxPages) maxPages = 20; // Default to comprehensive test
+      if (!options.standard) standard = 'WCAG2AA'; // Default standard
+      // Other defaults are already set above
     }
     
     // Set default for maxPages if not provided via CLI or prompts
@@ -201,8 +209,8 @@ program
     let outputFormat = options.html ? 'html' : 'markdown';
     let includeCopyButtons = !options.noCopyButtons;
 
-    // Prompt für Output-Format (falls nicht gesetzt)
-    if (!options.html && !options.noCopyButtons) {
+    // Prompt für Output-Format (falls nicht gesetzt und nicht non-interactive)
+    if (!options.html && !options.noCopyButtons && !options.nonInteractive) {
       const formatAnswer = await inquirer.prompt([{
         type: 'list',
         name: 'outputFormat',
@@ -225,6 +233,11 @@ program
         }]);
         includeCopyButtons = copyButtonsAnswer.includeCopyButtons;
       }
+    } else if (options.nonInteractive && !options.html && !options.noCopyButtons) {
+      // In non-interactive mode, use markdown as default
+      console.log('🤖 Non-interactive mode: Using markdown output format');
+      outputFormat = 'markdown';
+      includeCopyButtons = false; // Not applicable for markdown
     }
     
     // Ensure maxPages is a number
