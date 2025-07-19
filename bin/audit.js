@@ -265,7 +265,8 @@ program
       // Extract domain and create subdirectory
       const url = new URL(sitemapUrl);
       const domain = url.hostname.replace(/\./g, '-');
-      const timestamp = new Date().toISOString().split('T')[0]; // Date-only for overwritable files
+      const currentTimestamp = new Date().toISOString(); // Full timestamp for file content
+      const dateOnly = currentTimestamp.split('T')[0]; // Date-only for filename
       
       // Create subdirectory based on domain
       const fs = require('fs');
@@ -275,7 +276,7 @@ program
       }
       
       // Use simple filenames without domain
-      const filename = `accessibility-report-${timestamp}.md`;
+      const filename = `accessibility-report-${dateOnly}.md`;
       const outputPath = path.join(subDir, filename);
       
       // Run standard pipeline
@@ -328,7 +329,9 @@ program
         maxCpuUsage: parseInt(options.maxCpu),
         // 🆕 Output-Format-Optionen
         outputFormat: outputFormat,
-        includeCopyButtons: includeCopyButtons
+        includeCopyButtons: includeCopyButtons,
+        // 🕐 Timestamp für Report-Generierung
+        timestamp: currentTimestamp
       };
       
       console.log('🧪 Running accessibility tests...');
@@ -337,6 +340,17 @@ program
       // Rename the output file to use domain-based naming
       if (outputFiles.length > 0 && options.markdown !== false) {
         const originalFile = outputFiles[0];
+        
+        // Stelle sicher, dass die Datei mit aktuellem Timestamp neu generiert wird
+        if (fs.existsSync(originalFile)) {
+          const content = fs.readFileSync(originalFile, 'utf8');
+          const updatedContent = content.replace(
+            /Generated: .*/,
+            `Generated: ${currentTimestamp}`
+          );
+          fs.writeFileSync(originalFile, updatedContent, 'utf8');
+        }
+        
         fs.renameSync(originalFile, outputPath);
         
         console.log('');
