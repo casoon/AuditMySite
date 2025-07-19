@@ -36,7 +36,19 @@
     "https-compliance",
     "owasp"
   ],
-  "author": "casoon",
+  "author": {
+    "name": "Jörn Seidel",
+    "email": "joern.seidel@casoon.de",
+    "url": "https://casoon.de"
+  },
+  "company": "CASOON",
+  "contributors": [
+    {
+      "name": "Jörn Seidel",
+      "email": "joern.seidel@casoon.de",
+      "role": "Lead Developer"
+    }
+  ],
   "license": "MIT",
   "dependencies": {
     "@types/js-yaml": "^4.0.9",
@@ -71,5 +83,10 @@
   "bugs": {
     "url": "https://github.com/casoon/AuditMySite/issues"
   },
-  "homepage": "https://github.com/casoon/AuditMySite#readme"
+  "homepage": "https://github.com/casoon/AuditMySite#readme",
+  "publisher": "CASOON",
+  "organization": {
+    "name": "CASOON",
+    "url": "https://casoon.de"
+  }
 }
