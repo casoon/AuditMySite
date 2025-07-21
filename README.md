@@ -20,49 +20,9 @@ npx @casoon/auditmysite http://your-site.com/sitemap.xml \
   --security-scan
 ```
 
-## 📊 **Feature Scope - Implemented Phases**
+## 💡 **Usage Tip**
 
-### **🚀 Phase 1: Advanced Parallelization (100% Implemented)**
-- **10x faster** through true parallelization with Worker Pool
-- **Event-Driven Queue System** for intelligent task management
-- **Resource Monitoring** (Memory, CPU, Network) with automatic throttling
-- **Priority Queue** with intelligent URL prioritization
-- **Network Throttling** for server-friendly request rates
-- **Live Status Updates**: `📊 67% | 2/3 | 🔧 2/3 | 💾 45MB | ⏱️ 10s`
-- **Automatic Retry Logic** with exponential backoff strategy
-- **Memory-Leak Prevention** through proper resource management
-
-### **⚡ Phase 2: Modern Performance Standards (100% Implemented)**
-- **Core Web Vitals Testing** (LCP, FID, CLS, FCP, TTI, TBT)
-- **Lighthouse Integration** for comprehensive performance audits
-- **Performance Scoring** with automatic recommendations
-- **Memory Usage Monitoring** with leak detection
-- **Loading Performance Tests** with detailed metrics
-- **Performance Reports** with PageSpeed/Lightspeed analysis
-
-### **📱 Phase 3: Mobile-First Testing (100% Implemented)**
-- **Touch Target Testing** (44px minimum size for interactive elements)
-- **PWA Feature Testing** (Manifest, Service Worker, Installability)
-- **Mobile Emulation** with various viewport sizes
-- **Responsive Design Validation** for all screen sizes
-- **Touch Navigation Testing** for mobile user experience
-- **Offline Capability Testing** for Progressive Web Apps
-
-### **🔒 Phase 4: Security Testing (100% Implemented)**
-- **Security Headers Validation** (CSP, HSTS, X-Frame-Options, etc.)
-- **HTTPS Enforcement Testing** with mixed content detection
-- **Content Security Policy Analysis** with detailed directive parsing
-- **Vulnerability Scanning** (XSS, Injection, Info Disclosure)
-- **Security Scoring** and automated recommendations
-- **Compliance Reports** for GDPR, SOC2, ISO27001
-
-### **📄 Phase 5: Interactive HTML Reports (100% Implemented)**
-- **Modern, responsive design** with CSS variables
-- **Dark Mode Support** (automatic detection)
-- **Copy-to-Clipboard Buttons** for AI-compatible data exports
-- **Interactive Tables** with hover effects and sorting
-- **Toast Notifications** for user feedback
-- **Mobile-optimized layout** for all devices
+Start with 5 pages to identify general layout issues. Once the basic structure is validated, proceed to audit the main content pages in detail for accessibility and compliance.
 
 ## 🛠️ **Additional Features**
 
@@ -208,6 +168,10 @@ This project is licensed under the MIT License. For third-party dependencies and
 ---
 
 ## 🇩🇪 **Deutsche Dokumentation**
+
+### **Barrierefreiheitsgesetz (BFSG) & EU-Richtlinie 2019/882**
+
+Dieses Tool unterstützt die Überprüfung auf Konformität mit dem deutschen Barrierefreiheitsgesetz (BFSG) und der EU-Richtlinie 2019/882. Die Berichte helfen, gesetzliche Anforderungen für öffentliche Stellen und Unternehmen zu erfüllen.
 
 ### **Schnellstart:**
 ```bash
