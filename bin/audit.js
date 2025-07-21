@@ -15,7 +15,7 @@ program
   .option('-m, --max-pages <number>', 'Maximum number of pages to test')
   .option('-t, --timeout <number>', 'Timeout in milliseconds', '10000')
   .option('-w, --wait-until <string>', 'Wait until (domcontentloaded|load|networkidle)', 'domcontentloaded')
-  .option('-f, --filter <patterns>', 'Exclude URL patterns (comma-separated)')
+  .option('-f, --format <format>', 'Output format (markdown, html, pdf)')
   .option('-i, --include <patterns>', 'Include URL patterns (comma-separated)')
   .option('-v, --verbose', 'Verbose output')
   .option('--standard <standard>', 'Accessibility standard (WCAG2A|WCAG2AA|WCAG2AAA|Section508)', 'WCAG2AA')
@@ -69,7 +69,6 @@ program
   // 🆕 Legacy-Option für sequenzielle Tests
   .option('--sequential', 'Use sequential testing (legacy mode, slower)')
   // 🆕 Output-Format-Optionen
-  .option('-f, --format <format>', 'Output format (markdown, html, pdf)', 'markdown')
   .option('--include-copy-buttons', 'Include copy buttons in HTML reports', false)
   // 🆕 Non-Interactive Modus für automatisierte Tests
   .option('--non-interactive', 'Skip all interactive prompts and use defaults (for CI/CD)')
