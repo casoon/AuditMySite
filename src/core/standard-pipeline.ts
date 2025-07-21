@@ -3,6 +3,7 @@ import { AccessibilityChecker } from './accessibility-checker';
 import { OutputGenerator } from '../generators';
 import { DetailedReportGenerator, PerformanceReportGenerator, SeoReportGenerator, SecurityReportGenerator } from '../reports';
 import { HtmlReportGenerator } from '../reports/html-report-generator';
+import { PdfGenerator } from '../generators/pdf-generator';
 import { SecurityScanner } from './security-scanner';
 import { TestOptions, TestSummary, AccessibilityResult } from '../types';
 import * as path from 'path';
@@ -19,6 +20,7 @@ export interface StandardPipelineOptions {
   generatePerformanceReport?: boolean;
   generateSeoReport?: boolean;
   generateSecurityReport?: boolean;
+  generatePdfReport?: boolean;
   skipCspForLocalhost?: boolean;
   hideElements?: string;
   includeNotices?: boolean;
@@ -47,7 +49,7 @@ export interface StandardPipelineOptions {
   // 🆕 Legacy-Option für sequenzielle Tests (nur für Kompatibilität)
   useSequentialTesting?: boolean;
   // 🆕 Output-Format-Option
-  outputFormat?: 'markdown' | 'html';
+  outputFormat?: 'markdown' | 'html' | 'pdf';
   includeCopyButtons?: boolean;
 }
 
@@ -174,7 +176,7 @@ export class StandardPipeline {
     const outputGenerator = new OutputGenerator();
     const outputFiles: string[] = [];
     
-    // Wähle zwischen Markdown und HTML Output
+    // Wähle zwischen Markdown, HTML und PDF Output
     if (options.outputFormat === 'html') {
       console.log('   🌐 Generiere HTML-Bericht...');
       const htmlReportGenerator = new HtmlReportGenerator();
@@ -183,6 +185,29 @@ export class StandardPipeline {
         includeCopyButtons: options.includeCopyButtons !== false
       });
       outputFiles.push(htmlReportPath);
+    } else if (options.outputFormat === 'pdf') {
+      console.log('   📄 Generiere PDF-Bericht...');
+      const pdfGenerator = new PdfGenerator();
+      
+      // Browser-Instanz für PDF-Generierung erstellen
+      const { chromium } = require('playwright');
+      const browser = await chromium.launch({ headless: true });
+      const page = await browser.newPage();
+      
+      try {
+        const pdfReportPath = await pdfGenerator.generatePdfReport(summary, page, {
+          outputDir: options.outputDir,
+          format: 'A4',
+          printBackground: true,
+          includeCharts: true
+        });
+        outputFiles.push(pdfReportPath);
+        console.log(`   ✅ PDF-Bericht erstellt: ${pdfReportPath}`);
+      } catch (error) {
+        console.error('   ❌ PDF-Generierung fehlgeschlagen:', error);
+      } finally {
+        await browser.close();
+      }
     } else {
       // Markdown für Menschen (Standard) - ohne Domain im Dateinamen
       const mdOutputPath = path.join(outputDir, `accessibility-report-${dateOnly}.md`);

@@ -69,8 +69,8 @@ program
   // 🆕 Legacy-Option für sequenzielle Tests
   .option('--sequential', 'Use sequential testing (legacy mode, slower)')
   // 🆕 Output-Format-Optionen
-  .option('--html', 'Generate HTML report instead of Markdown')
-  .option('--no-copy-buttons', 'Disable copy-to-clipboard buttons in HTML report')
+  .option('-f, --format <format>', 'Output format (markdown, html, pdf)', 'markdown')
+  .option('--include-copy-buttons', 'Include copy buttons in HTML reports', false)
   // 🆕 Non-Interactive Modus für automatisierte Tests
   .option('--non-interactive', 'Skip all interactive prompts and use defaults (for CI/CD)')
   .action(async (sitemapUrl, options) => {
@@ -207,18 +207,19 @@ program
     if (!maxPages) maxPages = 20;
     
     // Setze Standardwerte für Output-Format
-    let outputFormat = options.html ? 'html' : 'markdown';
-    let includeCopyButtons = !options.noCopyButtons;
+    let outputFormat = options.format?.toLowerCase();
+    let includeCopyButtons = options.includeCopyButtons;
 
     // Prompt für Output-Format (falls nicht gesetzt und nicht non-interactive)
-    if (!options.html && !options.noCopyButtons && !options.nonInteractive) {
+    if (!outputFormat && !options.nonInteractive) {
       const formatAnswer = await inquirer.prompt([{
         type: 'list',
         name: 'outputFormat',
         message: 'Welches Ausgabeformat möchten Sie verwenden?',
         choices: [
           { name: 'Markdown (Standard)', value: 'markdown' },
-          { name: 'HTML (Interaktiv mit Copy-Buttons)', value: 'html' }
+          { name: 'HTML (Interaktiv mit Copy-Buttons)', value: 'html' },
+          { name: 'PDF (PDF-Export)', value: 'pdf' }
         ],
         default: 'markdown'
       }]);
@@ -234,11 +235,17 @@ program
         }]);
         includeCopyButtons = copyButtonsAnswer.includeCopyButtons;
       }
-    } else if (options.nonInteractive && !options.html && !options.noCopyButtons) {
+    } else if (options.nonInteractive && !outputFormat) {
       // Im non-interactive Modus Markdown als Standard verwenden
       console.log('🤖 Non-interactive Modus: Verwende Markdown-Ausgabeformat');
       outputFormat = 'markdown';
       includeCopyButtons = false; // Nicht anwendbar für Markdown
+    }
+    
+    // Output format validation
+    if (!['markdown', 'html', 'pdf'].includes(outputFormat)) {
+      console.error('❌ Invalid output format. Use: markdown, html, or pdf');
+      process.exit(1);
     }
     
     // Ensure maxPages is a number
@@ -255,6 +262,8 @@ program
     console.log(`📄 Output Format: ${outputFormat.toUpperCase()}`);
     if (outputFormat === 'html') {
       console.log(`📋 Copy Buttons: ${includeCopyButtons ? 'Yes' : 'No'}`);
+    } else if (outputFormat === 'pdf') {
+      console.log(`📄 PDF Generation: Yes`);
     }
     if (!options.sequential) {
       console.log(`🔧 Parallel Workers: ${maxConcurrent}`);
@@ -358,7 +367,7 @@ program
       const { summary, outputFiles } = await pipeline.run(pipelineOptions);
       
       // Rename the output file to use domain-based naming
-      if (outputFiles.length > 0 && options.markdown !== false) {
+      if (outputFiles.length > 0 && outputFormat !== 'pdf') { // Only rename if not PDF
         const originalFile = outputFiles[0];
         
         // Stelle sicher, dass die Datei mit aktuellem Timestamp neu generiert wird
