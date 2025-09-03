@@ -1,24 +1,24 @@
 import { EventDrivenQueue, EventDrivenQueueOptions, QueueStats } from './event-driven-queue';
-import { AccessibilityChecker } from './accessibility-checker';
+import { AccessibilityChecker } from '@core/accessibility';
 import { TestOptions, AccessibilityResult } from '../types';
 
 export interface ParallelTestManagerOptions extends EventDrivenQueueOptions {
-  // Queue-spezifische Optionen
+  // Queue-specific options
   maxConcurrent?: number;
   maxRetries?: number;
   retryDelay?: number;
   
-  // Test-spezifische Optionen
+  // Test-specific options
   testOptions?: TestOptions;
   
-  // Progress-Reporting
+  // Progress Reporting
   enableProgressBar?: boolean;
   progressUpdateInterval?: number;
   
   // Resource Management
   enableResourceMonitoring?: boolean;
   maxMemoryUsage?: number; // MB
-  maxCpuUsage?: number; // Prozent
+  maxCpuUsage?: number; // Percent
   
   // Event Callbacks
   onTestStart?: (url: string) => void;
@@ -56,7 +56,7 @@ export class ParallelTestManager {
       ...options
     };
 
-    // Event-Driven Queue initialisieren
+    // Initialize Event-Driven Queue
     this.queue = new EventDrivenQueue({
       maxRetries: this.options.maxRetries,
       maxConcurrent: this.options.maxConcurrent,
@@ -74,7 +74,7 @@ export class ParallelTestManager {
       }
     });
 
-    // Accessibility Checker initialisieren
+    // Initialize Accessibility Checker
     this.accessibilityChecker = new AccessibilityChecker();
   }
 
@@ -94,13 +94,13 @@ export class ParallelTestManager {
 
     console.log(`🧪 Starting parallel tests for ${urls.length} URLs with ${this.options.maxConcurrent} workers`);
 
-    // URLs zur Queue hinzufügen
+    // Add URLs to queue
     this.queue.addUrls(urls);
 
-    // Event-Listener für Queue-Events
+    // Event listeners for queue events
     this.setupEventListeners();
 
-    // Parallele Test-Ausführung starten
+    // Start parallel test execution
     await this.processQueue();
 
     const duration = this.startTime ? Date.now() - this.startTime.getTime() : 0;

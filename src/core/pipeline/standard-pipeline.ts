@@ -1,0 +1,242 @@
+import { SitemapParser } from '@core/parsers';
+import { AccessibilityChecker } from '@core/accessibility';
+import { TestOptions, TestSummary, AccessibilityResult, AuditIssue } from '@core/types';
+import * as path from 'path';
+import * as fs from 'fs';
+
+export interface StandardPipelineOptions {
+  sitemapUrl: string;
+  maxPages?: number;
+  timeout?: number;
+  pa11yStandard?: 'WCAG2A' | 'WCAG2AA' | 'WCAG2AAA' | 'Section508';
+  outputDir?: string;
+  includeDetails?: boolean;
+  includePa11yIssues?: boolean;
+  generateDetailedReport?: boolean;
+  generatePerformanceReport?: boolean;
+  hideElements?: string;
+  includeNotices?: boolean;
+  includeWarnings?: boolean;
+  wait?: number;
+  // 🆕 New Playwright options
+  collectPerformanceMetrics?: boolean;
+  captureScreenshots?: boolean;
+  testKeyboardNavigation?: boolean;
+  testColorContrast?: boolean;
+  testFocusManagement?: boolean;
+  blockImages?: boolean;
+  blockCSS?: boolean;
+  mobileEmulation?: boolean;
+  viewportSize?: { width: number; height: number };
+  userAgent?: string;
+  // 🚀 Parallel test options (Queue is now default)
+  maxConcurrent?: number;
+  maxRetries?: number;
+  retryDelay?: number;
+  enableProgressBar?: boolean;
+  progressUpdateInterval?: number;
+  enableResourceMonitoring?: boolean;
+  maxMemoryUsage?: number;
+  maxCpuUsage?: number;
+  // 🆕 Legacy option for sequential tests (for compatibility only)
+  useSequentialTesting?: boolean;
+  // 🆕 Output format option
+  outputFormat?: 'markdown' | 'html';
+}
+
+export class StandardPipeline {
+  
+  /**
+   * Runs the standard pipeline and creates AI-friendly output files
+   */
+  async run(options: StandardPipelineOptions): Promise<{
+    summary: TestSummary;
+    outputFiles: string[];
+  }> {
+    const outputDir = options.outputDir || './reports';
+    const dateOnly = new Date().toISOString().split('T')[0]; // Date only, no timestamp
+    
+    // Initialize parser
+    const parser = new SitemapParser();
+    
+    // Parse sitemap
+    const urls = await parser.parseSitemap(options.sitemapUrl);
+    console.log('DEBUG: Sitemap-URLs:', urls);
+    console.log(`📄 Sitemap loaded: ${urls.length} URLs found`);
+    
+    // Filter URLs
+    const filterPatterns = ['[...slug]', '[category]', '/demo/'];
+    const filteredUrls = parser.filterUrls(urls, { filterPatterns });
+    console.log('DEBUG: Gefilterte URLs:', filteredUrls);
+    console.log(`🔍 URLs filtered: ${filteredUrls.length} URLs to test`);
+    
+    // Convert URLs to local URLs
+    const baseUrl = new URL(options.sitemapUrl).origin;
+    const localUrls = parser.convertToLocalUrls(filteredUrls, baseUrl);
+    
+    // IMPORTANT: Limit URLs to maxPages
+    const maxPages = options.maxPages || 20;
+    const limitedUrls = localUrls.slice(0, maxPages);
+    console.log(`📋 URLs limited to ${maxPages}: ${limitedUrls.length} URLs will be tested`);
+    
+    // Initialize Accessibility Checker
+    const checker = new AccessibilityChecker();
+    await checker.initialize();
+    
+    console.log('🦪 Running accessibility tests...');
+    console.log(`   📊 Collect performance metrics: ${options.collectPerformanceMetrics ? 'Yes' : 'No'}`);
+    console.log(`   📸 Capture screenshots: ${options.captureScreenshots ? 'Yes' : 'No'}`);
+    console.log(`   ⌨️  Test keyboard navigation: ${options.testKeyboardNavigation ? 'Yes' : 'No'}`);
+    console.log(`   🎨 Test color contrast: ${options.testColorContrast ? 'Yes' : 'No'}`);
+    console.log(`   🎯 Test focus management: ${options.testFocusManagement ? 'Yes' : 'No'}`);
+    console.log(`   🚀 Parallel tests: ${options.useSequentialTesting ? 'No' : 'Yes'}`);
+    if (options.useSequentialTesting) {
+      console.log(`   📋 Use sequential tests (Legacy mode)...`);
+    } else {
+      console.log(`   🔧 Parallel workers: ${options.maxConcurrent || 3}`);
+      console.log(`   🔄 Max retries: ${options.maxRetries || 3}`);
+      console.log(`   ⏱️  Retry delay: ${options.retryDelay || 2000}ms`);
+    }
+    
+    // Execute tests
+    const testOptions: TestOptions = {
+      maxPages: maxPages,
+      timeout: options.timeout || 10000,
+      waitUntil: 'domcontentloaded',
+      pa11yStandard: options.pa11yStandard || 'WCAG2AA',
+      hideElements: options.hideElements,
+      includeNotices: options.includeNotices,
+      includeWarnings: options.includeWarnings,
+      wait: options.wait,
+      // 🆕 New Playwright options
+      collectPerformanceMetrics: options.collectPerformanceMetrics,
+      captureScreenshots: options.captureScreenshots,
+      testKeyboardNavigation: options.testKeyboardNavigation,
+      testColorContrast: options.testColorContrast,
+      testFocusManagement: options.testFocusManagement,
+      blockImages: options.blockImages,
+      blockCSS: options.blockCSS,
+      mobileEmulation: options.mobileEmulation,
+      viewportSize: options.viewportSize,
+      userAgent: options.userAgent,
+      // 🚀 Parallel test options
+      useParallelTesting: !options.useSequentialTesting, // Keep this for compatibility, but it's now the default
+      maxConcurrent: options.maxConcurrent,
+      maxRetries: options.maxRetries,
+      retryDelay: options.retryDelay,
+      enableProgressBar: options.enableProgressBar,
+      progressUpdateInterval: options.progressUpdateInterval,
+      enableResourceMonitoring: options.enableResourceMonitoring,
+      maxMemoryUsage: options.maxMemoryUsage,
+      maxCpuUsage: options.maxCpuUsage
+    };
+    
+    // Choose between queue (default) and sequential processing
+    console.log('DEBUG: URLs an AccessibilityChecker:', limitedUrls.map((url: any) => url.loc));
+    let results: AccessibilityResult[];
+    if (options.useSequentialTesting) {
+      console.log('📋 Use sequential tests (Legacy mode)...');
+      results = await checker.testMultiplePages(
+        limitedUrls.map((url: any) => url.loc),
+        testOptions
+      );
+    } else {
+      console.log('🚀 Use integrated queue processing with short status updates (Standard)...');
+      results = await checker.testMultiplePagesWithQueue(
+        limitedUrls.map((url: any) => url.loc),
+        testOptions
+      );
+    }
+    console.log('DEBUG: Accessibility-Testergebnisse:', JSON.stringify(results, null, 2));
+    
+    console.log('\n📋 Creating test summary...');
+    
+    // Create summary
+    const summary: TestSummary = {
+      totalPages: limitedUrls.length, // 🆕 Use limitedUrls instead of localUrls
+      testedPages: results.length,
+      passedPages: results.filter(r => r.passed).length,
+      failedPages: results.filter(r => !r.passed).length,
+      totalErrors: results.reduce((sum, r) => sum + r.errors.length, 0),
+      totalWarnings: results.reduce((sum, r) => sum + r.warnings.length, 0),
+      totalDuration: results.reduce((sum, r) => sum + r.duration, 0),
+      results
+    };
+
+    // 🆕 Create DetailedIssue array and generate Markdown report
+    const { DetailedIssueCollector } = require('@core/accessibility');
+    const { DetailedIssueMarkdownReport } = require('@reports');
+    const detailedIssues = (DetailedIssueCollector.collectAll(results) || []);
+    console.log('DEBUG: detailedIssues', detailedIssues);
+    console.log('DEBUG: typeof DetailedIssueMarkdownReport.generate', typeof DetailedIssueMarkdownReport.generate);
+    const detailedMd = DetailedIssueMarkdownReport.generate(detailedIssues || []);
+    const detailedMdPath = path.join(outputDir, `detailed-issues-${dateOnly}.md`);
+    fs.writeFileSync(detailedMdPath, detailedMd, 'utf8');
+    
+    await checker.cleanup();
+    
+    console.log('📄 Generating output files...');
+    // Generate output files
+    const outputFiles: string[] = [];
+    
+    // Collect issues for reports
+    const { PerformanceIssueCollector } = require('@core/performance');
+    let allIssues: any[] = [];
+    allIssues = allIssues.concat(DetailedIssueCollector.collectAll(results) || []);
+    allIssues = allIssues.concat(PerformanceIssueCollector.collectAll(summary) || []);
+
+    // Choose between Markdown and HTML output
+    if (options.outputFormat === 'html') {
+      console.log('   🌐 Generating HTML report...');
+      const { prepareOutputData } = require('@generators/output-generator');
+      const { generateHtmlReport } = require('@reports/html-report');
+      const outputOptions = { includeDetails: true, summaryOnly: false };
+      const timestamp = new Date().toISOString();
+      const htmlData = prepareOutputData(summary, timestamp, outputOptions);
+      const htmlContent = generateHtmlReport(htmlData);
+      const htmlPath = path.join(outputDir, `accessibility-report-${dateOnly}.html`);
+      fs.writeFileSync(htmlPath, htmlContent, 'utf8');
+      outputFiles.push(htmlPath);
+    } else {
+      // Generate Markdown reports (default)
+      const { OutputGenerator } = require('@generators');
+      const { generateMarkdownReport } = require('@generators');
+      const outputGenerator = new OutputGenerator();
+
+      // Main accessibility report
+      const timestamp = new Date().toISOString();
+      const { prepareOutputData } = require('@generators/output-generator');
+      const mdData = prepareOutputData(summary, timestamp, { includeDetails: true, summaryOnly: false });
+      const qualityMd = generateMarkdownReport(mdData);
+      const qualityMdPath = path.join(outputDir, `accessibility-quality-report-${dateOnly}.md`);
+      fs.writeFileSync(qualityMdPath, qualityMd, 'utf8');
+      outputFiles.push(qualityMdPath);
+    }
+    
+    // Generate performance report (if requested)
+    if (options.generatePerformanceReport !== false && options.collectPerformanceMetrics) {
+      console.log('   📊 Generating performance report...');
+      const { PerformanceReportGenerator } = require('@reports');
+      const performanceReportGenerator = new PerformanceReportGenerator();
+      const performanceReportContent = performanceReportGenerator.generateReport(summary.results || []);
+      const performanceReportPath = path.join(outputDir, `performance-report-${dateOnly}.md`);
+      fs.writeFileSync(performanceReportPath, performanceReportContent, 'utf8');
+      outputFiles.push(performanceReportPath);
+
+      // 🆕 Create performance issues as AuditIssue[] and generate Markdown report
+      const { PerformanceIssueMarkdownReport } = require('@reports');
+      const perfIssues = PerformanceIssueCollector.collectAll(summary) || [];
+      console.log('DEBUG: perfIssues', perfIssues);
+      console.log('DEBUG: typeof PerformanceIssueMarkdownReport.generate', typeof PerformanceIssueMarkdownReport.generate);
+      const perfMd = PerformanceIssueMarkdownReport.generate(perfIssues);
+      const perfMdPath = path.join(outputDir, `performance-issues-${dateOnly}.md`);
+      fs.writeFileSync(perfMdPath, perfMd, 'utf8');
+    }
+    
+    
+    return {
+      summary,
+      outputFiles
+    };
+  }
+}

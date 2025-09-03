@@ -39,7 +39,7 @@ export class SimpleQueue {
   }
 
   /**
-   * URLs zur Queue hinzufügen
+   * Add URLs to queue
    */
   addUrls(urls: string[]): void {
     const newUrls = urls.map(url => ({
@@ -49,20 +49,20 @@ export class SimpleQueue {
       attempts: 0
     }));
 
-    // Duplikate entfernen
+    // Remove duplicates
     const existingUrls = new Set(this.queue.map(item => item.url));
     const uniqueNewUrls = newUrls.filter(item => !existingUrls.has(item.url));
     
     this.queue.push(...uniqueNewUrls);
     
-    // Nach Priorität sortieren
+    // Sort by priority
     this.queue.sort((a, b) => a.priority - b.priority);
     
     console.log(`📋 Added ${uniqueNewUrls.length} URLs to queue (${this.queue.length} total)`);
   }
 
   /**
-   * Nächste URL aus der Queue holen
+   * Get next URL from queue
    */
   getNextUrl(): QueuedUrl | null {
     const pendingUrl = this.queue.find(item => item.status === 'pending');
@@ -75,7 +75,7 @@ export class SimpleQueue {
   }
 
   /**
-   * URL als abgeschlossen markieren
+   * Mark URL as completed
    */
   markCompleted(url: string, result: any): void {
     const item = this.queue.find(item => item.url === url);
@@ -88,7 +88,7 @@ export class SimpleQueue {
   }
 
   /**
-   * URL als fehlgeschlagen markieren
+   * Mark URL as failed
    */
   markFailed(url: string, error: string): void {
     const item = this.queue.find(item => item.url === url);
@@ -108,7 +108,7 @@ export class SimpleQueue {
   }
 
   /**
-   * Queue-Status abrufen
+   * Get queue status
    */
   getStatus(): {
     total: number;
@@ -136,14 +136,14 @@ export class SimpleQueue {
   }
 
   /**
-   * Alle abgeschlossenen Ergebnisse abrufen
+   * Get all completed results
    */
   getCompletedResults(): any[] {
     return this.completed.map(item => item.result);
   }
 
   /**
-   * Alle fehlgeschlagenen Ergebnisse abrufen
+   * Get all failed results
    */
   getFailedResults(): any[] {
     return this.failed.map(item => ({
@@ -160,7 +160,7 @@ export class SimpleQueue {
   }
 
   /**
-   * Queue-Statistiken anzeigen
+   * Show queue statistics
    */
   showStats(): void {
     const status = this.getStatus();
@@ -174,17 +174,17 @@ export class SimpleQueue {
   }
 
   /**
-   * Priorität für URL berechnen
+   * Calculate priority for URL
    */
   private calculatePriority(url: string): number {
     const pattern = this.options.priorityPatterns!.find(p => 
       url.includes(p.pattern)
     );
-    return pattern ? pattern.priority : 10; // Standard-Priorität
+    return pattern ? pattern.priority : 10; // Standard priority
   }
 
   /**
-   * Queue leeren
+   * Clear queue
    */
   clear(): void {
     this.queue = [];
@@ -193,12 +193,12 @@ export class SimpleQueue {
   }
 
   /**
-   * Fehlgeschlagene URLs erneut versuchen
+   * Retry failed URLs
    */
   retryFailed(): void {
     const failedUrls = this.failed.map(item => item.url);
     this.failed = [];
     this.addUrls(failedUrls);
-    console.log(`🔄 Added ${failedUrls.length} failed URLs back to queue`);
+    console.log(`�� Added ${failedUrls.length} failed URLs back to queue`);
   }
 } 

@@ -1,55 +1,7 @@
 import * as fs from 'fs';
 import * as path from 'path';
 import * as yaml from 'js-yaml';
-
-export interface AuditConfig {
-  sitemap?: string;
-  maxPages?: number;
-  timeout?: number;
-  outputDir?: string;
-  standards?: string[];
-  performance?: {
-    enabled?: boolean;
-    lighthouse?: boolean;
-    coreWebVitals?: boolean;
-  };
-  security?: {
-    enabled?: boolean;
-    scanHeaders?: boolean;
-    httpsCheck?: boolean;
-    cspCheck?: boolean;
-  };
-  accessibility?: {
-    enabled?: boolean;
-    pa11y?: boolean;
-    wcag?: string;
-  };
-  seo?: {
-    enabled?: boolean;
-    metaCheck?: boolean;
-    structuredData?: boolean;
-  };
-  mobile?: {
-    enabled?: boolean;
-    touchTargets?: boolean;
-    pwa?: boolean;
-  };
-  parallel?: {
-    maxConcurrent?: number;
-    maxRetries?: number;
-    retryDelay?: number;
-  };
-  output?: {
-    format?: 'markdown' | 'html' | 'json' | 'csv';
-    includeCopyButtons?: boolean;
-    includeDetails?: boolean;
-  };
-  logging?: {
-    level?: 'debug' | 'info' | 'warn' | 'error';
-    file?: string;
-    verbose?: boolean;
-  };
-}
+import { AuditConfig } from '@core/types';
 
 export interface PresetConfig {
   name: string;
@@ -67,7 +19,7 @@ export class ConfigManager {
   }
 
   /**
-   * Lädt Konfiguration aus Datei
+   * Loads configuration from file
    */
   loadConfig(configPath?: string): AuditConfig {
     const paths = configPath ? [configPath] : this.getDefaultConfigPaths();
@@ -97,7 +49,7 @@ export class ConfigManager {
   }
 
   /**
-   * Speichert Konfiguration in Datei
+   * Saves configuration to file
    */
   saveConfig(config: AuditConfig, configPath?: string): void {
     const path = configPath || this.configPath || 'auditmysite.config.yml';
@@ -122,7 +74,7 @@ export class ConfigManager {
   }
 
   /**
-   * Lädt Konfiguration aus Environment Variables
+   * Loads configuration from environment variables
    */
   loadFromEnvironment(): void {
     const envConfig: Partial<AuditConfig> = {};
@@ -166,7 +118,7 @@ export class ConfigManager {
   }
 
   /**
-   * Wendet Preset-Konfiguration an
+   * Applies preset configuration
    */
   applyPreset(presetName: string): AuditConfig {
     const preset = this.presets.get(presetName);
@@ -181,7 +133,7 @@ export class ConfigManager {
   }
 
   /**
-   * Zeigt verfügbare Presets
+   * Shows available presets
    */
   listPresets(): void {
     console.log('📋 Available presets:');
@@ -191,7 +143,7 @@ export class ConfigManager {
   }
 
   /**
-   * Erstellt Standard-Konfigurationsdatei
+   * Creates default configuration file
    */
   createDefaultConfig(configPath: string = 'auditmysite.config.yml'): void {
     const defaultConfig: AuditConfig = {
@@ -233,7 +185,6 @@ export class ConfigManager {
       },
       output: {
         format: 'markdown',
-        includeCopyButtons: true,
         includeDetails: true
       },
       logging: {
@@ -246,7 +197,7 @@ export class ConfigManager {
   }
 
   /**
-   * Validiert Konfiguration
+   * Validates configuration
    */
   validateConfig(config: AuditConfig): { valid: boolean; errors: string[] } {
     const errors: string[] = [];
@@ -279,14 +230,14 @@ export class ConfigManager {
   }
 
   /**
-   * Gibt aktuelle Konfiguration zurück
+   * Returns current configuration
    */
   getConfig(): AuditConfig {
     return this.config;
   }
 
   /**
-   * Setzt Konfigurationswert
+   * Sets configuration value
    */
   setConfig(key: string, value: any): void {
     const keys = key.split('.');

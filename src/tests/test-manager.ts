@@ -11,9 +11,6 @@ import { ValidationErrorHandlingTest } from './validation/validation-error-handl
 import { ValidationFormValidationTest } from './validation/validation-form-validation-test';
 import { LanguageI18nTest } from './language/language-i18n-test';
 import { LanguageTextDirectionTest } from './language/language-text-direction-test';
-import { SeoMetaTest } from './seo/seo-meta-test';
-import { SeoContentTest } from './seo/seo-content-test';
-import { SeoTechnicalTest } from './seo/seo-technical-test';
 
 export interface TestSuiteResult {
   totalTests: number;
@@ -44,10 +41,7 @@ export class TestManager {
       new ValidationErrorHandlingTest(),
       new ValidationFormValidationTest(),
       new LanguageI18nTest(),
-      new LanguageTextDirectionTest(),
-      new SeoMetaTest(),
-      new SeoContentTest(),
-      new SeoTechnicalTest()
+      new LanguageTextDirectionTest()
     ];
   }
 

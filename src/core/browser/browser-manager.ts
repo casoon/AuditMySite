@@ -1,5 +1,5 @@
 import { chromium, Browser, BrowserContext } from 'playwright';
-import { TestOptions } from '../types';
+import { TestOptions } from '@core/types';
 
 export interface BrowserConfig {
   headless?: boolean;
@@ -20,7 +20,7 @@ export class BrowserManager {
   }
 
   async initialize(): Promise<void> {
-    console.log('🚀 Initialisiere geteilten Browser...');
+    console.log('🚀 Initializing shared browser instance...');
     
     // Browser mit Remote Debugging starten
     this.browser = await chromium.launch({
@@ -47,8 +47,8 @@ export class BrowserManager {
     // WebSocket Endpoint für pa11y/Lighthouse
     this.wsEndpoint = `ws://127.0.0.1:${this.port}`;
     
-    console.log(`✅ Geteilter Browser bereit auf Port ${this.port}`);
-    console.log(`🔗 WebSocket: ${this.wsEndpoint}`);
+    console.log(`✅ Shared browser ready on port ${this.port}`);
+    console.log(`ℹ️  WebSocket endpoint for internal use: ${this.wsEndpoint}`);
   }
 
   async getPage() {

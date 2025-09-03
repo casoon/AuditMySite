@@ -16,7 +16,17 @@
     "moduleResolution": "node",
     "allowSyntheticDefaultImports": true,
     "experimentalDecorators": true,
-    "emitDecoratorMetadata": true
+    "emitDecoratorMetadata": true,
+    "baseUrl": "./src",
+    "paths": {
+      "@core/*": ["core/*"],
+      "@generators/*": ["generators/*"],
+      "@reports/*": ["reports/*"],
+      "@reports": ["reports/index.ts"],
+      "@generators": ["generators/index.ts"],
+      "@parsers/*": ["parsers/*"],
+      "@tests/*": ["tests/*"]
+    }
   },
   "include": [
     "src/**/*"

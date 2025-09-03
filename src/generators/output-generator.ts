@@ -1,8 +1,11 @@
-import { TestSummary, AccessibilityResult } from '../types';
+import { DetailedIssue } from '@core/types';
+import { groupByPage } from '@reports/report-utils';
 import * as fs from 'fs';
 import * as path from 'path';
 import { JsonGenerator } from './json-generator';
 import { CsvGenerator } from './csv-generator';
+import { MarkdownGenerator } from './markdown-generator';
+import { HtmlGenerator } from './html-generator';
 
 export interface OutputOptions {
   format: 'json' | 'csv' | 'markdown' | 'html';
@@ -12,14 +15,63 @@ export interface OutputOptions {
   summaryOnly?: boolean;
 }
 
+export function prepareOutputData(summary: any, timestamp: string, options: OutputOptions & { securityResults?: any[] }) {
+  return {
+    metadata: {
+      timestamp,
+      tool: '@casoon/accessibility-test-cli',
+      version: '1.0.1',
+      totalPages: summary.totalPages,
+      testedPages: summary.testedPages,
+      passedPages: summary.passedPages,
+      failedPages: summary.failedPages,
+      totalErrors: summary.totalErrors,
+      totalWarnings: summary.totalWarnings,
+      totalDuration: summary.totalDuration,
+      successRate: summary.testedPages > 0 ? (summary.passedPages / summary.testedPages * 100).toFixed(2) + '%' : '0%'
+    },
+    summary: {
+      overall: summary.passedPages === summary.testedPages ? 'PASSED' : 'FAILED',
+      score: summary.testedPages > 0 ? Math.round((summary.passedPages / summary.testedPages) * 100) : 0,
+      criticalIssues: summary.totalErrors,
+      warnings: summary.totalWarnings,
+      averageLoadTime: summary.testedPages > 0 ? Math.round(summary.totalDuration / summary.testedPages) : 0
+    },
+    pages: options.summaryOnly ? [] : summary.results.map((result: any) => ({
+      url: result.url,
+      title: result.title,
+      status: result.passed ? 'PASSED' : 'FAILED',
+      loadTime: result.duration,
+      errors: result.errors.length,
+      warnings: result.warnings.length,
+      issues: options.includeDetails ? {
+        imagesWithoutAlt: result.imagesWithoutAlt,
+        buttonsWithoutLabel: result.buttonsWithoutLabel,
+        headingsCount: result.headingsCount,
+        pa11yIssues: options.includePa11yIssues ? result.pa11yIssues : undefined,
+        pa11yScore: result.pa11yScore,
+        performanceMetrics: result.performanceMetrics,
+        keyboardNavigation: result.keyboardNavigation,
+        colorContrastIssues: result.colorContrastIssues,
+        focusManagementIssues: result.focusManagementIssues,
+        screenshots: result.screenshots
+      } : undefined,
+      errorDetails: options.includeDetails ? result.errors : undefined,
+      warningDetails: options.includeDetails ? result.warnings : undefined
+    })),
+    securityResults: options.securityResults || [],
+    recommendations: [] // ggf. aus generateRecommendations(summary)
+  };
+}
+
 export class OutputGenerator {
   
   /**
-   * Generiert eine KI-freundliche Output-Datei
+   * Generates a user-friendly output file
    */
-  async generateOutput(summary: TestSummary, options: OutputOptions): Promise<string> {
+  async generateOutput(summary: any, options: OutputOptions): Promise<string> {
     const timestamp = new Date().toISOString();
-    const outputData = this.prepareOutputData(summary, timestamp, options);
+    const outputData = prepareOutputData(summary, timestamp, options);
     
     let content: string;
     let filename: string;
@@ -34,86 +86,30 @@ export class OutputGenerator {
         filename = options.outputFile || `accessibility-report-${Date.now()}.csv`;
         break;
       case 'markdown':
-        content = this.generateMarkdown(outputData, options);
+        content = new MarkdownGenerator().generateMarkdown(outputData, options);
         filename = options.outputFile || `accessibility-report-${Date.now()}.md`;
         break;
       case 'html':
-        content = this.generateHTML(outputData, options);
-        filename = options.outputFile || `accessibility-report-${Date.now()}.html`;
-        break;
+        throw new Error('HTML-Generierung erfolgt jetzt ausschließlich über das Report-Modul (html-report.ts)');
       default:
         throw new Error(`Unsupported format: ${options.format}`);
     }
     
-    // Datei schreiben
+    // Write file
     const outputPath = path.resolve(filename);
     fs.writeFileSync(outputPath, content, 'utf8');
     
     return outputPath;
   }
   
-  private prepareOutputData(summary: TestSummary, timestamp: string, options: OutputOptions) {
-    return {
-      metadata: {
-        timestamp,
-        tool: '@casoon/accessibility-test-cli',
-        version: '1.0.1',
-        totalPages: summary.totalPages,
-        testedPages: summary.testedPages,
-        passedPages: summary.passedPages,
-        failedPages: summary.failedPages,
-        totalErrors: summary.totalErrors,
-        totalWarnings: summary.totalWarnings,
-        totalDuration: summary.totalDuration,
-        successRate: summary.testedPages > 0 ? (summary.passedPages / summary.testedPages * 100).toFixed(2) + '%' : '0%'
-      },
-      summary: {
-        overall: summary.passedPages === summary.testedPages ? 'PASSED' : 'FAILED',
-        score: summary.testedPages > 0 ? Math.round((summary.passedPages / summary.testedPages) * 100) : 0,
-        criticalIssues: summary.totalErrors,
-        warnings: summary.totalWarnings,
-        averageLoadTime: summary.testedPages > 0 ? Math.round(summary.totalDuration / summary.testedPages) : 0
-      },
-      pages: options.summaryOnly ? [] : summary.results.map(result => ({
-        url: result.url,
-        title: result.title,
-        status: result.passed ? 'PASSED' : 'FAILED',
-        loadTime: result.duration,
-        errors: result.errors.length,
-        warnings: result.warnings.length,
-        issues: options.includeDetails ? {
-          imagesWithoutAlt: result.imagesWithoutAlt,
-          buttonsWithoutLabel: result.buttonsWithoutLabel,
-          headingsCount: result.headingsCount,
-          pa11yIssues: options.includePa11yIssues ? result.pa11yIssues : undefined,
-          pa11yScore: result.pa11yScore,
-          performanceMetrics: result.performanceMetrics,
-          keyboardNavigation: result.keyboardNavigation,
-          colorContrastIssues: result.colorContrastIssues,
-          focusManagementIssues: result.focusManagementIssues,
-          screenshots: result.screenshots
-        } : undefined,
-        errorDetails: options.includeDetails ? result.errors : undefined,
-        warningDetails: options.includeDetails ? result.warnings : undefined
-      })),
-      recommendations: this.generateRecommendations(summary)
-    };
-  }
-  
   private generateJSON(data: any, options: OutputOptions): string {
     const jsonGenerator = new JsonGenerator();
-    return jsonGenerator.generateJson(data, {
-      includeDetails: options.includeDetails,
-      pretty: true
-    });
+    return jsonGenerator.generateJson(data);
   }
   
   private generateCSV(data: any, options: OutputOptions): string {
     const csvGenerator = new CsvGenerator();
-    return csvGenerator.generateCsv(data, {
-      includeDetails: options.includeDetails,
-      includeHeaders: true
-    });
+    return csvGenerator.generateCsv(data);
   }
   
   private generateMarkdown(data: any, options: OutputOptions): string {
@@ -367,28 +363,16 @@ export class OutputGenerator {
 </html>`;
   }
   
-  private generateRecommendations(summary: TestSummary): string[] {
+  private generateRecommendations(summary: any): string[] {
     const recommendations: string[] = [];
     
-    if (summary.totalErrors > 0) {
-      recommendations.push(`Fix ${summary.totalErrors} critical accessibility errors to meet WCAG standards.`);
-    }
-    
-    if (summary.totalWarnings > 0) {
-      recommendations.push(`Address ${summary.totalWarnings} accessibility warnings to improve user experience.`);
-    }
-    
-    if (summary.failedPages > 0) {
-      recommendations.push(`Review and fix issues on ${summary.failedPages} pages that failed accessibility tests.`);
-    }
-    
-    const successRate = summary.testedPages > 0 ? (summary.passedPages / summary.testedPages) * 100 : 0;
-    if (successRate < 80) {
-      recommendations.push(`Improve overall accessibility score (currently ${successRate.toFixed(1)}%) to reach at least 80%.`);
-    }
-    
-    if (summary.totalDuration > 30000) {
-      recommendations.push(`Optimize page load times - average load time is ${Math.round(summary.totalDuration / summary.testedPages)}ms.`);
+    // Analyze the results and generate recommendations
+    if (summary.accessibility && summary.accessibility.issues) {
+      summary.accessibility.issues.forEach((result: any) => {
+        if (result.severity === 'error') {
+          recommendations.push(`Fix accessibility error: ${result.message}`);
+        }
+      });
     }
     
     return recommendations;

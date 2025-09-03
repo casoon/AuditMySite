@@ -21,7 +21,7 @@ export { MediaAccessibilityTest } from './media/media-accessibility-test';
 export { PerformanceLoadingTest } from './performance/performance-loading-test';
 export { PerformanceMemoryTest } from './performance/performance-memory-test';
 export { CoreWebVitalsTest } from './performance/core-web-vitals-test';
-export { LighthouseTest } from './performance/lighthouse-test';
+// export { LighthouseTest } from './performance/lighthouse-test'; // Removed
 
 // Validation tests
 export { ValidationErrorHandlingTest } from './validation/validation-error-handling-test';
@@ -30,15 +30,7 @@ export { ValidationFormValidationTest } from './validation/validation-form-valid
 // Language tests
 export { LanguageI18nTest } from './language/language-i18n-test';
 export { LanguageTextDirectionTest } from './language/language-text-direction-test';
-export { SeoMetaTest } from './seo/seo-meta-test';
-export { SeoContentTest } from './seo/seo-content-test';
-export { SeoTechnicalTest } from './seo/seo-technical-test';
-
-// Security tests
-export { SecurityHeadersTest } from './security/security-headers-test';
-export { HttpsTest } from './security/https-test';
-export { CspTest } from './security/csp-test';
-export { VulnerabilityTest } from './security/vulnerability-test';
+// SEO and security tests removed
 
 // Mobile tests
 export { TouchTargetTest } from './mobile/touch-target-test';
@@ -54,7 +46,6 @@ export const TEST_CATEGORIES = {
   LANGUAGE: 'language',
   PERFORMANCE: 'performance',
   VALIDATION: 'validation',
-  SECURITY: 'security',
   MOBILE: 'mobile'
 } as const;
 
@@ -64,4 +55,6 @@ export const TEST_PRIORITIES = {
   HIGH: 'high',
   MEDIUM: 'medium',
   LOW: 'low'
-} as const; 
+} as const;
+
+// Security exports removed

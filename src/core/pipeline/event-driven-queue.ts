@@ -24,8 +24,8 @@ export interface EventDrivenQueueOptions {
   priorityPatterns?: Array<{ pattern: string; priority: number }>;
   retryDelay?: number;
   enableEvents?: boolean;
-  enableShortStatus?: boolean; // Neue Option für kurze Status-Updates
-  statusUpdateInterval?: number; // Interval für Status-Updates
+  enableShortStatus?: boolean; // New option for short status updates
+  statusUpdateInterval?: number; // Interval for status updates
   eventCallbacks?: {
     onUrlAdded?: (url: string, priority: number) => void;
     onUrlStarted?: (url: string) => void;
@@ -35,7 +35,7 @@ export interface EventDrivenQueueOptions {
     onQueueEmpty?: () => void;
     onProgressUpdate?: (stats: QueueStats) => void;
     onError?: (error: string) => void;
-    onShortStatus?: (status: string) => void; // Neuer Callback für kurze Status
+    onShortStatus?: (status: string) => void; // New callback for short status
   };
 }
 
@@ -55,7 +55,7 @@ export interface QueueStats {
 }
 
 export interface ProcessOptions {
-  processor: (url: string) => Promise<any>; // Funktion die eine URL verarbeitet
+  processor: (url: string) => Promise<any>; // Function that processes a URL
   onResult?: (url: string, result: any) => void;
   onError?: (url: string, error: string) => void;
   onProgress?: (stats: QueueStats) => void;
@@ -87,12 +87,12 @@ export class EventDrivenQueue extends EventEmitter {
       ],
       retryDelay: 1000,
       enableEvents: true,
-      enableShortStatus: true, // Standardmäßig aktiviert
-      statusUpdateInterval: 2000, // 2 Sekunden
+      enableShortStatus: true, // Enabled by default
+      statusUpdateInterval: 2000, // 2 seconds
       ...options
     };
 
-    // Event-Listener für interne Queue-Events
+    // Event listeners for internal queue events
     if (this.options.enableEvents) {
       this.setupEventListeners();
     }
@@ -157,7 +157,7 @@ export class EventDrivenQueue extends EventEmitter {
       this.emit('url-added', url, priority);
     });
 
-    // Sortiere nach Priorität (höchste zuerst)
+    // Sort by priority (highest first)
     this.queue.sort((a, b) => b.priority - a.priority);
     
     this.updateProgress();
@@ -258,21 +258,21 @@ export class EventDrivenQueue extends EventEmitter {
     const retrying = this.queue.filter(q => q.status === 'retrying').length;
     const progress = total > 0 ? ((completed + failed) / total) * 100 : 0;
     
-    // Berechne durchschnittliche Dauer
+    // Calculate average duration
     const completedWithDuration = this.completed.filter(q => q.duration);
     const averageDuration = completedWithDuration.length > 0 
       ? completedWithDuration.reduce((sum, q) => sum + q.duration!, 0) / completedWithDuration.length 
       : 0;
     
-    // Schätze verbleibende Zeit
+    // Estimate remaining time
     const remainingItems = pending + inProgress + retrying;
     const estimatedTimeRemaining = remainingItems > 0 && averageDuration > 0
       ? (remainingItems * averageDuration) / this.options.maxConcurrent!
       : 0;
     
-    // System-Metriken (vereinfacht)
+    // System metrics (simplified)
     const memoryUsage = process.memoryUsage().heapUsed / 1024 / 1024; // MB
-    const cpuUsage = process.cpuUsage().user / 1000000; // Sekunden
+    const cpuUsage = process.cpuUsage().user / 1000000; // seconds
     
     return {
       total,
@@ -296,11 +296,11 @@ export class EventDrivenQueue extends EventEmitter {
   }
 
   /**
-   * 🚀 Integrierte Parallel-Verarbeitung der Queue
-   * Verarbeitet alle URLs parallel mit automatischer Status-Berichterstattung
+   * 🚀 Integrated parallel queue processing
+   * Processes all URLs in parallel with automatic status reporting
    */
   async processUrls(urls: string[], options: ProcessOptions): Promise<any[]> {
-    console.log(`🚀 Starte Queue-Verarbeitung für ${urls.length} URLs mit ${this.options.maxConcurrent} Workern`);
+    console.log(`🚀 Starting queue processing for ${urls.length} URLs with ${this.options.maxConcurrent} workers`);
     
     this.addUrls(urls);
     this.startTime = new Date();
@@ -324,17 +324,17 @@ export class EventDrivenQueue extends EventEmitter {
     // Stoppe Status-Updates
     this.stopStatusUpdates();
 
-    // Sammle alle Ergebnisse
+    // Collect all results
     results.push(...this.completed.map(q => q.result));
     
     const duration = Date.now() - this.startTime!.getTime();
-    console.log(`✅ Queue-Verarbeitung abgeschlossen: ${this.completed.length}/${urls.length} URLs in ${duration}ms`);
+    console.log(`✅ Queue processing completed: ${this.completed.length}/${urls.length} URLs in ${duration}ms`);
     
     return results;
   }
 
   /**
-   * 🔧 Worker-Funktion für parallele Verarbeitung
+   * 🔧 Worker function for parallel processing
    */
   private async worker(workerId: number, options: ProcessOptions): Promise<void> {
     while (this.queue.length > 0 || this.activeWorkers.size > 0) {
@@ -358,7 +358,7 @@ export class EventDrivenQueue extends EventEmitter {
   }
 
   /**
-   * 📊 Startet kurze Status-Updates
+   * 📊 Starts short status updates
    */
   private startStatusUpdates(onShortStatus?: (status: string) => void): void {
     this.statusInterval = setInterval(() => {
@@ -372,7 +372,7 @@ export class EventDrivenQueue extends EventEmitter {
   }
 
   /**
-   * ⏹️ Stoppt Status-Updates
+   * ⏹️ Stops status updates
    */
   private stopStatusUpdates(): void {
     if (this.statusInterval) {
@@ -382,14 +382,14 @@ export class EventDrivenQueue extends EventEmitter {
   }
 
   /**
-   * 📝 Generiert kurze Status-Nachricht mit verbesserter ETA
+   * 📝 Generates short status message with improved ETA
    */
   private generateShortStatus(stats: QueueStats): string {
     const progress = Math.round(stats.progress);
     const workers = `${stats.activeWorkers}/${this.options.maxConcurrent}`;
     const memory = Math.round(stats.memoryUsage);
     
-    // Verbesserte ETA-Berechnung
+    // Improved ETA calculation
     let eta = '?';
     if (stats.estimatedTimeRemaining > 0) {
       const seconds = Math.round(stats.estimatedTimeRemaining / 1000);
@@ -402,12 +402,12 @@ export class EventDrivenQueue extends EventEmitter {
       }
     }
     
-    // Speed-Indicator (URLs pro Minute)
+    // Speed indicator (URLs per minute)
     const speed = stats.completed > 0 && this.startTime 
       ? Math.round((stats.completed / ((Date.now() - this.startTime.getTime()) / 60000)) * 10) / 10
       : 0;
     
-    // Memory-Warning
+    // Memory warning
     const memoryWarning = stats.memoryUsage > 500 ? ' ⚠️' : '';
     
     return `📊 ${progress}% | ${stats.completed}/${stats.total} | 🔧 ${workers} | 💾 ${memory}MB${memoryWarning} | ⏱️ ${eta} | 🚀 ${speed}/min`;

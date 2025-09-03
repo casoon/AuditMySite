@@ -1,2 +1,2 @@
 // Parsers for different data sources
-export { SitemapParser } from './sitemap-parser'; 
+export * from './sitemap-parser'; 

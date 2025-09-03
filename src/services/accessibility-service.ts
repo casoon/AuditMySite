@@ -1,6 +1,6 @@
-import { AccessibilityChecker } from '../core/accessibility-checker';
-import { SitemapParser } from '../parsers/sitemap-parser';
-import { TestOptions, AccessibilityResult, TestSummary } from '../types';
+import { AccessibilityResult, TestOptions } from '@core/types';
+import { SitemapParser } from '@core/parsers';
+import { TestSummary } from '../types';
 
 export interface ServiceOptions {
   maxPages?: number;
@@ -34,11 +34,11 @@ export interface ServiceResult {
 }
 
 export class AccessibilityService {
-  private checker: AccessibilityChecker;
+  private checker: any; // AccessibilityChecker is not directly imported here, so it's kept as 'any'
   private parser: SitemapParser;
 
   constructor() {
-    this.checker = new AccessibilityChecker();
+    this.checker = new (require('@core/accessibility').AccessibilityChecker)(); // Dynamically import AccessibilityChecker
     this.parser = new SitemapParser();
   }
 
@@ -73,7 +73,7 @@ export class AccessibilityService {
 
       // Run tests
       const results = await this.checker.testMultiplePagesParallel(
-        limitedUrls.map(url => url.loc),
+        limitedUrls.map((url: any) => url.loc),
         testOptions
       );
 
@@ -83,18 +83,6 @@ export class AccessibilityService {
       // Generate reports if requested
       const reports: any = {};
       
-      if (options.detailedReport) {
-        reports.detailed = await this.generateDetailedReport(results);
-      }
-      
-      if (options.performanceReport) {
-        reports.performance = await this.generatePerformanceReport(results);
-      }
-      
-      if (options.seoReport) {
-        reports.seo = await this.generateSeoReport(results);
-      }
-      
       if (options.securityReport) {
         reports.security = await this.generateSecurityReport(results);
       }
@@ -103,7 +91,7 @@ export class AccessibilityService {
         success: summary.successRate === 100,
         results,
         summary,
-        reports: Object.keys(reports).length > 0 ? reports : undefined
+        reports: reports.security ? { security: reports.security } : undefined
       };
 
     } catch (error) {
@@ -143,65 +131,45 @@ export class AccessibilityService {
     };
   }
 
-  private async generateDetailedReport(results: AccessibilityResult[]): Promise<string> {
-    // Import here to avoid circular dependencies
-    const { DetailedReportGenerator } = await import('../reports/detailed-report');
-    const generator = new DetailedReportGenerator();
-    
-    const summary: TestSummary = {
-      totalPages: results.length,
-      testedPages: results.length,
-      passedPages: results.filter(r => r.passed).length,
-      failedPages: results.filter(r => !r.passed).length,
-      totalErrors: results.reduce((sum, r) => sum + r.errors.length, 0),
-      totalWarnings: results.reduce((sum, r) => sum + r.warnings.length, 0),
-      totalDuration: results.reduce((sum, r) => sum + r.duration, 0),
-      results
-    };
-
-    return await generator.generateDetailedReport(summary);
-  }
-
-  private async generatePerformanceReport(results: AccessibilityResult[]): Promise<string> {
-    // Import here to avoid circular dependencies
-    const { PerformanceReportGenerator } = await import('../reports/performance-report');
-    const generator = new PerformanceReportGenerator();
-    
-    const summary: TestSummary = {
-      totalPages: results.length,
-      testedPages: results.length,
-      passedPages: results.filter(r => r.passed).length,
-      failedPages: results.filter(r => !r.passed).length,
-      totalErrors: results.reduce((sum, r) => sum + r.errors.length, 0),
-      totalWarnings: results.reduce((sum, r) => sum + r.warnings.length, 0),
-      totalDuration: results.reduce((sum, r) => sum + r.duration, 0),
-      results
-    };
-
-    return await generator.generatePerformanceReport(summary);
-  }
-
-  private async generateSeoReport(results: AccessibilityResult[]): Promise<string> {
-    // Import here to avoid circular dependencies
-    const { SeoReportGenerator } = await import('../reports/seo-report');
-    const generator = new SeoReportGenerator();
-    
-    const summary: TestSummary = {
-      totalPages: results.length,
-      testedPages: results.length,
-      passedPages: results.filter(r => r.passed).length,
-      failedPages: results.filter(r => !r.passed).length,
-      totalErrors: results.reduce((sum, r) => sum + r.errors.length, 0),
-      totalWarnings: results.reduce((sum, r) => sum + r.warnings.length, 0),
-      totalDuration: results.reduce((sum, r) => sum + r.duration, 0),
-      results
-    };
-
-    return await generator.generateSeoReport(summary);
-  }
-
   private async generateSecurityReport(results: AccessibilityResult[]): Promise<string> {
     // Placeholder for security report
     return `# Security Report\n\nSecurity scanning not yet implemented.`;
+  }
+
+  async runBatchTests(urls: string[], options: TestOptions): Promise<TestSummary> {
+    const results: AccessibilityResult[] = [];
+    let totalErrors = 0;
+    let totalWarnings = 0;
+    let passedPages = 0;
+    let failedPages = 0;
+    
+    for (const url of urls) {
+      try {
+        const result = await this.checker.runTest(url, options);
+        results.push(result);
+        
+        if (result.issues.length === 0) {
+          passedPages++;
+        } else {
+          failedPages++;
+          totalErrors += result.issues.filter((issue: any) => issue.severity === 'error').length;
+          totalWarnings += result.issues.filter((issue: any) => issue.severity === 'warning').length;
+        }
+      } catch (error) {
+        console.error(`Error testing ${url}:`, error);
+        failedPages++;
+      }
+    }
+    
+    return {
+      totalErrors,
+      totalWarnings,
+      passedPages,
+      failedPages,
+      testedPages: urls.length,
+      totalPages: urls.length, // Add missing property
+      results,
+      totalDuration: 0 // TODO: Implement actual duration tracking
+    };
   }
 } 

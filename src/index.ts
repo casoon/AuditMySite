@@ -13,55 +13,55 @@ const program = new Command();
 program
   .name("a11y-test")
   .description(
-    "CLI-Tool für automatische Accessibility-Tests basierend auf Sitemap",
+    "CLI tool for automated accessibility testing based on sitemap",
   )
   .version("1.0.0");
 
 program
-  .argument("<sitemap-url>", "URL zur sitemap.xml")
+  .argument("<sitemap-url>", "URL to sitemap.xml")
   .option(
     "-m, --max-pages <number>",
-    "Maximale Anzahl zu testender Seiten",
+    "Maximum number of pages to test",
     "20",
   )
-  .option("-t, --timeout <number>", "Timeout in Millisekunden", "10000")
+  .option("-t, --timeout <number>", "Timeout in milliseconds", "10000")
   .option(
     "-w, --wait-until <string>",
-    "Warten bis (domcontentloaded|load|networkidle)",
+    "Wait until (domcontentloaded|load|networkidle)",
     "domcontentloaded",
   )
   .option(
     "-f, --filter <patterns>",
-    "Auszuschließende URL-Muster (kommagetrennt)",
+    "URL patterns to exclude (comma-separated)",
     "[...slug],[category],/demo/",
   )
   .option(
     "-i, --include <patterns>",
-    "Einzuschließende URL-Muster (kommagetrennt)",
+    "URL patterns to include (comma-separated)",
   )
-  .option("-v, --verbose", "Detaillierte Ausgabe")
+  .option("-v, --verbose", "Detailed output")
 
   .option(
     "--standard <standard>",
     "Accessibility Standard (WCAG2A|WCAG2AA|WCAG2AAA|Section508)",
     "WCAG2AA"
   )
-  .option("--include-details", "Detaillierte Informationen in Output-Datei")
-  .option("--include-pa11y", "pa11y-Issues in Output-Datei einschließen")
-  .option("--summary-only", "Nur Zusammenfassung ohne Seiten-Details")
+  .option("--include-details", "Detailed information in output file")
+  .option("--include-pa11y", "Include pa11y issues in output file")
+  .option("--summary-only", "Summary only without page details")
   .action(async (sitemapUrl: string, options: any) => {
-    const spinner = ora("Initialisiere Accessibility-Tests...").start();
+    const spinner = ora("Initializing accessibility tests...").start();
 
     try {
-      // Parser initialisieren
+      // Initialize parser
       const parser = new SitemapParser();
-      spinner.text = "Lade Sitemap...";
+      spinner.text = "Loading sitemap...";
 
-      // Sitemap parsen
+      // Parse sitemap
       const urls = await parser.parseSitemap(sitemapUrl);
-      spinner.text = `Sitemap geladen: ${urls.length} URLs gefunden`;
+      spinner.text = `Sitemap loaded: ${urls.length} URLs found`;
 
-      // URLs filtern
+      // Filter URLs
       const filterPatterns = options.filter
         ? options.filter.split(",")
         : ["[...slug]", "[category]", "/demo/"];
@@ -73,19 +73,19 @@ program
         filterPatterns,
         includePatterns,
       });
-      spinner.text = `URLs gefiltert: ${filteredUrls.length} URLs zum Testen`;
+      spinner.text = `URLs filtered: ${filteredUrls.length} URLs to test`;
 
-      // URLs zu lokalen URLs konvertieren (falls nötig)
+      // Convert URLs to local URLs (if needed)
       const baseUrl = new URL(sitemapUrl).origin;
       const localUrls = parser.convertToLocalUrls(filteredUrls, baseUrl);
 
-      // Accessibility-Checker initialisieren
+      // Initialize accessibility checker
       const checker = new AccessibilityChecker();
       await checker.initialize();
 
-      spinner.text = "Führe Accessibility-Tests aus...";
+      spinner.text = "Running accessibility tests...";
 
-      // Tests ausführen
+      // Run tests
       const testOptions: TestOptions = {
         maxPages: parseInt(options.maxPages),
         timeout: parseInt(options.timeout),
@@ -99,26 +99,26 @@ program
         testOptions,
       );
 
-      // Zusammenfassung erstellen
+      // Create summary
       const summary: TestSummary = {
         totalPages: localUrls.length,
         testedPages: results.length,
-        passedPages: results.filter((r) => r.passed).length,
-        failedPages: results.filter((r) => !r.passed).length,
-        totalErrors: results.reduce((sum, r) => sum + r.errors.length, 0),
-        totalWarnings: results.reduce((sum, r) => sum + r.warnings.length, 0),
-        totalDuration: results.reduce((sum, r) => sum + r.duration, 0),
+        passedPages: results.filter((r: any) => r.passed).length,
+        failedPages: results.filter((r: any) => !r.passed).length,
+        totalErrors: results.reduce((sum: number, r: any) => sum + r.errors.length, 0),
+        totalWarnings: results.reduce((sum: number, r: any) => sum + r.warnings.length, 0),
+        totalDuration: results.reduce((sum: number, r: any) => sum + r.duration, 0),
         results,
       };
 
       await checker.cleanup();
 
-      // Ergebnisse ausgeben
-      spinner.succeed("Tests abgeschlossen!");
+      // Display results
+      spinner.succeed("Tests completed!");
       
-      // Output-Datei generieren falls gewünscht
+      // Generate output file if requested
       if (options.output && options.output !== 'console') {
-        spinner.text = 'Generiere Output-Datei...';
+        spinner.text = 'Generating output file...';
         const outputGenerator = new OutputGenerator();
         const outputOptions = {
           format: options.output as 'json' | 'csv' | 'markdown' | 'html',
@@ -130,37 +130,37 @@ program
         
         try {
           const outputPath = await outputGenerator.generateOutput(summary, outputOptions);
-          spinner.succeed(`Output-Datei erstellt: ${outputPath}`);
+          spinner.succeed(`Output file created: ${outputPath}`);
         } catch (error) {
-          spinner.warn(`Fehler beim Erstellen der Output-Datei: ${error}`);
+          spinner.warn(`Error creating output file: ${error}`);
         }
       }
       
       displayResults(summary, options);
     } catch (error) {
-      spinner.fail(`Fehler: ${error}`);
+      spinner.fail(`Error: ${error}`);
       process.exit(1);
     }
   });
 
 function displayResults(summary: TestSummary, options: any): void {
-  console.log("\n" + chalk.bold.blue("🎯 Accessibility Test Zusammenfassung"));
+  console.log("\n" + chalk.bold.blue("🎯 Accessibility Test Summary"));
   console.log(chalk.gray("─".repeat(50)));
 
-  console.log(`📄 Gesamtseiten: ${summary.totalPages}`);
-  console.log(`🧪 Getestete Seiten: ${summary.testedPages}`);
-  console.log(`✅ Bestanden: ${chalk.green(summary.passedPages)}`);
-  console.log(`❌ Fehlgeschlagen: ${chalk.red(summary.failedPages)}`);
-  console.log(`⚠️  Warnungen: ${chalk.yellow(summary.totalWarnings)}`);
-  console.log(`⏱️  Gesamtdauer: ${summary.totalDuration}ms`);
+  console.log(`📄 Total pages: ${summary.totalPages}`);
+  console.log(`🧪 Tested pages: ${summary.testedPages}`);
+  console.log(`✅ Passed: ${chalk.green(summary.passedPages)}`);
+  console.log(`❌ Failed: ${chalk.red(summary.failedPages)}`);
+  console.log(`⚠️  Warnings: ${chalk.yellow(summary.totalWarnings)}`);
+  console.log(`⏱️  Total duration: ${summary.totalDuration}ms`);
 
   if (options.verbose) {
-    console.log("\n" + chalk.bold("📋 Detaillierte Ergebnisse:"));
+    console.log("\n" + chalk.bold("📋 Detailed results:"));
     summary.results.forEach((result) => {
       const status = result.passed ? chalk.green("✅") : chalk.red("❌");
       console.log(`${status} ${result.url}`);
-      console.log(`   Titel: ${result.title}`);
-      console.log(`   Dauer: ${result.duration}ms`);
+      console.log(`   Title: ${result.title}`);
+      console.log(`   Duration: ${result.duration}ms`);
 
       if (result.warnings.length > 0) {
         result.warnings.forEach((warning) => {

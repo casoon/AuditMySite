@@ -1,24 +1,27 @@
 import { chromium, Browser, Page } from "playwright";
 import pa11y from "pa11y";
-import { AccessibilityResult, TestOptions, Pa11yIssue } from "../types";
-import { BrowserManager } from './browser-manager';
-import { LighthouseIntegration } from './lighthouse-integration';
-
-import { SimpleQueue, QueuedUrl } from './simple-queue';
-import { ParallelTestManager, ParallelTestManagerOptions, ParallelTestResult } from './parallel-test-manager';
-import { EventDrivenQueue, ProcessOptions } from './event-driven-queue';
+import { AccessibilityResult, TestOptions, Pa11yIssue } from '@core/types';
+import { BrowserManager } from '@core/browser';
+import { WebVitalsCollector } from '@core/performance';
+import { SimpleQueue } from '@core/pipeline';
+import { ParallelTestManager, ParallelTestManagerOptions, ParallelTestResult } from '@core/accessibility';
+import { EventDrivenQueue, ProcessOptions } from '@core/accessibility';
 import * as fs from 'fs';
 import * as path from 'path';
 
 export class AccessibilityChecker {
-  private browserManager: BrowserManager | null = null;
-  private lighthouseIntegration: LighthouseIntegration | null = null;
+  public browserManager: BrowserManager | null = null;
+  private webVitalsCollector: WebVitalsCollector;
   private testQueue: SimpleQueue | null = null;
   private parallelTestManager: ParallelTestManager | null = null;
   private eventDrivenQueue: EventDrivenQueue | null = null;
 
+  constructor() {
+    this.webVitalsCollector = new WebVitalsCollector();
+  }
+
   async initialize(): Promise<void> {
-    // 🆕 Browser Manager für geteilten Browser
+    // 🆕 Browser Manager for shared browser
     this.browserManager = new BrowserManager({
       headless: true,
       port: 9222
@@ -26,8 +29,8 @@ export class AccessibilityChecker {
     
     await this.browserManager.initialize();
     
-    // 🆕 Lighthouse Integration
-    this.lighthouseIntegration = new LighthouseIntegration(this.browserManager);
+    // 🆕 Lighthouse Integration - Removed
+    // this.lighthouseIntegration = new LighthouseIntegration(this.browserManager);
   }
 
   async cleanup(): Promise<void> {
@@ -40,6 +43,7 @@ export class AccessibilityChecker {
     url: string,
     options: TestOptions = {},
   ): Promise<AccessibilityResult> {
+    console.log('TESTREACHED', url);
     if (!this.browserManager) {
       throw new Error("Browser Manager not initialized");
     }
@@ -60,7 +64,7 @@ export class AccessibilityChecker {
 
     try {
       if (options.verbose) console.log(`   🔧 Configuring page...`);
-      // 🆕 Erweiterte Page-Konfiguration
+      // 🆕 Extended page configuration
       await this.configurePage(page, options);
 
       if (options.verbose) console.log(`   🌐 Navigating to page...`);
@@ -69,17 +73,17 @@ export class AccessibilityChecker {
         timeout: options.timeout || 10000,
       });
 
-      // 🆕 Performance-Metriken sammeln
+      // 🆕 Collect performance metrics
       if (options.collectPerformanceMetrics) {
         if (options.verbose) console.log(`   📊 Collecting performance metrics...`);
         await this.collectPerformanceMetrics(page, result, options);
       }
 
-      // Seitentitel prüfen
+      // Check page title
       if (options.verbose) console.log(`   📋 Extracting page title...`);
       result.title = await page.title();
 
-      // Bilder ohne alt-Attribut
+      // Images without alt attribute
       if (options.verbose) console.log(`   🖼️  Checking images for alt attributes...`);
       result.imagesWithoutAlt = await page.locator("img:not([alt])").count();
       if (result.imagesWithoutAlt > 0) {
@@ -87,8 +91,9 @@ export class AccessibilityChecker {
           `${result.imagesWithoutAlt} images without alt attribute`,
         );
       }
+      console.log('DEBUG: Nach Alt-Check', {url: result.url, errors: result.errors.length, warnings: result.warnings.length});
 
-      // Buttons ohne aria-label
+      // Buttons without aria-label
       if (options.verbose) console.log(`   🔘 Checking buttons for aria labels...`);
       result.buttonsWithoutLabel = await page
         .locator("button:not([aria-label])")
@@ -99,8 +104,9 @@ export class AccessibilityChecker {
           `${result.buttonsWithoutLabel} buttons without aria-label`,
         );
       }
+      console.log('DEBUG: Nach Button-Label-Check', {url: result.url, errors: result.errors.length, warnings: result.warnings.length});
 
-      // Überschriften-Hierarchie
+      // Heading hierarchy
       if (options.verbose) console.log(`   📝 Checking heading hierarchy...`);
       result.headingsCount = await page
         .locator("h1, h2, h3, h4, h5, h6")
@@ -108,8 +114,9 @@ export class AccessibilityChecker {
       if (result.headingsCount === 0) {
         result.errors.push("No headings found");
       }
+      console.log('DEBUG: Nach Heading-Check', {url: result.url, errors: result.errors.length, warnings: result.warnings.length});
 
-      // 🆕 Erweiterte Accessibility-Tests
+      // 🆕 Extended accessibility tests
       if (options.testKeyboardNavigation) {
         if (options.verbose) console.log(`   ⌨️  Testing keyboard navigation...`);
         await this.testKeyboardNavigation(page, result, options);
@@ -131,19 +138,19 @@ export class AccessibilityChecker {
         await this.captureScreenshots(page, url, result, options);
       }
 
-              // pa11y Accessibility-Tests durchführen
-        if (options.verbose) console.log(`   🔍 Running pa11y accessibility tests...`);
+      // Run pa11y accessibility tests
+      if (options.verbose) console.log(`   🔍 Running pa11y accessibility tests...`);
         try {
-          // 🆕 Optimierte pa11y-Konfiguration für localhost
+          // 🆕 Optimized pa11y config for localhost
           const pa11yResult = await pa11y(url, {
-            timeout: options.timeout || 15000, // Erhöht für localhost
-            wait: options.wait || 2000, // Länger warten für localhost
+            timeout: options.timeout || 15000, // Increased for localhost
+            wait: options.wait || 2000, // Wait longer for localhost
             standard: options.pa11yStandard || 'WCAG2AA',
             hideElements: options.hideElements || 'iframe[src*="google-analytics"], iframe[src*="doubleclick"]',
             includeNotices: options.includeNotices !== false,
             includeWarnings: options.includeWarnings !== false,
             runners: options.runners || ['axe', 'htmlcs'],
-            // 🆕 Vereinfachte Chrome-Konfiguration für localhost
+            // 🆕 Simplified Chrome config for localhost
             chromeLaunchConfig: {
               ...options.chromeLaunchConfig,
               args: [
@@ -161,7 +168,7 @@ export class AccessibilityChecker {
             log: options.verbose ? console : undefined,
           });
 
-        // pa11y-Ergebnisse in unser Format konvertieren
+        // Convert pa11y results to our format
         pa11yResult.issues.forEach((issue) => {
           // Detaillierte Issue-Informationen speichern
           const detailedIssue: Pa11yIssue = {
@@ -178,7 +185,7 @@ export class AccessibilityChecker {
           result.pa11yIssues = result.pa11yIssues || [];
           result.pa11yIssues.push(detailedIssue);
           
-          // Für Kompatibilität auch in errors/warnings
+          // For compatibility, also add to errors/warnings
           const message = `${issue.code}: ${issue.message}`;
           if (issue.type === 'error') {
             result.errors.push(message);
@@ -188,13 +195,14 @@ export class AccessibilityChecker {
             result.warnings.push(`Notice: ${message}`);
           }
         });
+        console.log('DEBUG: Nach pa11y', {url: result.url, errors: result.errors.length, warnings: result.warnings.length, pa11yIssues: result.pa11yIssues?.length});
 
-        // Zusätzliche pa11y-Metriken
+        // Additional pa11y metrics
         if (pa11yResult.documentTitle) {
           result.title = pa11yResult.documentTitle;
         }
 
-        // pa11y Score berechnen
+        // Calculate pa11y score
         if (pa11yResult.issues.length > 0) {
           const totalIssues = pa11yResult.issues.length;
           const errorIssues = pa11yResult.issues.filter(issue => issue.type === 'error').length;
@@ -204,46 +212,25 @@ export class AccessibilityChecker {
         }
 
       } catch (pa11yError) {
-        // 🆕 Bessere Fehlerbehandlung für pa11y
+        // 🆕 Improved error handling for pa11y
         const errorMessage = pa11yError instanceof Error ? pa11yError.message : String(pa11yError);
         
-        // Timeout-Fehler speziell behandeln
+        // Handle timeout errors specifically
         if (errorMessage.includes('timeout') || errorMessage.includes('Timeout')) {
           if (options.verbose) {
             console.log(`   ⚠️  pa11y timeout for ${url} - skipping pa11y tests`);
           }
-          // Timeout-Fehler nicht als Warning hinzufügen, da sie auf localhost normal sind
+          // Do not add timeout errors as warnings, as they are normal for localhost
         } else {
-          // Andere pa11y-Fehler als Warning hinzufügen
+          // Add other pa11y errors as warnings
           result.warnings.push(`pa11y test failed: ${errorMessage}`);
         }
       }
+      console.log('DEBUG: Nach pa11y/Ende', {url: result.url, errors: result.errors.length, warnings: result.warnings.length, pa11yIssues: result.pa11yIssues?.length});
 
-      // 🆕 Lighthouse Tests durchführen (mit geteiltem Browser)
-      if (options.lighthouse) {
-        if (options.verbose) console.log(`   �� Running Lighthouse tests...`);
-        try {
-          const lighthouseResult = await this.lighthouseIntegration!.runLighthouse(url);
-          
-          // Lighthouse-Ergebnisse speichern
-          result.lighthouseScores = {
-            performance: lighthouseResult.performance,
-            accessibility: lighthouseResult.accessibility,
-            bestPractices: lighthouseResult.bestPractices,
-            seo: lighthouseResult.seo
-          };
-          
-          result.lighthouseMetrics = lighthouseResult.metrics;
-          
-          if (options.verbose) {
-            console.log(`   📊 Lighthouse Scores: P:${lighthouseResult.performance} A:${lighthouseResult.accessibility} BP:${lighthouseResult.bestPractices} SEO:${lighthouseResult.seo}`);
-          }
-        } catch (lighthouseError) {
-          result.warnings.push(`Lighthouse test failed: ${lighthouseError}`);
-        }
-      }
+      // Lighthouse integration removed
 
-      // Prüfe auf kritische Fehler
+      // Check for critical errors
       if (result.errors.length > 0) {
         result.passed = false;
       }
@@ -266,7 +253,7 @@ export class AccessibilityChecker {
     const maxPages = options.maxPages || urls.length;
     const pagesToTest = urls.slice(0, maxPages);
 
-    // Einfache Queue erstellen
+    // Simple queue
     this.testQueue = new SimpleQueue({
       maxRetries: 3,
       maxConcurrent: 1,
@@ -280,10 +267,10 @@ export class AccessibilityChecker {
       ]
     });
 
-    // URLs zur Queue hinzufügen
+    // Add URLs to queue
     this.testQueue.addUrls(pagesToTest);
     
-    console.log(`🧪 Testing ${pagesToTest.length} pages using queue system...`);
+    console.log(`🦪 Testing ${pagesToTest.length} pages using queue system...`);
     this.testQueue.showStats();
 
     let completedCount = 0;
@@ -293,7 +280,7 @@ export class AccessibilityChecker {
     while (completedCount < pagesToTest.length && attempts < maxAttempts) {
       attempts++;
       
-      // Nächste URL aus der Queue holen
+      // Next URL from queue
       const queuedUrl = this.testQueue.getNextUrl();
       if (!queuedUrl) {
         // Keine URLs mehr in der Queue
@@ -322,7 +309,7 @@ export class AccessibilityChecker {
           console.log(`   🎯 Result: FAILED (${result.errors.length} errors, ${result.warnings.length} warnings)`);
         }
         
-        // Status alle 5 URLs anzeigen
+        // Show status every 5 URLs
         if (completedCount % 5 === 0) {
           this.testQueue.showStats();
         }
@@ -351,7 +338,7 @@ export class AccessibilityChecker {
       }
     }
 
-    // Finale Statistiken anzeigen
+    // Final statistics
     console.log('\n📊 Final Queue Statistics:');
     this.testQueue.showStats();
 
@@ -359,10 +346,10 @@ export class AccessibilityChecker {
   }
 
   /**
-   * 🚀 Parallele Accessibility-Tests mit Event-Driven Queue
+   * 🚀 Parallel accessibility tests with event-driven queue
    * 
-   * Diese Methode verwendet das Event-Driven Queue System für parallele Tests
-   * mit Echtzeit-Status-Reporting und Resource-Monitoring.
+   * This method uses the event-driven queue system for parallel tests
+   * with real-time status reporting and resource monitoring.
    */
   async testMultiplePagesParallel(
     urls: string[],
@@ -371,7 +358,7 @@ export class AccessibilityChecker {
     const maxPages = options.maxPages || urls.length;
     const pagesToTest = urls.slice(0, maxPages);
     
-    // Parallele Test-Optionen
+    // Parallel test options
     const parallelOptions: ParallelTestManagerOptions = {
       maxConcurrent: options.maxConcurrent || 3,
       maxRetries: options.maxRetries || 3,
@@ -406,22 +393,22 @@ export class AccessibilityChecker {
       }
     };
 
-    // Parallel Test Manager initialisieren
+    // Initialize Parallel Test Manager
     this.parallelTestManager = new ParallelTestManager(parallelOptions);
     
     try {
       console.log(`🚀 Starting parallel accessibility tests for ${pagesToTest.length} pages with ${parallelOptions.maxConcurrent} workers`);
       console.log(`⚙️  Configuration: maxRetries=${parallelOptions.maxRetries}, retryDelay=${parallelOptions.retryDelay}ms`);
       
-      // Manager initialisieren
+      // Initialize manager
       await this.parallelTestManager.initialize();
       
-      // Tests ausführen
+      // Run tests
       const startTime = Date.now();
       const result: ParallelTestResult = await this.parallelTestManager.runTests(pagesToTest);
       const totalDuration = Date.now() - startTime;
       
-      // Ergebnisse ausgeben
+      // Output results
       console.log('\n📋 Parallel Test Results Summary:');
       console.log('==================================');
       console.log(`⏱️  Total Duration: ${totalDuration}ms`);
@@ -430,7 +417,7 @@ export class AccessibilityChecker {
       console.log(`❌ Failed: ${result.results.filter(r => !r.passed).length}`);
       console.log(`💥 Errors: ${result.errors.length}`);
       
-      // Performance-Metriken
+      // Performance metrics
       const avgTimePerUrl = totalDuration / pagesToTest.length;
       const speedup = avgTimePerUrl > 0 ? (avgTimePerUrl * pagesToTest.length) / totalDuration : 0;
       
@@ -440,7 +427,7 @@ export class AccessibilityChecker {
       console.log(`Speedup factor: ${speedup.toFixed(1)}x`);
       console.log(`Throughput: ${(pagesToTest.length / (totalDuration / 1000)).toFixed(1)} URLs/second`);
       
-      // Detaillierte Statistiken
+      // Detailed statistics
       console.log('\n📊 Queue Statistics:');
       console.log('===================');
       console.log(`Total: ${result.stats.total}`);
@@ -452,7 +439,7 @@ export class AccessibilityChecker {
       console.log(`Memory Usage: ${result.stats.memoryUsage}MB`);
       console.log(`CPU Usage: ${result.stats.cpuUsage}s`);
       
-      // Fehler-Details
+      // Error details
       if (result.errors.length > 0) {
         console.log('\n❌ Failed URLs:');
         console.log('===============');
@@ -476,16 +463,16 @@ export class AccessibilityChecker {
   }
 
   /**
-   * 🚀 Integrierte Queue-Verarbeitung mit kurzen Status-Updates
-   * Diese Methode nutzt die Event-Driven Queue direkt für maximale Effizienz
+   * 🚀 Integrated queue processing with short status updates
+   * This method uses the event-driven queue directly for maximum efficiency
    */
   async testMultiplePagesWithQueue(
     urls: string[],
     options: TestOptions = {},
   ): Promise<AccessibilityResult[]> {
-    console.log(`🚀 Starte integrierte Queue-Verarbeitung für ${urls.length} URLs`);
+    console.log(`🚀 Starting integrated queue processing for ${urls.length} URLs`);
     
-    // Initialisiere Browser
+    // Initialize browser
     if (!this.browserManager) {
       this.browserManager = new BrowserManager({
         headless: true,
@@ -494,7 +481,7 @@ export class AccessibilityChecker {
       await this.browserManager.initialize();
     }
 
-    // Erstelle Event-Driven Queue
+    // Create Event-Driven Queue
     this.eventDrivenQueue = new EventDrivenQueue({
       maxConcurrent: options.maxConcurrent || 3,
       maxRetries: options.maxRetries || 3,
@@ -503,7 +490,7 @@ export class AccessibilityChecker {
       statusUpdateInterval: 2000,
       eventCallbacks: {
         onShortStatus: (status: string) => {
-          // Überschreibe die aktuelle Zeile mit dem Status
+          // Overwrite the current line with the status
           process.stdout.write(`\r${status}`);
         },
         onUrlCompleted: (url: string, result: any, duration: number) => {
@@ -512,30 +499,30 @@ export class AccessibilityChecker {
         },
         onUrlFailed: (url: string, error: string, attempts: number) => {
           const shortUrl = url.split('/').pop() || url;
-          console.log(`\n❌ ${shortUrl} (Versuch ${attempts})`);
+          console.log(`\n❌ ${shortUrl} (Attempt ${attempts})`);
         }
       }
     });
 
-    // Definiere den Processor für jede URL
+    // Define the processor for each URL
     const processOptions: ProcessOptions = {
       processor: async (url: string) => {
         return await this.testPage(url, options);
       },
       onResult: (url: string, result: AccessibilityResult) => {
-        // Optional: Zusätzliche Verarbeitung nach erfolgreichem Test
+        // Optional: additional processing after successful test
       },
       onError: (url: string, error: string) => {
-        console.error(`\n💥 Fehler bei ${url}: ${error}`);
+        console.error(`\n💥 Error for ${url}: ${error}`);
       }
     };
 
     try {
-      // Verarbeite alle URLs mit der Queue
+      // Process all URLs with the queue
       const results = await this.eventDrivenQueue.processUrls(urls, processOptions);
       
-      console.log(`\n🎉 Queue-Verarbeitung abgeschlossen!`);
-      console.log(`📊 Ergebnisse: ${results.length} URLs getestet`);
+      console.log(`\n🎉 Queue processing completed!`);
+      console.log(`📊 Results: ${results.length} URLs tested`);
       
       return results as AccessibilityResult[];
     } finally {
@@ -544,19 +531,19 @@ export class AccessibilityChecker {
     }
   }
 
-  // 🆕 Erweiterte Page-Konfiguration
+  // 🆕 Extended page configuration
   private async configurePage(page: Page, options: TestOptions): Promise<void> {
-    // Viewport-Konfiguration
+    // Viewport configuration
     const viewportSize = options.viewportSize || { width: 1920, height: 1080 };
     await page.setViewportSize(viewportSize);
 
-    // User-Agent setzen (Standard: auditmysite)
+    // Set user agent (default: auditmysite)
     const userAgent = options.userAgent || 'auditmysite/1.0 (+https://github.com/casoon/AuditMySite)';
     await page.setExtraHTTPHeaders({
       'User-Agent': userAgent
     });
 
-    // Network-Interception für Performance
+    // Network interception for performance
     if (options.blockImages) {
       await page.route('**/*.{png,jpg,jpeg,gif,svg,webp}', route => {
         route.abort();
@@ -569,14 +556,14 @@ export class AccessibilityChecker {
       });
     }
 
-    // Console-Logging
+    // Console logging
     page.on('console', msg => {
       if (options.verbose) {
         console.log(`Browser Console: ${msg.text()}`);
       }
     });
 
-    // Error-Handling
+    // Error handling
     page.on('pageerror', error => {
       if (options.verbose) {
         console.log(`JavaScript Error: ${error.message}`);
@@ -584,8 +571,56 @@ export class AccessibilityChecker {
     });
   }
 
-  // 🆕 Performance-Metriken sammeln
+  // 🆕 Collect performance metrics using Google's Web Vitals
   private async collectPerformanceMetrics(page: Page, result: AccessibilityResult, options: TestOptions): Promise<void> {
+    try {
+      if (options.verbose) console.log(`   📊 Collecting Core Web Vitals...`);
+      
+      // Use the official WebVitalsCollector for accurate metrics
+      const webVitals = await this.webVitalsCollector.collectMetrics(page);
+      
+      // Store Web Vitals in result
+      result.performanceMetrics = {
+        // Navigation timing
+        loadTime: webVitals.loadTime,
+        domContentLoaded: webVitals.domContentLoaded,
+        firstPaint: 0, // Not available in Web Vitals, set to 0
+        renderTime: webVitals.renderTime,
+        
+        // Core Web Vitals
+        firstContentfulPaint: webVitals.fcp,
+        largestContentfulPaint: webVitals.lcp,
+        cumulativeLayoutShift: webVitals.cls,
+        interactionToNextPaint: webVitals.inp,
+        timeToFirstByte: webVitals.ttfb,
+        
+        // Quality score
+        performanceScore: webVitals.score,
+        performanceGrade: webVitals.grade
+      };
+      
+      // Add performance-based warnings using Web Vitals thresholds
+      webVitals.recommendations.forEach(rec => {
+        if (rec !== 'Excellent performance! All Core Web Vitals are within good thresholds.') {
+          result.warnings.push(rec);
+        }
+      });
+      
+      if (options.verbose) {
+        console.log(`   🏆 Performance Score: ${webVitals.score} (${webVitals.grade})`);
+        console.log(`   📈 LCP: ${webVitals.lcp}ms, FCP: ${webVitals.fcp}ms, CLS: ${webVitals.cls}`);
+      }
+      
+    } catch (error) {
+      if (options.verbose) {
+        console.log(`Web Vitals collection failed: ${error}`);
+      }
+      // Fallback to simple metrics if Web Vitals fail
+      await this.collectFallbackMetrics(page, result, options);
+    }
+  }
+  
+  private async collectFallbackMetrics(page: Page, result: AccessibilityResult, options: TestOptions): Promise<void> {
     try {
       const metrics = await page.evaluate(() => {
         const navigation = performance.getEntriesByType('navigation')[0] as PerformanceNavigationTiming;
@@ -600,13 +635,12 @@ export class AccessibilityChecker {
 
       result.performanceMetrics = metrics;
 
-      // Performance-Warnungen
       if (metrics.loadTime > 3000) {
         result.warnings.push(`Slow page load: ${Math.round(metrics.loadTime)}ms`);
       }
     } catch (error) {
       if (options.verbose) {
-        console.log(`Performance metrics collection failed: ${error}`);
+        console.log(`Fallback metrics collection failed: ${error}`);
       }
     }
   }
@@ -618,7 +652,7 @@ export class AccessibilityChecker {
         const focusableElements = document.querySelectorAll('button, input, select, textarea, a[href], [tabindex]:not([tabindex="-1"])');
         const navigation: string[] = [];
         
-        // Simuliere Tab-Navigation für die ersten 10 Elemente
+        // Simulate tab navigation for the first 10 elements
         for (let i = 0; i < Math.min(focusableElements.length, 10); i++) {
           const element = focusableElements[i] as HTMLElement;
           navigation.push(`${element.tagName.toLowerCase()}: ${element.textContent?.trim().substring(0, 50) || element.outerHTML}`);
@@ -635,7 +669,7 @@ export class AccessibilityChecker {
     }
   }
 
-  // 🆕 Color Contrast Test (vereinfacht)
+  // 🆕 Color Contrast Test (simplified)
   private async testColorContrast(page: Page, result: AccessibilityResult, options: TestOptions): Promise<void> {
     try {
       const contrastIssues = await page.evaluate(() => {
@@ -647,7 +681,7 @@ export class AccessibilityChecker {
           const color = style.color;
           const backgroundColor = style.backgroundColor;
           
-          // Einfache Kontrast-Prüfung (vereinfacht)
+          // Simple contrast check (simplified)
           if (color && backgroundColor && 
               color !== backgroundColor && 
               color !== 'rgba(0, 0, 0, 0)' && 
@@ -676,7 +710,7 @@ export class AccessibilityChecker {
       const focusIssues = await page.evaluate(() => {
         const issues: string[] = [];
         
-        // Prüfe auf focus-visible
+        // Check for focus-visible
         const focusableElements = document.querySelectorAll('button, input, select, textarea, a[href]');
         focusableElements.forEach(el => {
           const style = window.getComputedStyle(el);
@@ -702,7 +736,7 @@ export class AccessibilityChecker {
     }
   }
 
-  // 🆕 Screenshot-Funktionalität
+  // 🆕 Screenshot functionality
   private async captureScreenshots(page: Page, url: string, result: AccessibilityResult, options: TestOptions): Promise<void> {
     try {
       // Screenshots-Ordner erstellen

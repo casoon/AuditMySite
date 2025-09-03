@@ -22,11 +22,22 @@ export interface AccessibilityResult {
   pa11yIssues?: Pa11yIssue[];
   pa11yScore?: number;
   performanceMetrics?: {
+    // Navigation timing
     loadTime: number;
     domContentLoaded: number;
     firstPaint: number;
+    renderTime?: number;
+    
+    // Core Web Vitals
     firstContentfulPaint: number;
     largestContentfulPaint: number;
+    cumulativeLayoutShift?: number;
+    interactionToNextPaint?: number;
+    timeToFirstByte?: number;
+    
+    // Quality metrics
+    performanceScore?: number;
+    performanceGrade?: 'A' | 'B' | 'C' | 'D' | 'F';
   };
   keyboardNavigation?: string[];
   colorContrastIssues?: string[];
@@ -37,7 +48,7 @@ export interface AccessibilityResult {
   };
   consoleErrors?: string[];
   networkErrors?: string[];
-  // 🆕 Lighthouse-Ergebnisse
+  // 🆕 Lighthouse results
   lighthouseScores?: LighthouseScores;
   lighthouseMetrics?: LighthouseMetrics;
 }
@@ -70,24 +81,23 @@ export interface TestOptions {
   viewportSize?: { width: number; height: number };
   userAgent?: string;
 
-  // 🚀 Parallele Test-Optionen
-  maxConcurrent?: number;              // Anzahl paralleler Worker (Default: 3)
-  maxRetries?: number;                 // Max. Retry-Versuche (Default: 3)
-  retryDelay?: number;                 // Retry-Delay in ms (Default: 2000)
-  enableProgressBar?: boolean;         // Progress-Bar aktivieren (Default: true)
-  progressUpdateInterval?: number;     // Progress-Update-Interval in ms (Default: 1000)
-  enableResourceMonitoring?: boolean;  // Resource-Monitoring aktivieren (Default: true)
-  maxMemoryUsage?: number;             // Max. Memory-Verbrauch in MB (Default: 512)
-  maxCpuUsage?: number;                // Max. CPU-Verbrauch in % (Default: 80)
-  useParallelTesting?: boolean;        // Parallele Tests aktivieren (Default: false)
-  // 🆕 Legacy-Option für sequenzielle Tests (nur für Kompatibilität)
+  // 🚀 Parallel test options
+  maxConcurrent?: number;              // Number of parallel workers (default: 3)
+  maxRetries?: number;                 // Max. retry attempts (default: 3)
+  retryDelay?: number;                 // Retry delay in ms (default: 2000)
+  enableProgressBar?: boolean;         // Enable progress bar (default: true)
+  progressUpdateInterval?: number;     // Progress update interval in ms (default: 1000)
+  enableResourceMonitoring?: boolean;  // Enable resource monitoring (default: true)
+  maxMemoryUsage?: number;             // Max. memory usage in MB (default: 512)
+  maxCpuUsage?: number;                // Max. CPU usage in % (default: 80)
+  useParallelTesting?: boolean;        // Enable parallel tests (default: false)
+  // 🆕 Legacy option for sequential tests (for compatibility only)
   useSequentialTesting?: boolean;
-  // 🆕 Output-Format-Option
-  outputFormat?: 'markdown' | 'html';
-  includeCopyButtons?: boolean;
-  // 🆕 pa11y-Optionen
+  // 🆕 Output format option
+  outputFormat?: 'markdown' | 'html' | 'pdf';
+  // 🆕 pa11y options
   usePa11y?: boolean;
-  // 🆕 Lighthouse-Optionen
+  // 🆕 Lighthouse options
   lighthouse?: boolean;
 }
 
@@ -123,4 +133,107 @@ export interface TestSummary {
   totalWarnings: number;
   totalDuration: number;
   results: AccessibilityResult[];
+}
+
+/**
+ * Central, unified issue interface for all report types
+ */
+export interface AuditIssue {
+  reportType: 'accessibility' | 'security' | 'seo' | 'performance';
+  pageUrl: string;
+  pageTitle?: string;
+  type: string;
+  severity: 'error' | 'warning' | 'info';
+  message: string;
+  code?: string;
+  selector?: string;
+  context?: string;
+  htmlSnippet?: string;
+  lineNumber?: number;
+  source?: string;
+  recommendation?: string;
+  resource?: string;
+  score?: number;
+  metric?: string;
+}
+
+/**
+ * @deprecated Please use AuditIssue!
+ */
+export interface DetailedIssue extends AuditIssue {}
+
+export interface AuditConfig {
+  sitemap?: string;
+  maxPages?: number;
+  timeout?: number;
+  outputDir?: string;
+  standards?: string[];
+  performance?: {
+    enabled?: boolean;
+    lighthouse?: boolean;
+    coreWebVitals?: boolean;
+  };
+  security?: {
+    enabled?: boolean;
+    scanHeaders?: boolean;
+    httpsCheck?: boolean;
+    cspCheck?: boolean;
+  };
+  accessibility?: {
+    enabled?: boolean;
+    pa11y?: boolean;
+    wcag?: string;
+  };
+  seo?: {
+    enabled?: boolean;
+    metaCheck?: boolean;
+    structuredData?: boolean;
+  };
+  mobile?: {
+    enabled?: boolean;
+    touchTargets?: boolean;
+    pwa?: boolean;
+  };
+  parallel?: {
+    maxConcurrent?: number;
+    maxRetries?: number;
+    retryDelay?: number;
+  };
+  output?: {
+    format?: 'markdown' | 'html' | 'json' | 'csv';
+    // includeCopyButtons?: boolean; // entfernt
+    includeDetails?: boolean;
+  };
+  logging?: {
+    level?: 'debug' | 'info' | 'warn' | 'error';
+    file?: string;
+    verbose?: boolean;
+  };
+}
+
+export interface PresetConfig {
+  name: string;
+  description: string;
+  config: Partial<AuditConfig>;
+}
+
+export interface SecurityScanResult {
+  url: string;
+  timestamp: string;
+  overallScore: number;
+  tests: {
+    securityHeaders: any;
+    https: any;
+    csp: any;
+    vulnerability: any;
+  };
+  summary: {
+    totalIssues: number;
+    totalWarnings: number;
+    criticalIssues: number;
+    highIssues: number;
+    mediumIssues: number;
+    lowIssues: number;
+  };
+  recommendations: string[];
 }

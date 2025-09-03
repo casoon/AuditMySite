@@ -20,7 +20,7 @@ const PORT = 3001;
 app.use(express.json());
 app.use(express.static(path.join(__dirname, 'public')));
 
-// Mock-Sitemap mit verschiedenen Test-Szenarien
+// Mock-Sitemap mit Accessibility- und Performance-Test-Szenarien
 app.get('/sitemap.xml', (req, res) => {
   const sitemap = `<?xml version="1.0" encoding="UTF-8"?>
 <urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
@@ -34,61 +34,37 @@ app.get('/sitemap.xml', (req, res) => {
     <loc>http://localhost:${PORT}/accessibility-errors</loc>
     <lastmod>2025-01-01</lastmod>
     <changefreq>weekly</changefreq>
-    <priority>0.8</priority>
+    <priority>0.9</priority>
   </url>
   <url>
     <loc>http://localhost:${PORT}/performance-issues</loc>
     <lastmod>2025-01-01</lastmod>
     <changefreq>weekly</changefreq>
-    <priority>0.7</priority>
-  </url>
-  <url>
-    <loc>http://localhost:${PORT}/seo-problems</loc>
-    <lastmod>2025-01-01</lastmod>
-    <changefreq>weekly</changefreq>
-    <priority>0.6</priority>
-  </url>
-  <url>
-    <loc>http://localhost:${PORT}/security-issues</loc>
-    <lastmod>2025-01-01</lastmod>
-    <changefreq>weekly</changefreq>
-    <priority>0.5</priority>
+    <priority>0.8</priority>
   </url>
   <url>
     <loc>http://localhost:${PORT}/advanced-contrast-test</loc>
     <lastmod>2025-01-01</lastmod>
     <changefreq>weekly</changefreq>
-    <priority>0.4</priority>
+    <priority>0.7</priority>
   </url>
   <url>
     <loc>http://localhost:${PORT}/screen-reader-test</loc>
     <lastmod>2025-01-01</lastmod>
     <changefreq>weekly</changefreq>
-    <priority>0.3</priority>
-  </url>
-  <url>
-    <loc>http://localhost:${PORT}/pwa-test</loc>
-    <lastmod>2025-01-01</lastmod>
-    <changefreq>weekly</changefreq>
-    <priority>0.2</priority>
+    <priority>0.6</priority>
   </url>
   <url>
     <loc>http://localhost:${PORT}/mobile-touch-test</loc>
     <lastmod>2025-01-01</lastmod>
     <changefreq>weekly</changefreq>
-    <priority>0.1</priority>
-  </url>
-  <url>
-    <loc>http://localhost:${PORT}/advanced-security-test</loc>
-    <lastmod>2025-01-01</lastmod>
-    <changefreq>weekly</changefreq>
-    <priority>0.0</priority>
+    <priority>0.5</priority>
   </url>
   <url>
     <loc>http://localhost:${PORT}/core-web-vitals-test</loc>
     <lastmod>2025-01-01</lastmod>
     <changefreq>weekly</changefreq>
-    <priority>0.0</priority>
+    <priority>0.4</priority>
   </url>
 </urlset>`;
   
@@ -114,17 +90,7 @@ app.get('/performance-issues', (req, res) => {
   res.send(html);
 });
 
-// 4. SEO Problems Page - Sollte SEO-Probleme haben
-app.get('/seo-problems', (req, res) => {
-  const html = loadTemplate('seo-problems');
-  res.send(html);
-});
-
-// 5. Security Issues Page - Sollte Security-Probleme haben
-app.get('/security-issues', (req, res) => {
-  const html = loadTemplate('security-issues');
-  res.send(html);
-});
+// Routes für Security und SEO wurden entfernt
 
 // 6. Advanced Contrast Test - Sollte detaillierte Kontrast-Probleme haben
 app.get('/advanced-contrast-test', (req, res) => {
@@ -138,11 +104,7 @@ app.get('/screen-reader-test', (req, res) => {
   res.send(html);
 });
 
-// 8. PWA Test - Sollte PWA Probleme haben
-app.get('/pwa-test', (req, res) => {
-  const html = loadTemplate('pwa-test');
-  res.send(html);
-});
+// PWA Test wurde entfernt
 
 // 9. Mobile Touch Test - Sollte Touch Target Probleme haben
 app.get('/mobile-touch-test', (req, res) => {
@@ -150,11 +112,7 @@ app.get('/mobile-touch-test', (req, res) => {
   res.send(html);
 });
 
-// 10. Advanced Security Test - Sollte erweiterte Security Probleme haben
-app.get('/advanced-security-test', (req, res) => {
-  const html = loadTemplate('advanced-security-test');
-  res.send(html);
-});
+// Advanced Security Test wurde entfernt
 
 // 11. Core Web Vitals Test - Sollte Performance Probleme haben
 app.get('/core-web-vitals-test', (req, res) => {

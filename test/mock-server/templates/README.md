@@ -1,6 +1,11 @@
-# HTML Templates für Mock Server
+# HTML Templates for Mock Server
 
-Diese Templates enthalten HTML-Code für verschiedene Test-Szenarien des AuditMySite Testframeworks.
+This directory contains example HTML templates used by the mock server for testing various accessibility, performance, SEO, and security scenarios. Each file simulates a specific test case or web page state. You can use these templates to run automated tests or to manually verify the behavior of the AuditMySite tool.
+
+**Usage:**
+- Place new HTML files here to add more test scenarios.
+- Refer to the file names to understand which aspect is being tested (e.g., accessibility-errors.html, performance-issues.html).
+- The mock server will serve these files at corresponding routes for local testing.
 
 ## 📁 Template-Übersicht
 
@@ -108,62 +113,4 @@ Diese Templates enthalten HTML-Code für verschiedene Test-Szenarien des AuditMy
 ## 🛠️ Verwendung
 
 ### **Template laden**
-```javascript
-const html = loadTemplate('perfect-page');
 ```
-
-### **Neues Template erstellen**
-1. HTML-Datei in `templates/` erstellen
-2. Route in `server.js` hinzufügen
-3. Sitemap aktualisieren
-4. Test-Suite erweitern
-
-### **Template bearbeiten**
-- Direkt die HTML-Datei bearbeiten
-- Server automatisch neu laden
-- Tests ausführen
-
-## 📋 Template-Struktur
-
-Alle Templates folgen dieser Grundstruktur:
-
-```html
-<!DOCTYPE html>
-<html lang="en">
-<head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Template Name</title>
-  <style>
-    /* CSS für spezifische Test-Szenarien */
-  </style>
-</head>
-<body>
-  <h1>Template Name</h1>
-  
-  <!-- Spezifische Test-Elemente -->
-  
-  <script>
-    // JavaScript für spezifische Test-Szenarien
-  </script>
-</body>
-</html>
-```
-
-## 🔧 Wartung
-
-### **Template aktualisieren**
-- HTML-Datei direkt bearbeiten
-- Keine Server-Neustarts nötig
-- Sofortige Verfügbarkeit
-
-### **Neue Test-Szenarien**
-- Template erstellen
-- Server-Route hinzufügen
-- Sitemap erweitern
-- Tests konfigurieren
-
-### **Debugging**
-- Browser-Entwicklertools verwenden
-- Template-Pfad prüfen
-- Server-Logs überwachen 

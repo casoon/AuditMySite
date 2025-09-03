@@ -1,13 +1,13 @@
 {
   "name": "@casoon/auditmysite",
-  "version": "1.0.5",
-  "description": "A comprehensive command-line tool for automated accessibility, security, performance, and SEO testing using Playwright and pa11y, based on sitemap URLs",
+  "version": "1.1.0",
+  "description": "Simplified accessibility testing tool with Core Web Vitals - just works out of the box! Test websites for WCAG compliance with real performance metrics.",
   "main": "dist/index.js",
   "bin": {
-    "auditmysite": "./bin/audit.js"
+    "auditmysite": "./bin/audit-v2.js"
   },
   "scripts": {
-    "build": "tsc",
+    "build": "tsc && tsc-alias",
     "dev": "tsc --watch",
     "test": "node test/run-tests.js",
     "test:mock-server": "node test/mock-server/server.js",
@@ -17,7 +17,6 @@
   },
   "keywords": [
     "accessibility",
-    "security",
     "testing",
     "cli",
     "playwright",
@@ -25,16 +24,17 @@
     "wcag",
     "audit",
     "compliance",
+    "web-vitals",
+    "core-web-vitals",
     "performance",
-    "seo",
+    "lcp",
+    "fcp",
+    "cls",
+    "ttfb",
     "html-reports",
-    "queue-processing",
-    "parallel-testing",
-    "security-scanning",
-    "vulnerability-assessment",
-    "csp",
-    "https-compliance",
-    "owasp"
+    "sitemap",
+    "simple",
+    "out-of-the-box"
   ],
   "author": {
     "name": "Jörn Seidel",
@@ -53,12 +53,10 @@
   "dependencies": {
     "@types/js-yaml": "^4.0.9",
     "chalk": "^5.3.0",
-    "chrome-launcher": "^1.2.0",
     "commander": "^11.1.0",
     "express": "^4.21.2",
     "inquirer": "^9.2.12",
     "js-yaml": "^4.1.0",
-    "lighthouse": "^11.7.1",
     "ora": "^7.0.1",
     "pa11y": "^6.2.3",
     "playwright": "^1.40.0"
@@ -71,7 +69,9 @@
     "@typescript-eslint/parser": "^6.13.0",
     "eslint": "^8.55.0",
     "prettier": "^3.1.0",
-    "typescript": "^5.3.0"
+    "tsc-alias": "^1.8.16",
+    "typescript": "^5.3.0",
+    "web-vitals": "^5.1.0"
   },
   "engines": {
     "node": ">=18.0.0"
