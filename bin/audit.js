@@ -4,7 +4,7 @@ const { Command } = require('commander');
 const { StandardPipeline } = require('../dist/core');
 const inquirer = require('inquirer').default;
 const path = require('path');
-const ora = require('ora');
+const ora = require('ora').default || require('ora');
 
 const program = new Command();
 
@@ -122,6 +122,9 @@ program
     console.log(`   📄 Format: ${config.format.toUpperCase()}`);
     console.log(`   📁 Output: ${config.outputDir}`);
     
+    // Declare spinner in outer scope for error handling
+    let spinner;
+    
     try {
       // Extract domain for report organization
       const url = new URL(sitemapUrl);
@@ -166,7 +169,7 @@ program
       const totalPages = config.maxPages === 1000 ? 'all' : config.maxPages;
       const estimatedTime = calculateEstimatedTime(config.maxPages, config.maxConcurrent);
       
-      let spinner = ora({
+      spinner = ora({
         text: `Testing ${totalPages} pages - Estimated time: ${estimatedTime}`,
         color: 'cyan',
         spinner: 'dots12'

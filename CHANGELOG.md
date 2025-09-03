@@ -10,7 +10,7 @@ All notable changes to AuditMySite will be documented in this file.
 
 ### ✨ Updated
 
-- **pa11y**: Updated from v6.2.3 to v7.0.0 - Eliminates deprecated puppeteer and glob dependencies
+- **pa11y**: Updated from v6.2.3 to v9.0.0 - Latest version with modern Puppeteer v24+ (eliminates all deprecation warnings)
 - **chalk**: Updated from v5.3.0 to v5.6.0 - Latest stable version
 - **commander**: Updated from v11.1.0 to v12.1.0 - Improved CLI parsing
 - **inquirer**: Updated from v9.2.12 to v10.2.0 - Better interactive prompts
