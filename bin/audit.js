@@ -12,7 +12,7 @@ const program = new Command();
 program
   .name('auditmysite')
   .description('🎯 Simple accessibility testing - just works!')
-  .version('1.2.2')
+  .version('1.3.0')
   .argument('<sitemapUrl>', 'URL of the sitemap.xml to test')
   
   // ✅ Only these 6 ESSENTIAL options:
@@ -108,6 +108,30 @@ program
           name: 'verbose',
           message: '🔍 Show detailed progress information?',
           default: false
+        },
+        {
+          type: 'confirm',
+          name: 'modernHtml5',
+          message: '🔥 Enable enhanced HTML5 elements testing (details, dialog, semantic)?',
+          default: true
+        },
+        {
+          type: 'confirm',
+          name: 'ariaEnhanced',
+          message: '⚡ Enable enhanced ARIA analysis with impact scoring?',
+          default: true
+        },
+        {
+          type: 'confirm',
+          name: 'chrome135Features',
+          message: '🚀 Enable Chrome 135 specific features and optimizations?',
+          default: true
+        },
+        {
+          type: 'confirm',
+          name: 'semanticAnalysis',
+          message: '📊 Enable semantic structure analysis and recommendations?',
+          default: true
         }
       ]);
       
@@ -160,7 +184,13 @@ program
         captureScreenshots: false,          // Optional für Tests
         testKeyboardNavigation: false,      // Fokus auf Core-Tests
         testColorContrast: false,          // Fokus auf Core-Tests
-        testFocusManagement: false         // Fokus auf Core-Tests
+        testFocusManagement: false,         // Fokus auf Core-Tests
+        
+        // 🔥 Enhanced v1.3 Features  
+        modernHtml5: config.modernHtml5 !== undefined ? config.modernHtml5 : true,
+        ariaEnhanced: config.ariaEnhanced !== undefined ? config.ariaEnhanced : true,
+        chrome135Features: config.chrome135Features !== undefined ? config.chrome135Features : true,
+        semanticAnalysis: config.semanticAnalysis !== undefined ? config.semanticAnalysis : true
       };
       
       console.log('\n🎯 Starting accessibility test...');
