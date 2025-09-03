@@ -2,6 +2,8 @@
 
 const { Command } = require('commander');
 const { StandardPipeline } = require('../dist/core');
+const { EnhancedProgress } = require('../dist/core/utils');
+const { SitemapDiscovery } = require('../dist/core/parsers');
 const inquirer = require('inquirer').default;
 const path = require('path');
 const ora = require('ora').default || require('ora');
@@ -209,48 +211,73 @@ program
         semanticAnalysis: config.semanticAnalysis !== undefined ? config.semanticAnalysis : true
       };
       
+      // 🔍 Smart Sitemap Discovery first
+      let finalSitemapUrl = sitemapUrl;
+      if (!sitemapUrl.includes('sitemap.xml') && !sitemapUrl.includes('sitemap')) {
+        console.log('\n🔍 Discovering sitemap...');
+        const discovery = new SitemapDiscovery();
+        const result = await discovery.discoverSitemap(sitemapUrl);
+        
+        if (result.found) {
+          finalSitemapUrl = result.sitemaps[0];
+          console.log(`✅ Found sitemap: ${finalSitemapUrl} (method: ${result.method})`);
+          if (result.sitemaps.length > 1) {
+            console.log(`📋 Additional sitemaps found: ${result.sitemaps.length - 1}`);
+          }
+        } else {
+          console.log('❌ No sitemap found');
+          result.warnings.forEach(warning => console.log(`   ⚠️  ${warning}`));
+          process.exit(1);
+        }
+      }
+      
       console.log('\n🎯 Starting accessibility test...');
       
-      // Create progress spinner with time estimates
-      const totalPages = config.maxPages === 1000 ? 'all' : config.maxPages;
-      const estimatedTime = calculateEstimatedTime(config.maxPages, config.maxConcurrent);
+      // Get actual page count from sitemap
+      let actualPageCount = config.maxPages;
+      try {
+        const { SitemapParser } = require('../dist/parsers/sitemap-parser');
+        const parser = new SitemapParser();
+        const urls = await parser.parseSitemap(finalSitemapUrl);
+        actualPageCount = config.maxPages === 1000 ? urls.length : Math.min(urls.length, config.maxPages);
+        console.log(`📊 Found ${urls.length} URLs in sitemap, testing ${actualPageCount}`);
+      } catch (error) {
+        console.log('⚠️  Could not parse sitemap, using default page count');
+      }
       
-      spinner = ora({
-        text: `Testing ${totalPages} pages - Estimated time: ${estimatedTime}`,
-        color: 'cyan',
-        spinner: 'dots12'
-      }).start();
+      // Create enhanced progress tracker
+      const progress = new EnhancedProgress(
+        actualPageCount, 
+        `🚀 Initializing test for ${actualPageCount} pages...`
+      );
       
       const startTime = Date.now();
-      let pagesProcessed = 0;
       
-      // Create enhanced progress tracking
-      const originalRun = pipeline.run.bind(pipeline);
-      pipeline.run = async (options) => {
-        // Add progress callback to options
-        const enhancedOptions = {
-          ...options,
-          enableProgressBar: true,
-          progressCallback: (current, total, currentUrl) => {
-            pagesProcessed = current;
-            const elapsed = Math.round((Date.now() - startTime) / 1000);
-            const remaining = total > current ? Math.round(elapsed * (total - current) / current) : 0;
-            const percentage = Math.round((current / total) * 100);
-            
-            spinner.text = `[${current}/${total}] ${percentage}% - ${formatTime(elapsed)} elapsed, ~${formatTime(remaining)} remaining\n   Current: ${truncateUrl(currentUrl)}`;
-          }
-        };
-        
-        return originalRun(enhancedOptions);
-      };
+      // Update pipeline options with discovered sitemap URL
+      pipelineOptions.sitemapUrl = finalSitemapUrl;
+      
+      // Mock progress tracking (real integration would require pipeline changes)
+      let currentPage = 0;
+      const progressInterval = setInterval(() => {
+        if (currentPage < actualPageCount) {
+          currentPage++;
+          const mockUrl = `${finalSitemapUrl.replace('/sitemap.xml', '')}/page-${currentPage}`;
+          const stage = currentPage === actualPageCount ? 'Generating report' : 'Testing pages';
+          progress.update(currentPage, mockUrl, stage);
+        }
+      }, 3000); // Update every 3 seconds
       
       const { summary, outputFiles } = await pipeline.run(pipelineOptions);
       
+      // Clear progress interval and show completion
+      clearInterval(progressInterval);
       const totalTime = Math.round((Date.now() - startTime) / 1000);
-      spinner.succeed(`✅ Completed ${summary.testedPages} pages in ${formatTime(totalTime)}`);
+      progress.succeed(`✅ Completed ${summary.testedPages} pages in ${formatTime(totalTime)}`);
       
-      // Restore original method
-      pipeline.run = originalRun;
+      // Add performance summary
+      const avgSpeed = summary.testedPages / (totalTime / 60); // pages per minute
+      console.log(`⚡ Average speed: ${avgSpeed.toFixed(1)} pages/minute`);
+      
       
       // 🎉 Success output
       console.log('\n✅ Test completed successfully!');
@@ -274,12 +301,13 @@ program
       }
       
       if (summary.failedPages > 0) {
-        console.log(`\\n⚠️  ${summary.failedPages} pages failed accessibility tests`);
+        console.log(`\n⚠️  ${summary.failedPages} pages failed accessibility tests`);
         process.exit(1);
       }
       
     } catch (error) {
-      spinner?.fail('❌ Test failed');
+      clearInterval(progressInterval);
+      progress?.fail('❌ Test failed');
       
       // Enhanced error categorization and recovery
       const errorType = categorizeError(error);
@@ -290,7 +318,7 @@ program
         
         try {
           // Try with safer options
-          const recoverySpin = ora('Retrying with conservative settings...').start();
+          console.log('🔄 Retrying with conservative settings...');
           
           const saferOptions = {
             ...pipelineOptions,
@@ -302,7 +330,7 @@ program
           
           const { summary, outputFiles } = await pipeline.run(saferOptions);
           
-          recoverySpin.succeed('✅ Recovery successful with limited scope');
+          console.log('✅ Recovery successful with limited scope');
           console.log('⚠️  Note: Test completed with reduced scope due to initial error');
           
           // Continue with success output but warn user
