@@ -1,6 +1,6 @@
-import { ReportGenerator } from './report-generator';
 import { Html5ElementsAnalysis } from '../accessibility/html5-elements-checker';
 import { AriaAnalysisResults } from '../accessibility/aria-rules-analyzer';
+import * as fs from 'fs/promises';
 
 /**
  * Enhanced Report Summary with v1.3 Features
@@ -76,7 +76,7 @@ export interface EnhancedReportData {
 /**
  * Enhanced Report Generator with HTML5 and ARIA Analysis
  */
-export class EnhancedReportGenerator extends ReportGenerator {
+export class EnhancedReportGenerator {
 
   /**
    * Generate enhanced HTML report with new v1.3 sections
@@ -364,7 +364,7 @@ export class EnhancedReportGenerator extends ReportGenerator {
         <div class="metrics-grid">
           <div class="metric">
             <span>Modern Elements:</span>
-            <strong>${Object.values(page.html5Analysis.elementBreakdown).reduce((a: number, b: number) => a + b, 0)}</strong>
+            <strong>${Object.values(page.html5Analysis.elementBreakdown).reduce((a, b) => (a as number) + (b as number), 0)}</strong>
           </div>
           <div class="metric">
             <span>Semantic Score:</span>
@@ -413,7 +413,7 @@ export class EnhancedReportGenerator extends ReportGenerator {
       <div class="analysis-subsection">
         <h4>💡 Recommendations</h4>
         <ul class="recommendations-list">
-          ${page.recommendations.slice(0, 5).map(rec => `<li>${rec}</li>`).join('')}
+          ${page.recommendations.slice(0, 5).map((rec: string) => `<li>${rec}</li>`).join('')}
           ${page.recommendations.length > 5 ? `<li class="more-recommendations">... and ${page.recommendations.length - 5} more</li>` : ''}
         </ul>
       </div>`;
@@ -874,6 +874,40 @@ export class EnhancedReportGenerator extends ReportGenerator {
             <li>Improve landmark role coverage</li>
             <li>Fix invalid ARIA attribute values</li>
           </ul>
+        </div>
+      </div>
+    </section>`;
+  }
+
+  private generatePerformanceSection(data: EnhancedReportData): string {
+    return `
+    <section class="analysis-section performance-section">
+      <h2>⚡ Performance Analysis</h2>
+      <p class="section-description">Web Vitals and performance metrics analysis</p>
+      
+      <div class="analysis-grid">
+        <div class="analysis-card">
+          <h3>Performance Score</h3>
+          <div class="score-circle">
+            <div class="score-value">${Math.round(data.summary.avgPerformanceScore)}%</div>
+          </div>
+          <p>Average across all tested pages</p>
+        </div>
+        
+        <div class="analysis-card">
+          <h3>Chrome 135 Features</h3>
+          <div class="metric-row">
+            <span>Performance Optimizations:</span>
+            <strong class="${data.summary.chrome135Features.performanceOptimizations ? 'success' : 'warning'}">
+              ${data.summary.chrome135Features.performanceOptimizations ? 'Active' : 'Not Available'}
+            </strong>
+          </div>
+          <div class="metric-row">
+            <span>Enhanced Dialog Support:</span>
+            <strong class="${data.summary.chrome135Features.enhancedDialogSupport ? 'success' : 'warning'}">
+              ${data.summary.chrome135Features.enhancedDialogSupport ? 'Active' : 'Not Available'}
+            </strong>
+          </div>
         </div>
       </div>
     </section>`;

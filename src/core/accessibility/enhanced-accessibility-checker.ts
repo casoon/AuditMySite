@@ -32,6 +32,7 @@ export interface EnhancedAccessibilityResult extends AccessibilityResult {
   
   // Performance optimization results
   chrome135Optimizations?: PerformanceOptimizationResults;
+  performanceResults?: any; // Add performanceResults property
   
   // Enhanced recommendations
   enhancedRecommendations?: string[];

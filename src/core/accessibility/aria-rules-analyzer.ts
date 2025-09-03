@@ -108,7 +108,7 @@ export class AriaRulesAnalyzer {
         results.enhancedFeatures = this.detectEnhancedAriaFeatures();
 
         return results;
-      }.bind(this));
+      });
 
       // Generate enhanced recommendations
       analysis.recommendations = this.generateAriaRecommendations(analysis);
@@ -133,7 +133,7 @@ export class AriaRulesAnalyzer {
     const ariaMultiline = element.getAttribute('aria-multiline');
 
     let hasValidAria = true;
-    let impactLevel: AriaImpactLevel = AriaImpactLevel.MINOR;
+    let impactLevel: string = 'minor';
 
     // 1. Role validation
     if (role) {
@@ -155,7 +155,7 @@ export class AriaRulesAnalyzer {
       if (!validRoles.includes(role)) {
         results.roleIssues++;
         hasValidAria = false;
-        impactLevel = AriaImpactLevel.SERIOUS;
+        impactLevel = 'serious';
       }
     }
 
@@ -167,7 +167,7 @@ export class AriaRulesAnalyzer {
       if (missingIds.length > 0) {
         results.ariaLabelIssues++;
         hasValidAria = false;
-        impactLevel = AriaImpactLevel.SERIOUS;
+        impactLevel = 'serious';
       }
     }
 
@@ -178,7 +178,7 @@ export class AriaRulesAnalyzer {
       if (missingIds.length > 0) {
         results.ariaDescribedByIssues++;
         hasValidAria = false;
-        impactLevel = AriaImpactLevel.MODERATE;
+        impactLevel = 'moderate';
       }
     }
 
@@ -190,7 +190,7 @@ export class AriaRulesAnalyzer {
         if (!['yes', 'no', '1', '0'].includes(ariaRequired.toLowerCase())) {
           results.ariaRequiredIssues++;
           hasValidAria = false;
-          impactLevel = AriaImpactLevel.MODERATE;
+          impactLevel = 'moderate';
         }
       }
     }
@@ -203,7 +203,7 @@ export class AriaRulesAnalyzer {
         if (!['yes', 'no', '1', '0'].includes(ariaMultiline.toLowerCase())) {
           results.ariaMultilineIssues++;
           hasValidAria = false;
-          impactLevel = AriaImpactLevel.MINOR;
+          impactLevel = 'minor';
         }
       }
     }
@@ -225,16 +225,16 @@ export class AriaRulesAnalyzer {
       
       // Update impact breakdown
       switch (impactLevel) {
-        case AriaImpactLevel.CRITICAL:
+        case 'critical':
           results.impactBreakdown.critical++;
           break;
-        case AriaImpactLevel.SERIOUS:
+        case 'serious':
           results.impactBreakdown.serious++;
           break;
-        case AriaImpactLevel.MODERATE:
+        case 'moderate':
           results.impactBreakdown.moderate++;
           break;
-        case AriaImpactLevel.MINOR:
+        case 'minor':
           results.impactBreakdown.minor++;
           break;
       }

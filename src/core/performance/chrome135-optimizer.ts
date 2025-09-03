@@ -105,9 +105,10 @@ export class Chrome135Optimizer {
     for (const page of pages) {
       try {
         // Enable enhanced accessibility features in Chrome 135
-        await page.evaluateOnNewDocument(() => {
+        await page.addInitScript(() => {
           // Force accessibility tree computation for modern elements
-          if (window.chrome && window.chrome.runtime) {
+          // @ts-ignore - Chrome 135 specific API
+          if ((window as any).chrome && (window as any).chrome.runtime) {
             // Chrome 135 specific accessibility enhancements
             const observer = new MutationObserver(() => {
               // Trigger accessibility tree updates for dynamic content
@@ -134,7 +135,7 @@ export class Chrome135Optimizer {
     for (const page of pages) {
       try {
         // Chrome 135 has improved dialog element support
-        await page.evaluateOnNewDocument(() => {
+        await page.addInitScript(() => {
           // Enhance dialog accessibility in Chrome 135
           if (HTMLDialogElement && HTMLDialogElement.prototype.showModal) {
             const originalShowModal = HTMLDialogElement.prototype.showModal;
@@ -268,7 +269,7 @@ export class Chrome135Optimizer {
           // Chrome 135 enhanced performance markers
           window.addEventListener('load', () => {
             const loadTime = window.performance.now() - startTime;
-            window.__chrome135LoadTime = loadTime;
+            (window as any).__chrome135LoadTime = loadTime;
           });
         }
         
@@ -297,8 +298,9 @@ export class Chrome135Optimizer {
           try {
             const clsObserver = new PerformanceObserver((list) => {
               for (const entry of list.getEntries()) {
-                if (entry.hadRecentInput) continue;
-                window.__chrome135CLS = (window.__chrome135CLS || 0) + entry.value;
+                // @ts-ignore - Layout shift entry API
+                if ((entry as any).hadRecentInput) continue;
+                (window as any).__chrome135CLS = ((window as any).__chrome135CLS || 0) + (entry as any).value;
               }
             });
             clsObserver.observe({ type: 'layout-shift', buffered: true });
@@ -311,7 +313,7 @@ export class Chrome135Optimizer {
             const lcpObserver = new PerformanceObserver((list) => {
               const entries = list.getEntries();
               const lastEntry = entries[entries.length - 1];
-              window.__chrome135LCP = lastEntry.startTime;
+              (window as any).__chrome135LCP = lastEntry.startTime;
             });
             lcpObserver.observe({ type: 'largest-contentful-paint', buffered: true });
           } catch (e) {
@@ -475,13 +477,13 @@ export class Chrome135Optimizer {
                            navigator.userAgent.includes('Chrome/136'); // Early releases
         
         return {
-          enhancedAccessibilityTree: isChrome135 && !!window.getComputedAccessibleName,
+          enhancedAccessibilityTree: isChrome135 && !!(window as any).getComputedAccessibleName,
           improvedDialogSupport: isChrome135 && !!HTMLDialogElement && 
                                 HTMLDialogElement.prototype.hasOwnProperty('showModal'),
-          modernDevToolsProtocol: isChrome135 && !!window.chrome,
-          optimizedResourceLoading: isChrome135 && !!window.performance.measureUserAgentSpecificMemory,
+          modernDevToolsProtocol: isChrome135 && !!(window as any).chrome,
+          optimizedResourceLoading: isChrome135 && !!(window.performance as any).measureUserAgentSpecificMemory,
           enhancedPerformanceMetrics: isChrome135 && !!window.PerformanceObserver,
-          betterMemoryManagement: isChrome135 && 'memory' in window.performance
+          betterMemoryManagement: isChrome135 && 'memory' in (window.performance as any)
         };
       });
       
@@ -505,9 +507,9 @@ export class Chrome135Optimizer {
     try {
       const gains = await page.evaluate(() => {
         return {
-          pageLoadTime: window.__chrome135LoadTime || 0,
-          memoryUsage: window.performance.memory ? 
-                      (window.performance.memory.usedJSHeapSize / 1024 / 1024) : 0,
+          pageLoadTime: (window as any).__chrome135LoadTime || 0,
+          memoryUsage: (window.performance as any).memory ? 
+                      ((window.performance as any).memory.usedJSHeapSize / 1024 / 1024) : 0,
           testExecutionSpeed: window.performance.now()
         };
       });

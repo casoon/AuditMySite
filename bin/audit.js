@@ -23,8 +23,23 @@ program
   .option('--non-interactive', 'Skip prompts for CI/CD (use defaults)')
   .option('-v, --verbose', 'Show detailed progress information')
   
+  // 🚀 Tauri Integration Options
+  .option('--stream', 'Enable streaming output for desktop integration')
+  .option('--session-id <id>', 'Session ID for tracking (required with --stream)')
+  .option('--chunk-size <size>', 'Chunk size for large reports', '1000')
+  
   .action(async (sitemapUrl, options) => {
-    console.log('🚀 AuditMySite v1.2 - Enhanced Accessibility Testing');
+    // 🚀 Tauri Integration: Streaming Mode
+    if (options.stream) {
+      if (!options.sessionId) {
+        console.error('Error: --session-id is required when using --stream mode');
+        process.exit(1);
+      }
+      await runStreamingAudit(sitemapUrl, options);
+      return;
+    }
+    
+    console.log('🚀 AuditMySite v1.3 - Enhanced Accessibility Testing');
     console.log(`📄 Sitemap: ${sitemapUrl}`);
     
     // 🎯 SMART DEFAULTS
@@ -444,6 +459,101 @@ function categorizeError(error) {
       'Check the GitHub issues page for similar problems'
     ]
   };
+}
+
+// 🚀 Streaming Audit Function for Tauri Integration
+async function runStreamingAudit(sitemapUrl, options) {
+  const { StreamingReporter } = require('../dist/core/reporting/streaming-reporter');
+  const { StandardPipeline } = require('../dist/core');
+  
+  const streamingReporter = StreamingReporter.create(
+    options.sessionId,
+    process.stdout,
+    {
+      enabled: true,
+      chunkSize: parseInt(options.chunkSize) || 10,
+      bufferTimeout: 1000,
+      includeDetailedResults: true,
+      compressResults: false
+    }
+  );
+  
+  try {
+    // Initialize streaming session
+    streamingReporter.init(options.full ? 1000 : 5, {});
+    
+    // Report initial progress
+    streamingReporter.reportProgress({
+      current: 0,
+      total: options.full ? 1000 : 5,
+      currentUrl: sitemapUrl,
+      stage: 'parsing_sitemap'
+    });
+    
+    // Configure pipeline options
+    const config = {
+      maxPages: options.full ? 1000 : 5,
+      standard: 'WCAG2AA',
+      format: options.format || 'html',
+      outputDir: options.outputDir || './reports',
+      timeout: 30000,
+      generateDetailedReport: true,
+      generatePerformanceReport: true,
+      generateSeoReport: false,
+      generateSecurityReport: false,
+      outputFormat: options.format || 'html',
+      maxConcurrent: 2,
+      verbose: options.verbose || false,
+      timestamp: new Date().toISOString(),
+      collectPerformanceMetrics: true,
+      
+      // 🔥 Enhanced v1.3 Features (all enabled by default for streaming)
+      modernHtml5: true,
+      ariaEnhanced: true,
+      chrome135Features: true,
+      semanticAnalysis: true
+    };
+    
+    const pipeline = new StandardPipeline();
+    
+    // Override pipeline progress reporting for streaming
+    const originalProgressCallback = config.progressCallback;
+    config.progressCallback = (current, total, currentUrl) => {
+      streamingReporter.reportProgress({
+        current,
+        total,
+        currentUrl: currentUrl || 'Processing...',
+        stage: 'testing_pages'
+      });
+      
+      if (originalProgressCallback) {
+        originalProgressCallback(current, total, currentUrl);
+      }
+    };
+    
+    const { summary, outputFiles } = await pipeline.run({
+      sitemapUrl,
+      ...config
+    });
+    
+    // Report completion
+    streamingReporter.complete(summary, summary.testedPages, summary.passedPages);
+    
+    // Clean exit for streaming mode
+    process.exit(summary.failedPages > 0 ? 1 : 0);
+    
+  } catch (error) {
+    streamingReporter.reportError(
+      error.message || String(error),
+      sitemapUrl,
+      'streaming_audit',
+      false
+    );
+    
+    process.exit(1);
+  } finally {
+    streamingReporter.cleanup();
+  }
 }
 
 program.parse();
