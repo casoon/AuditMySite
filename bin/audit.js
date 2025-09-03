@@ -4,444 +4,413 @@ const { Command } = require('commander');
 const { StandardPipeline } = require('../dist/core');
 const inquirer = require('inquirer').default;
 const path = require('path');
+const ora = require('ora');
 
 const program = new Command();
 
+// 🎯 SIMPLIFIED CLI - Only 6 essential options!
 program
   .name('auditmysite')
-  .description('A powerful command-line tool for automated accessibility testing using Playwright and pa11y, based on sitemap URLs')
-  .version('1.0.0')
+  .description('🎯 Simple accessibility testing - just works!')
+  .version('1.2.0')
   .argument('<sitemapUrl>', 'URL of the sitemap.xml to test')
-  .option('-m, --max-pages <number>', 'Maximum number of pages to test')
-  .option('-t, --timeout <number>', 'Timeout in milliseconds', '10000')
-  .option('-w, --wait-until <string>', 'Wait until (domcontentloaded|load|networkidle)', 'domcontentloaded')
-  .option('-f, --format <format>', 'Output format (markdown, html, pdf)')
-  .option('-i, --include <patterns>', 'Include URL patterns (comma-separated)')
-  .option('-v, --verbose', 'Verbose output')
-  .option('--standard <standard>', 'Accessibility standard (WCAG2A|WCAG2AA|WCAG2AAA|Section508)', 'WCAG2AA')
+  
+  // ✅ Only these 6 ESSENTIAL options:
+  .option('--full', 'Test all pages instead of just 5 (default: 5 pages)')
+  .option('--expert', 'Interactive expert mode with custom settings')
+  .option('--format <type>', 'Report format: html or markdown', 'html')
   .option('--output-dir <dir>', 'Output directory for reports', './reports')
-  .option('--include-details', 'Include detailed information in output')
-  .option('--include-pa11y', 'Include pa11y issues in output')
-  .option('--pa11y-standard <standard>', 'Pa11y standard (WCAG2A|WCAG2AA|WCAG2AAA|Section508)', 'WCAG2AA')
-  .option('--hide-elements <selectors>', 'CSS selectors to hide from pa11y tests')
-  .option('--include-notices', 'Include pa11y notices in output')
-  .option('--include-warnings', 'Include pa11y warnings in output', true)
-  .option('--pa11y-wait <ms>', 'Wait time after page load for pa11y tests', '1000')
-  .option('--performance-metrics', 'Collect performance metrics')
-  .option('--screenshots', 'Capture desktop and mobile screenshots')
-  .option('--keyboard-tests', 'Test keyboard navigation')
-  .option('--color-contrast', 'Test color contrast (simplified)')
-  .option('--focus-management', 'Test focus management')
-  .option('--block-images', 'Block images for faster testing')
-  .option('--block-css', 'Block CSS for faster testing')
-  .option('--mobile-emulation', 'Enable mobile emulation')
-  .option('--viewport <size>', 'Set viewport size (e.g., 1920x1080)', '1920x1080')
-  .option('--user-agent <agent>', 'Set custom user agent (default: auditmysite/1.0)')
-  .option('--detailed-report', 'Generate detailed error report for automated fixes')
-  .option('--performance-report', 'Generate performance report with PageSpeed/Lightspeed analysis')
-  .option('--no-performance-report', 'Disable performance report generation')
-  .option('--seo-report', 'Generate SEO report with search engine optimization analysis')
-  .option('--no-seo-report', 'Disable SEO report generation')
-  .option('--security-scan', 'Run comprehensive security scan (headers, HTTPS, CSP, vulnerabilities)')
-  .option('--no-security-scan', 'Disable security scan')
-  .option('--security-report', 'Generate detailed security report')
-  .option('--no-security-report', 'Disable security report generation')
-  .option('--skip-csp-localhost', 'Skip CSP test for localhost (faster development testing)')
-  // 🆕 pa11y options
-  .option('--use-pa11y', 'Use pa11y for detailed accessibility testing (slower, more memory)')
-  .option('--no-pa11y', 'Disable pa11y, use only Playwright tests (faster, less memory)')
-  // 🆕 Lighthouse options
-  .option('--lighthouse', 'Run Lighthouse tests for performance, accessibility, best practices, and SEO')
-  .option('--core-web-vitals', 'Test Core Web Vitals performance metrics (LCP, FID, CLS, FCP, TTI, TBT)')
-  .option('--touch-targets', 'Test touch target sizes for mobile accessibility (44px minimum)')
-  .option('--pwa', 'Test Progressive Web App features (manifest, service worker, installability)')
-  // 🚀 Parallel test options (Queue is now standard)
-  .option('--max-concurrent <number>', 'Number of parallel workers (default: 3)', '3')
-  .option('--concurrency <number>', 'Alias for --max-concurrent')
-  .option('--max-workers <number>', 'Alias for --max-concurrent')
-  .option('--max-retries <number>', 'Maximum retry attempts for failed tests (default: 3)', '3')
-  .option('--retry-delay <ms>', 'Delay between retry attempts in milliseconds (default: 2000)', '2000')
-  .option('--no-progress-bar', 'Disable live progress bar')
-  .option('--progress-interval <ms>', 'Progress update interval in milliseconds (default: 1000)', '1000')
-  .option('--no-resource-monitoring', 'Disable resource monitoring (memory/CPU)')
-  .option('--max-memory <mb>', 'Maximum memory usage in MB (default: 512)', '512')
-  .option('--max-cpu <percent>', 'Maximum CPU usage percentage (default: 80)', '80')
-  // 🆕 Legacy option for sequential tests
-  .option('--sequential', 'Use sequential testing (legacy mode, slower)')
-  // 🆕 Output format options
-  .option('--include-copy-buttons', 'Include copy buttons in HTML reports', false)
-  // 🆕 Non-interactive mode for automated tests
-  .option('--non-interactive', 'Skip all interactive prompts and use defaults (for CI/CD)')
+  .option('--non-interactive', 'Skip prompts for CI/CD (use defaults)')
+  .option('-v, --verbose', 'Show detailed progress information')
+  
   .action(async (sitemapUrl, options) => {
-    console.log('🚀 Starting accessibility test...');
+    console.log('🚀 AuditMySite v1.2 - Enhanced Accessibility Testing');
     console.log(`📄 Sitemap: ${sitemapUrl}`);
     
-    // Handle alias options for parallel workers
-    let maxConcurrent = options.maxConcurrent;
-    if (options.concurrency) maxConcurrent = options.concurrency;
-    if (options.maxWorkers) maxConcurrent = options.maxWorkers;
+    // 🎯 SMART DEFAULTS
+    const QUICK_DEFAULTS = {
+      maxPages: options.full ? 1000 : 5,
+      standard: 'WCAG2AA',
+      format: options.format || 'html',
+      outputDir: options.outputDir || './reports',
+      timeout: 10000,
+      maxConcurrent: 2,
+      generateDetailedReport: true,
+      generatePerformanceReport: true,
+      generateSeoReport: false,        // ❌ Removed 
+      generateSecurityReport: false,   // ❌ Removed
+      usePa11y: true,
+      lighthouse: false,               // ❌ Removed Lighthouse
+      captureScreenshots: false,      // ❌ Removed
+      verbose: options.verbose || false
+    };
     
-    // Interactive prompts for all options if not specified
-    let maxPages = options.maxPages;
-    let standard = options.standard || 'WCAG2AA'; // Default standard
-    let generateDetailedReport = options.detailedReport;
-    let generatePerformanceReport = options.performanceReport;
-    let generateSeoReport = options.seoReport;
-    let generateSecurityReport = options.securityReport;
+    let config = { ...QUICK_DEFAULTS };
     
-    // Handle negative flags (--no-* options)
-    if (options.noDetailedReport) generateDetailedReport = false;
-    if (options.noPerformanceReport) generatePerformanceReport = false;
-    if (options.noSeoReport) generateSeoReport = false;
-    if (options.noSecurityReport) generateSecurityReport = false;
-    
-    // Set sensible defaults for all parameters if not provided
-    if (generateDetailedReport === undefined) generateDetailedReport = true;
-    if (generatePerformanceReport === undefined) generatePerformanceReport = true;
-    if (generateSeoReport === undefined) generateSeoReport = true;
-    if (generateSecurityReport === undefined) generateSecurityReport = false;
-    
-        // Show prompts for parameters that are not set via CLI
-    // Only skip prompts for parameters that are explicitly provided
-    const maxPagesChoices = [
-      { name: '5 pages (Quick test)', value: 5 },
-      { name: '10 pages (Standard test)', value: 10 },
-      { name: '20 pages (Comprehensive test)', value: 20 },
-      { name: '50 pages (Full audit)', value: 50 },
-      { name: '100 pages (Complete analysis)', value: 100 },
-      { name: 'All pages (Maximum coverage)', value: 1000 }
-    ];
-    
-    const standardChoices = [
-      { name: 'WCAG 2.0 Level A (Basic)', value: 'WCAG2A' },
-      { name: 'WCAG 2.0 Level AA (Recommended)', value: 'WCAG2AA' },
-      { name: 'WCAG 2.0 Level AAA (Strict)', value: 'WCAG2AAA' },
-      { name: 'Section 508 (US Federal)', value: 'Section508' }
-    ];
-    
-    const prompts = [];
-    
-    // Only ask for maxPages if not provided via CLI
-    if (!options.maxPages) {
-      prompts.push({
-        type: 'list',
-        name: 'maxPages',
-        message: 'How many pages would you like to test?',
-        choices: maxPagesChoices,
-        default: 20
-      });
-    }
-    
-    // Only ask for standard if not provided via CLI
-    if (!options.standard) {
-      prompts.push({
-        type: 'list',
-        name: 'standard',
-        message: 'Which accessibility standard would you like to test against?',
-        choices: standardChoices,
-        default: standard
-      });
-    }
-    
-    // Only ask for detailed report if not provided via CLI
-    if (options.detailedReport === undefined && !options.noDetailedReport) {
-      prompts.push({
-        type: 'confirm',
-        name: 'generateDetailedReport',
-        message: 'Would you like to generate a detailed error report for automated fixes?',
-        default: true
-      });
-    }
-    
-    // Only ask for performance report if not provided via CLI
-    if (options.performanceReport === undefined && !options.noPerformanceReport) {
-      prompts.push({
-        type: 'confirm',
-        name: 'generatePerformanceReport',
-        message: 'Would you like to generate a performance report with PageSpeed/Lightspeed analysis?',
-        default: true
-      });
-    }
-    
-    // Only ask for SEO report if not provided via CLI
-    if (options.seoReport === undefined && !options.noSeoReport) {
-      prompts.push({
-        type: 'confirm',
-        name: 'generateSeoReport',
-        message: 'Would you like to generate an SEO report with search engine optimization analysis?',
-        default: true
-      });
-    }
-    
-    // Only ask for security report if not provided via CLI
-    if (options.securityReport === undefined && !options.noSecurityReport) {
-      prompts.push({
-        type: 'confirm',
-        name: 'generateSecurityReport',
-        message: 'Would you like to run a comprehensive security scan (headers, HTTPS, CSP, vulnerabilities)?',
-        default: false
-      });
-    }
-    
-    // Nur Prompts anzeigen, wenn welche vorhanden sind und nicht im non-interactive Modus
-    if (prompts.length > 0 && !options.nonInteractive) {
-      const answers = await inquirer.prompt(prompts);
+    // 🔧 EXPERT MODE - Interactive wizard
+    if (options.expert && !options.nonInteractive) {
+      console.log('\n🔧 Expert Mode - Custom Configuration');
+      console.log('━'.repeat(50));
       
-      // Werte aus Prompts aktualisieren (nur für Parameter, die abgefragt wurden)
-      if (!options.maxPages) maxPages = answers.maxPages;
-      if (!options.standard) standard = answers.standard;
-      if (options.detailedReport === undefined && !options.noDetailedReport) generateDetailedReport = answers.generateDetailedReport;
-      if (options.performanceReport === undefined && !options.noPerformanceReport) generatePerformanceReport = answers.generatePerformanceReport;
-      if (options.seoReport === undefined && !options.noSeoReport) generateSeoReport = answers.generateSeoReport;
-      if (options.securityReport === undefined && !options.noSecurityReport) generateSecurityReport = answers.generateSecurityReport;
-    } else if (options.nonInteractive && prompts.length > 0) {
-      // Use default values for all prompts in non-interactive mode
-      console.log('🤖 Non-interactive mode: Using default values for all prompts');
-      if (!options.maxPages) maxPages = 20; // Default: comprehensive test
-      if (!options.standard) standard = 'WCAG2AA'; // Default standard
-      // Other default values are already set above
-    }
-    
-    // Set default for maxPages if not provided via CLI or prompts
-    if (!maxPages) maxPages = 20;
-    
-    // Set default values for output format
-    let outputFormat = options.format?.toLowerCase();
-    let includeCopyButtons = options.includeCopyButtons;
-
-    // Prompt for output format (if not set and not non-interactive)
-    if (!outputFormat && !options.nonInteractive) {
-      const formatAnswer = await inquirer.prompt([{
-        type: 'list',
-        name: 'outputFormat',
-        message: 'Which output format would you like to use?',
-        choices: [
-          { name: 'Markdown (Standard)', value: 'markdown' },
-          { name: 'HTML (Interactive with Copy-Buttons)', value: 'html' },
-          { name: 'PDF (PDF Export)', value: 'pdf' }
-        ],
-        default: 'markdown'
-      }]);
+      const answers = await inquirer.prompt([
+        {
+          type: 'list',
+          name: 'maxPages',
+          message: '🔢 How many pages to test?',
+          choices: [
+            { name: '⚡ 5 pages (Quick test) - ~2 minutes', value: 5 },
+            { name: '🎯 20 pages (Standard test) - ~8 minutes', value: 20 },
+            { name: '📊 50 pages (Comprehensive) - ~20 minutes', value: 50 },
+            { name: '🚀 All pages (Maximum coverage) - varies', value: 1000 }
+          ],
+          default: 20
+        },
+        {
+          type: 'list', 
+          name: 'standard',
+          message: '♿ Accessibility standard?',
+          choices: [
+            { name: '🎯 WCAG 2.1 AA (Recommended) - Industry standard', value: 'WCAG2AA' },
+            { name: '⭐ WCAG 2.1 AAA (Strict) - Highest compliance', value: 'WCAG2AAA' },
+            { name: '🇺🇸 Section 508 (US Federal) - Government sites', value: 'Section508' }
+          ],
+          default: 'WCAG2AA'
+        },
+        {
+          type: 'list',
+          name: 'format',
+          message: '📄 Report format?',
+          choices: [
+            { name: '🌐 HTML - Professional reports for stakeholders', value: 'html' },
+            { name: '📝 Markdown - Developer-friendly, version control', value: 'markdown' }
+          ],
+          default: 'html'
+        },
+        {
+          type: 'confirm',
+          name: 'generatePerformanceReport',
+          message: '⚡ Include Core Web Vitals performance metrics?',
+          default: true
+        },
+        {
+          type: 'number',
+          name: 'maxConcurrent',
+          message: '🔄 Concurrent page tests (1-5)?',
+          default: 2,
+          validate: (value) => {
+            const num = parseInt(value);
+            if (num >= 1 && num <= 5) return true;
+            return 'Please enter a number between 1 and 5';
+          }
+        },
+        {
+          type: 'confirm',
+          name: 'verbose',
+          message: '🔍 Show detailed progress information?',
+          default: false
+        }
+      ]);
       
-      outputFormat = formatAnswer.outputFormat;
-      
-      if (outputFormat === 'html') {
-        // Copy-Buttons sind immer aktiv, keine Abfrage mehr
-      }
-    } else if (options.nonInteractive && !outputFormat) {
-      // Use Markdown as default in non-interactive mode
-      console.log('🤖 Non-interactive mode: Using Markdown output format');
-      outputFormat = 'markdown';
-      includeCopyButtons = false; // Not applicable for Markdown
+      config = { ...config, ...answers };
     }
     
-    // Output format validation
-    if (!['markdown', 'html', 'pdf'].includes(outputFormat)) {
-      console.error('❌ Invalid output format. Use: markdown, html, or pdf');
-      process.exit(1);
-    }
-    
-    // Ensure maxPages is a number
-    maxPages = parseInt(maxPages);
-    
-    console.log(`🧪 Max Pages: ${maxPages}`);
-    console.log(`⏱️  Timeout: ${options.timeout}ms`);
-    console.log(`📋 Standard: ${standard}`);
-    console.log(`📋 Detailed Report: ${generateDetailedReport ? 'Yes' : 'No'}`);
-    console.log(`📋 Performance Report: ${generatePerformanceReport ? 'Yes' : 'No'}`);
-    console.log(`📋 SEO Report: ${generateSeoReport ? 'Yes' : 'No'}`);
-    console.log(`🔒 Security Report: ${generateSecurityReport ? 'Yes' : 'No'}`);
-    console.log(`🚀 Queue Processing: ${options.sequential ? 'No (sequential)' : 'Yes (standard)'}`);
-    console.log(`📄 Output Format: ${outputFormat.toUpperCase()}`);
-    if (outputFormat === 'html') {
-      console.log(`📋 Copy Buttons: ${includeCopyButtons ? 'Yes' : 'No'}`);
-    } else if (outputFormat === 'pdf') {
-      console.log(`📄 PDF Generation: Yes`);
-    }
-    if (!options.sequential) {
-      console.log(`🔧 Parallel Workers: ${maxConcurrent}`);
-      console.log(`🔄 Max Retries: ${options.maxRetries}`);
-      console.log(`⏱️  Retry Delay: ${options.retryDelay}ms`);
-    }
+    // 📊 Show configuration
+    console.log(`\n📋 Configuration:`);
+    console.log(`   📄 Pages: ${config.maxPages === 1000 ? 'All' : config.maxPages}`);
+    console.log(`   📋 Standard: ${config.standard}`);
+    console.log(`   📊 Performance: ${config.generatePerformanceReport ? 'Yes' : 'No'}`);
+    console.log(`   📄 Format: ${config.format.toUpperCase()}`);
+    console.log(`   📁 Output: ${config.outputDir}`);
     
     try {
-      // Extract domain and create subdirectory
+      // Extract domain for report organization
       const url = new URL(sitemapUrl);
-      const domain = url.hostname.replace(/\./g, '-');
+      const domain = url.hostname.replace(/\\./g, '-');
+      const dateOnly = new Date().toLocaleDateString('en-CA');
       
-      // Use local timezone instead of UTC
-      const now = new Date();
-      const currentTimestamp = now.toLocaleString('en-US', {
-        timeZone: 'Europe/Berlin',
-        year: 'numeric',
-        month: '2-digit',
-        day: '2-digit',
-        hour: '2-digit',
-        minute: '2-digit',
-        second: '2-digit',
-        hour12: false
-      }).replace(/(\d{2})\.(\d{2})\.(\d{4}), (\d{2}):(\d{2}):(\d{2})/, '$3-$2-$1T$4:$5:$6+02:00');
-      
-      const dateOnly = now.toLocaleDateString('en-CA', {
-        timeZone: 'Europe/Berlin',
-        year: 'numeric',
-        month: '2-digit',
-        day: '2-digit'
-      }).split('-').join('-'); // YYYY-MM-DD
-      
-      // Create subdirectory based on domain
+      // Create domain subdirectory
       const fs = require('fs');
-      const subDir = path.join(options.outputDir, domain);
+      const subDir = path.join(config.outputDir, domain);
       if (!fs.existsSync(subDir)) {
         fs.mkdirSync(subDir, { recursive: true });
       }
       
-      // Use simple filenames without domain
-      let filename;
-      if (outputFormat === 'html') {
-        filename = `accessibility-report-${dateOnly}.html`;
-      } else {
-        filename = `accessibility-report-${dateOnly}.md`;
-      }
-      const outputPath = path.join(subDir, filename);
-      
-      // Run standard pipeline
+      // 🚀 Run the pipeline with simplified options
       const pipeline = new StandardPipeline();
-      // Parse viewport size if provided
-      let viewportSize;
-      if (options.viewport) {
-        const [width, height] = options.viewport.split('x').map(Number);
-        if (width && height) {
-          viewportSize = { width, height };
-        }
-      }
-
+      
       const pipelineOptions = {
         sitemapUrl,
-        maxPages: maxPages,
-        timeout: parseInt(options.timeout),
-        pa11yStandard: standard,
-        outputDir: subDir, // Use subdirectory instead of main output directory
-        includeDetails: options.includeDetails,
-        includePa11yIssues: options.includePa11y,
-        generateDetailedReport: generateDetailedReport,
-        generatePerformanceReport: generatePerformanceReport,
-        generateSeoReport: generateSeoReport,
-        generateSecurityReport: generateSecurityReport,
-        skipCspForLocalhost: options.skipCspLocalhost,
-        hideElements: options.hideElements,
-        includeNotices: options.includeNotices,
-        includeWarnings: options.includeWarnings,
-        wait: parseInt(options.pa11yWait),
-        // 🆕 New Playwright options
-        collectPerformanceMetrics: options.performanceMetrics || generatePerformanceReport,
-        captureScreenshots: options.screenshots,
-        testKeyboardNavigation: options.keyboardTests,
-        testColorContrast: options.colorContrast,
-        testFocusManagement: options.focusManagement,
-        blockImages: options.blockImages,
-        blockCSS: options.blockCSS,
-        mobileEmulation: options.mobileEmulation,
-        viewportSize,
-        userAgent: options.userAgent,
-        // 🚀 Parallel test options
-        useSequentialTesting: options.sequential,
-        maxConcurrent: parseInt(maxConcurrent),
-        maxRetries: parseInt(options.maxRetries),
-        retryDelay: parseInt(options.retryDelay),
-        enableProgressBar: !options.noProgressBar,
-        progressUpdateInterval: parseInt(options.progressInterval),
-        enableResourceMonitoring: !options.noResourceMonitoring,
-        maxMemoryUsage: parseInt(options.maxMemory),
-        maxCpuUsage: parseInt(options.maxCpu),
-        // 🆕 Output format options
-        outputFormat: outputFormat,
-        includeCopyButtons: includeCopyButtons,
-        // 🕐 Timestamp for report generation
-        timestamp: currentTimestamp
+        maxPages: config.maxPages,
+        timeout: config.timeout,
+        pa11yStandard: config.standard,
+        outputDir: subDir,
+        generateDetailedReport: config.generateDetailedReport,
+        generatePerformanceReport: config.generatePerformanceReport,
+        generateSeoReport: false,           // ❌ Always false now
+        generateSecurityReport: false,      // ❌ Always false now
+        outputFormat: config.format,
+        maxConcurrent: config.maxConcurrent,
+        verbose: config.verbose,
+        timestamp: new Date().toISOString(),
+        // 🆕 Performance-Metriken aktivieren
+        collectPerformanceMetrics: true,    // ✅ Web Vitals immer aktiviert
+        captureScreenshots: false,          // Optional für Tests
+        testKeyboardNavigation: false,      // Fokus auf Core-Tests
+        testColorContrast: false,          // Fokus auf Core-Tests
+        testFocusManagement: false         // Fokus auf Core-Tests
       };
       
-      console.log('🧪 Running accessibility tests...');
+      console.log('\n🎯 Starting accessibility test...');
+      
+      // Create progress spinner with time estimates
+      const totalPages = config.maxPages === 1000 ? 'all' : config.maxPages;
+      const estimatedTime = calculateEstimatedTime(config.maxPages, config.maxConcurrent);
+      
+      let spinner = ora({
+        text: `Testing ${totalPages} pages - Estimated time: ${estimatedTime}`,
+        color: 'cyan',
+        spinner: 'dots12'
+      }).start();
+      
+      const startTime = Date.now();
+      let pagesProcessed = 0;
+      
+      // Create enhanced progress tracking
+      const originalRun = pipeline.run.bind(pipeline);
+      pipeline.run = async (options) => {
+        // Add progress callback to options
+        const enhancedOptions = {
+          ...options,
+          enableProgressBar: true,
+          progressCallback: (current, total, currentUrl) => {
+            pagesProcessed = current;
+            const elapsed = Math.round((Date.now() - startTime) / 1000);
+            const remaining = total > current ? Math.round(elapsed * (total - current) / current) : 0;
+            const percentage = Math.round((current / total) * 100);
+            
+            spinner.text = `[${current}/${total}] ${percentage}% - ${formatTime(elapsed)} elapsed, ~${formatTime(remaining)} remaining\n   Current: ${truncateUrl(currentUrl)}`;
+          }
+        };
+        
+        return originalRun(enhancedOptions);
+      };
+      
       const { summary, outputFiles } = await pipeline.run(pipelineOptions);
       
-      // Rename the output file to use domain-based naming
-      if (outputFiles.length > 0 && outputFormat !== 'pdf') { // Only rename if not PDF
-        const originalFile = outputFiles[0];
-        
-        // Ensure the file is regenerated with current timestamp
-        if (fs.existsSync(originalFile)) {
-          const content = fs.readFileSync(originalFile, 'utf8');
-          const updatedContent = content.replace(
-            /Generated: .*/,
-            `Generated: ${currentTimestamp}`
-          );
-          fs.writeFileSync(originalFile, updatedContent, 'utf8');
-        }
-        
-        fs.renameSync(originalFile, outputPath);
-        
-        console.log('');
-        console.log('✅ Test completed successfully!');
-        console.log(`📊 Results:`);
-        console.log(`   - Tested pages: ${summary.testedPages}`);
-        console.log(`   - Passed: ${summary.passedPages}`);
-        console.log(`   - Failed: ${summary.failedPages}`);
-        console.log(`   - Errors: ${summary.totalErrors}`);
-        console.log(`   - Warnings: ${summary.totalWarnings}`);
-        console.log(`   - Success rate: ${summary.testedPages > 0 ? (summary.passedPages / summary.testedPages * 100).toFixed(1) : 0}%`);
-        console.log(`📄 Markdown report: ${outputPath}`);
-        
-        // Show all generated files
-        if (outputFiles.length > 0) {
-          console.log(`📁 Generated files:`);
-          outputFiles.forEach(file => {
-            const filename = path.basename(file);
-            if (filename.includes('detailed-errors')) {
-              console.log(`   📋 Detailed error report: ${file}`);
-            } else if (filename.includes('performance-report')) {
-              console.log(`   📊 Performance report: ${file}`);
-            } else if (filename.includes('seo-report')) {
-              console.log(`   🔍 SEO report: ${file}`);
-            } else if (filename.includes('security-report')) {
-              console.log(`   🔒 Security report: ${file}`);
-            } else {
-              console.log(`   📄 Markdown report: ${file}`);
-            }
-          });
-        }
-        
-        if (summary.failedPages > 0) {
-          console.log(`⚠️  ${summary.failedPages} pages failed the accessibility tests`);
-          process.exit(1);
-        }
-      } else {
-        console.log('');
-        console.log('✅ Test completed successfully!');
-        console.log(`📊 Results:`);
-        console.log(`   - Tested pages: ${summary.testedPages}`);
-        console.log(`   - Passed: ${summary.passedPages}`);
-        console.log(`   - Failed: ${summary.failedPages}`);
-        console.log(`   - Errors: ${summary.totalErrors}`);
-        console.log(`   - Warnings: ${summary.totalWarnings}`);
-        
-        // Show all generated files (even without Markdown)
-        if (outputFiles.length > 0) {
-          console.log(`📁 Generated files:`);
-          outputFiles.forEach(file => {
-            const filename = path.basename(file);
-            if (filename.includes('detailed-errors')) {
-              console.log(`   📋 Detailed error report: ${file}`);
-            } else if (filename.includes('performance-report')) {
-              console.log(`   📊 Performance report: ${file}`);
-            }
-          });
-        }
+      const totalTime = Math.round((Date.now() - startTime) / 1000);
+      spinner.succeed(`✅ Completed ${summary.testedPages} pages in ${formatTime(totalTime)}`);
+      
+      // Restore original method
+      pipeline.run = originalRun;
+      
+      // 🎉 Success output
+      console.log('\n✅ Test completed successfully!');
+      console.log(`📊 Results:`);
+      console.log(`   📄 Tested: ${summary.testedPages} pages`);
+      console.log(`   ✅ Passed: ${summary.passedPages}`);
+      console.log(`   ❌ Failed: ${summary.failedPages}`);
+      console.log(`   ⚠️  Errors: ${summary.totalErrors}`);
+      console.log(`   ⚠️  Warnings: ${summary.totalWarnings}`);
+      
+      const successRate = summary.testedPages > 0 ? 
+        (summary.passedPages / summary.testedPages * 100).toFixed(1) : 0;
+      console.log(`   🎯 Success Rate: ${successRate}%`);
+      
+      // Show generated files
+      if (outputFiles.length > 0) {
+        console.log(`\\n📁 Generated reports:`);
+        outputFiles.forEach(file => {
+          console.log(`   📄 ${path.basename(file)}`);
+        });
+      }
+      
+      if (summary.failedPages > 0) {
+        console.log(`\\n⚠️  ${summary.failedPages} pages failed accessibility tests`);
+        process.exit(1);
       }
       
     } catch (error) {
-      console.error('❌ Error during test:', error.message);
+      spinner?.fail('❌ Test failed');
+      
+      // Enhanced error categorization and recovery
+      const errorType = categorizeError(error);
+      console.error(`\n❌ ${errorType.type}: ${errorType.message}`);
+      
+      if (errorType.recoverable && !options.nonInteractive) {
+        console.log('\n🔄 Attempting automatic recovery...');
+        
+        try {
+          // Try with safer options
+          const recoverySpin = ora('Retrying with conservative settings...').start();
+          
+          const saferOptions = {
+            ...pipelineOptions,
+            maxConcurrent: 1,
+            timeout: 20000,
+            collectPerformanceMetrics: false,
+            maxPages: Math.min(pipelineOptions.maxPages, 3)
+          };
+          
+          const { summary, outputFiles } = await pipeline.run(saferOptions);
+          
+          recoverySpin.succeed('✅ Recovery successful with limited scope');
+          console.log('⚠️  Note: Test completed with reduced scope due to initial error');
+          
+          // Continue with success output but warn user
+          const successRate = summary.testedPages > 0 ? 
+            (summary.passedPages / summary.testedPages * 100).toFixed(1) : 0;
+          
+          console.log(`\n📊 Partial Results:`);
+          console.log(`   📄 Tested: ${summary.testedPages} pages (reduced from ${pipelineOptions.maxPages})`);
+          console.log(`   ✅ Passed: ${summary.passedPages}`);
+          console.log(`   ❌ Failed: ${summary.failedPages}`);
+          console.log(`   ⚠️  Success Rate: ${successRate}%`);
+          
+          if (outputFiles.length > 0) {
+            console.log(`\n📁 Generated reports:`);
+            outputFiles.forEach(file => {
+              console.log(`   📄 ${path.basename(file)}`);
+            });
+          }
+          
+          console.log('\n💡 Recommendation: Try running with --expert mode for more control');
+          process.exit(summary.failedPages > 0 ? 1 : 0);
+          
+        } catch (recoveryError) {
+          console.error('❌ Recovery attempt failed:', categorizeError(recoveryError).message);
+        }
+      }
+      
+      // Show helpful suggestions
+      console.log('\n💡 Troubleshooting suggestions:');
+      errorType.suggestions.forEach(suggestion => {
+        console.log(`   • ${suggestion}`);
+      });
+      
+      if (options.verbose) {
+        console.log('\n🔍 Full error details:');
+        console.error(error.stack);
+      } else {
+        console.log('\n🔍 Run with --verbose for detailed error information');
+      }
+      
       process.exit(1);
     }
   });
 
-program.parse(); 
+// Helper functions for progress tracking
+function calculateEstimatedTime(pages, concurrent = 2) {
+  if (pages === 1000) return '10-60 min';
+  const avgTimePerPage = 12; // seconds
+  const totalTime = Math.round((pages * avgTimePerPage) / concurrent);
+  return formatTime(totalTime);
+}
+
+function formatTime(seconds) {
+  if (seconds < 60) return `${seconds}s`;
+  const mins = Math.floor(seconds / 60);
+  const secs = seconds % 60;
+  return `${mins}m ${secs}s`;
+}
+
+function truncateUrl(url) {
+  if (!url) return 'Processing...';
+  return url.length > 50 ? url.substring(0, 47) + '...' : url;
+}
+
+function categorizeError(error) {
+  const message = error.message || String(error);
+  const stack = error.stack || '';
+  
+  // Network/Connection errors
+  if (message.includes('ENOTFOUND') || message.includes('ECONNREFUSED') || 
+      message.includes('net::ERR_') || message.includes('timeout')) {
+    return {
+      type: 'Network Error',
+      message: 'Cannot connect to the website or sitemap',
+      recoverable: true,
+      suggestions: [
+        'Check if the website URL is correct and accessible',
+        'Verify your internet connection',
+        'Try running the test later if the site is temporarily down',
+        'Use --expert mode to increase timeout settings'
+      ]
+    };
+  }
+  
+  // Sitemap parsing errors  
+  if (message.includes('sitemap') || message.includes('XML') || message.includes('parsing')) {
+    return {
+      type: 'Sitemap Error',
+      message: 'Cannot parse or access the sitemap.xml',
+      recoverable: false,
+      suggestions: [
+        'Verify the sitemap URL is correct (should end with /sitemap.xml)',
+        'Check if the sitemap is properly formatted XML',
+        'Ensure the sitemap is publicly accessible',
+        'Try testing a single page instead of the full sitemap'
+      ]
+    };
+  }
+  
+  // Browser/Playwright errors
+  if (message.includes('browser') || message.includes('playwright') || 
+      message.includes('chromium') || stack.includes('playwright')) {
+    return {
+      type: 'Browser Error',
+      message: 'Browser automation failed',
+      recoverable: true,
+      suggestions: [
+        'Try reducing concurrent tests with --expert mode',
+        'Restart your terminal and try again',
+        'Check available system memory (close other applications)',
+        'Run with --verbose for more detailed browser logs'
+      ]
+    };
+  }
+  
+  // Memory/Resource errors
+  if (message.includes('memory') || message.includes('ENOMEM') || 
+      message.includes('heap') || message.includes('allocation')) {
+    return {
+      type: 'Resource Error',
+      message: 'Insufficient system resources',
+      recoverable: true,
+      suggestions: [
+        'Reduce the number of pages tested (use --expert mode)',
+        'Close other applications to free memory',
+        'Test pages in smaller batches',
+        'Reduce concurrent tests to 1'
+      ]
+    };
+  }
+  
+  // Permission errors
+  if (message.includes('EACCES') || message.includes('permission') || message.includes('EPERM')) {
+    return {
+      type: 'Permission Error',
+      message: 'Insufficient permissions',
+      recoverable: false,
+      suggestions: [
+        'Run the command with appropriate permissions',
+        'Check if the output directory is writable',
+        'Ensure Node.js has permission to create browser profiles'
+      ]
+    };
+  }
+  
+  // Generic/Unknown errors
+  return {
+    type: 'Unknown Error',
+    message: message.length > 100 ? message.substring(0, 97) + '...' : message,
+    recoverable: true,
+    suggestions: [
+      'Try running with --verbose for more details',
+      'Use --expert mode for custom settings',
+      'Test with fewer pages first',
+      'Check the GitHub issues page for similar problems'
+    ]
+  };
+}
+
+program.parse();

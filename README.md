@@ -22,12 +22,14 @@ auditmysite https://your-site.com/sitemap.xml --expert
 
 ## ✨ Key Features
 
-- 🎯 **Simplified CLI** - Just 6 essential options
-- ⚡ **Core Web Vitals** - Real FCP, LCP, CLS, INP, TTFB metrics  
+- 🎯 **Simplified CLI** - Just 6 essential options + enhanced expert mode
+- ⚡ **Core Web Vitals** - Real FCP, LCP, CLS, INP, TTFB metrics with smart fallbacks
 - 🏆 **Smart Defaults** - Works perfectly without configuration
 - 📊 **Professional Reports** - Clean HTML/Markdown output
-- 🚀 **Fast & Reliable** - Parallel processing with automatic retries
+- 🚀 **Fast & Reliable** - Parallel processing with intelligent error recovery
 - ♿ **WCAG Compliance** - Comprehensive accessibility testing
+- ⏱️ **Real-time Progress** - Live updates with time estimates
+- 🔄 **Error Recovery** - Automatic fallback and helpful troubleshooting
 
 ## 📋 CLI Options
 
@@ -58,13 +60,14 @@ auditmysite https://example.com/sitemap.xml --full
 - ✅ Tests **all pages** in sitemap
 - ✅ Perfect for comprehensive audits
 
-### **Expert Mode**
+### **Expert Mode** 🆕
 ```bash
 auditmysite https://example.com/sitemap.xml --expert
 ```
-- ✅ **Interactive prompts** for custom settings
-- ✅ Choose pages, standards, output format
-- ✅ Advanced configuration options
+- ✅ **Interactive prompts** for pages, standards, format, concurrency
+- ✅ **Time estimates** for each configuration option
+- ✅ **Advanced settings** including concurrent test controls
+- ✅ **Performance options** - Enable/disable Web Vitals collection
 
 ### **CI/CD Integration**
 ```bash

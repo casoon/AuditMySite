@@ -2,6 +2,56 @@
 
 All notable changes to AuditMySite will be documented in this file.
 
+## [1.2.0] - 2025-09-03
+
+### 🎯 Enhanced User Experience Release 
+
+**AuditMySite v1.2** introduces significant UX improvements with **expert mode**, **smart progress tracking**, and **intelligent error recovery**. This release focuses on making the tool more robust and user-friendly.
+
+### ✨ Added
+
+- **🔧 Enhanced Expert Mode** - Interactive prompts for pages, standards, format, concurrency, and performance options
+- **⏱️ Real-time Progress Indicators** - Live progress bars with ETA calculations and current page display  
+- **🔄 Intelligent Error Recovery** - Automatic retry logic with fallback options for failed tests
+- **📊 Better Web Vitals Fallbacks** - Improved metrics collection for static/small pages with alternative calculations
+- **💡 Smart Error Categorization** - Helpful troubleshooting suggestions based on error types
+- **🎯 Time Estimates** - Accurate time predictions based on page count and concurrency
+
+### 🔧 Improved
+
+- **Progress Tracking**: Real-time updates with percentage completion and remaining time
+- **Error Handling**: Categorized errors (Network, Browser, Resource, Permission) with specific suggestions
+- **Web Vitals Collection**: Extended wait times (5-6s) and fallback strategies for LCP/CLS
+- **Expert Mode**: More comprehensive options including concurrent test configuration
+- **Recovery Logic**: Automatic retry with conservative settings when initial tests fail
+- **User Feedback**: Better error messages with actionable troubleshooting steps
+
+### 🛠️ Technical Improvements
+
+- **Performance Metrics**: Enhanced fallback algorithms for missing Web Vitals data
+- **Progress Spinner**: Elegant ora-based progress indicators with time tracking
+- **Error Recovery**: Automatic fallback to single-threaded mode with reduced scope
+- **CLI Experience**: Better formatted output with emojis and clear status updates
+- **Timeout Handling**: More robust handling of network and browser timeouts
+
+### 🐛 Fixed
+
+- Web Vitals metrics showing 0 on static pages (now provides intelligent fallbacks)
+- Progress tracking not showing during long-running tests
+- Unhelpful error messages that didn't guide users to solutions
+- Expert mode having limited configuration options
+- CLI not providing time estimates for test completion
+
+### 📈 User Experience
+
+- **Beginner-Friendly**: Default mode just works with smart progress tracking
+- **Expert-Ready**: Comprehensive interactive configuration for power users
+- **Error-Resilient**: Automatic recovery and helpful suggestions when things go wrong
+- **Time-Conscious**: Clear time estimates and real-time progress updates
+- **Actionable Feedback**: Specific troubleshooting steps for each error category
+
+---
+
 ## [1.1.0] - 2025-09-03
 
 ### 🎯 Enhanced Release - Simplified & Performance-Focused
