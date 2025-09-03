@@ -5,6 +5,7 @@ const { StandardPipeline } = require('../dist/core');
 const inquirer = require('inquirer').default;
 const path = require('path');
 const ora = require('ora').default || require('ora');
+const packageJson = require('../package.json');
 
 const program = new Command();
 
@@ -12,7 +13,7 @@ const program = new Command();
 program
   .name('auditmysite')
   .description('🎯 Simple accessibility testing - just works!')
-  .version('1.3.1')
+  .version(packageJson.version)
   .argument('<sitemapUrl>', 'URL of the sitemap.xml to test')
   
   // ✅ Only these 6 ESSENTIAL options:
@@ -39,7 +40,7 @@ program
       return;
     }
     
-    console.log('🚀 AuditMySite v1.3.1 - Enhanced Accessibility Testing');
+    console.log(`🚀 AuditMySite v${packageJson.version} - Enhanced Accessibility Testing`);
     console.log(`📄 Sitemap: ${sitemapUrl}`);
     
     // 🎯 SMART DEFAULTS

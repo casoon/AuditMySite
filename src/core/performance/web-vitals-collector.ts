@@ -140,13 +140,26 @@ export class WebVitalsCollector {
     if (enhanced.lcp === 0 && enhanced.loadTime > 0) {
       // For small pages, LCP often equals load time or FCP
       enhanced.lcp = enhanced.fcp > 0 ? enhanced.fcp * 1.2 : enhanced.loadTime * 0.8;
-      console.log('LCP fallback applied:', enhanced.lcp);
+      console.log(`LCP fallback applied: ${enhanced.lcp}ms (calculated from ${enhanced.fcp > 0 ? 'FCP' : 'loadTime'})`);
+    }
+    
+    // Additional LCP fallback using document timing
+    if (enhanced.lcp === 0 && enhanced.domContentLoaded > 0) {
+      // Estimate LCP as slightly after DOM ready for text-heavy pages
+      enhanced.lcp = enhanced.domContentLoaded + 200;
+      console.log(`LCP fallback from DOM timing: ${enhanced.lcp}ms`);
     }
     
     // CLS Fallback: Static pages often have 0 CLS, which is actually good
     if (enhanced.cls === 0) {
-      // 0 CLS is perfect for static content, no fallback needed
-      console.log('CLS is 0 - excellent layout stability');
+      // 0 CLS is perfect for static content, only log in verbose mode
+      if (process.env.VERBOSE) {
+        console.log('CLS is 0 - excellent layout stability for static content');
+      }
+    } else if (enhanced.cls > 0 && enhanced.cls < 0.001) {
+      // Very small CLS values are often measurement artifacts
+      enhanced.cls = 0;
+      console.log('CLS below threshold, normalized to 0');
     }
     
     // INP Fallback: Pages without interaction get 0, which is normal
