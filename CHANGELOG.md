@@ -2,6 +2,34 @@
 
 All notable changes to AuditMySite will be documented in this file.
 
+## [1.2.2] - 2025-09-03
+
+### ⚡ Pa11y v9.0.0 Final Release
+
+**Complete elimination of deprecated dependency warnings with pa11y v9.0.0 + ora v8 compatibility fixes.**
+
+### ✨ Updated
+
+- **pa11y**: v6.2.3 → v9.0.0 - Latest version with Puppeteer v24+ (zero deprecation warnings)
+- **ora**: Fixed ES module compatibility for v8.2.0 (progress spinner improvements)
+- **CLI**: Fixed spinner scope issues for better error handling
+
+### 🔧 Technical Fixes
+
+- CLI spinner now properly scoped for error handling scenarios
+- ora import fixed for ES module default export structure
+- All npm install deprecation warnings eliminated
+- Complete pa11y API compatibility verified with testing
+
+### 🎯 Impact
+
+- **Clean Installation**: Zero deprecation warnings during global install
+- **Latest Security**: Modern Puppeteer v24+ with latest security updates
+- **Enhanced Reliability**: Improved error handling and progress feedback
+- **Future-Proof**: Ready for modern Node.js environments
+
+---
+
 ## [1.2.1] - 2025-09-03
 
 ### 🔧 Dependencies Update
