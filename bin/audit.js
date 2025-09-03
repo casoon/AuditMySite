@@ -12,7 +12,7 @@ const program = new Command();
 program
   .name('auditmysite')
   .description('🎯 Simple accessibility testing - just works!')
-  .version('1.3.0')
+  .version('1.3.1')
   .argument('<sitemapUrl>', 'URL of the sitemap.xml to test')
   
   // ✅ Only these 6 ESSENTIAL options:
@@ -39,7 +39,7 @@ program
       return;
     }
     
-    console.log('🚀 AuditMySite v1.3 - Enhanced Accessibility Testing');
+    console.log('🚀 AuditMySite v1.3.1 - Enhanced Accessibility Testing');
     console.log(`📄 Sitemap: ${sitemapUrl}`);
     
     // 🎯 SMART DEFAULTS
