@@ -12,7 +12,7 @@ const program = new Command();
 program
   .name('auditmysite')
   .description('🎯 Simple accessibility testing - just works!')
-  .version('1.2.0')
+  .version('1.2.1')
   .argument('<sitemapUrl>', 'URL of the sitemap.xml to test')
   
   // ✅ Only these 6 ESSENTIAL options:

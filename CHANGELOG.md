@@ -2,6 +2,38 @@
 
 All notable changes to AuditMySite will be documented in this file.
 
+## [1.2.1] - 2025-09-03
+
+### 🔧 Dependencies Update
+
+**Fixed critical dependency warnings and vulnerabilities for cleaner installation experience.**
+
+### ✨ Updated
+
+- **pa11y**: Updated from v6.2.3 to v7.0.0 - Eliminates deprecated puppeteer and glob dependencies
+- **chalk**: Updated from v5.3.0 to v5.6.0 - Latest stable version
+- **commander**: Updated from v11.1.0 to v12.1.0 - Improved CLI parsing
+- **inquirer**: Updated from v9.2.12 to v10.2.0 - Better interactive prompts
+- **ora**: Updated from v7.0.1 to v8.2.0 - Enhanced progress spinners
+- **playwright**: Updated from v1.40.0 to v1.55.0 - Latest browser automation
+- **typescript**: Updated from v5.3.0 to v5.9.2 - Latest stable compiler
+- **@types/node**: Updated from v20.10.0 to v22.10.0 - Latest Node.js types
+
+### 🛡️ Security
+
+- Eliminated deprecated dependency warnings during installation
+- Reduced security vulnerabilities in dependency tree
+- Updated all dev dependencies to latest stable versions
+
+### 🎯 Impact
+
+- **Clean Installation**: No more "deprecated" warnings during `npm install -g`
+- **Better Performance**: Updated dependencies with performance improvements
+- **Enhanced Reliability**: Latest stable versions of all core dependencies
+- **Future-Proof**: Dependencies ready for Node.js 22+ and modern environments
+
+---
+
 ## [1.2.0] - 2025-09-03
 
 ### 🎯 Enhanced User Experience Release 
