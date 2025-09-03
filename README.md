@@ -1,6 +1,6 @@
-# 🎯 AuditMySite - Enhanced Accessibility Testing v1.3
+# 🎯 AuditMySite - Enhanced Accessibility Testing v1.5
 
-> **🔥 NEW v1.3**: Modern HTML5 & ARIA Analysis with Chrome 135 Optimizations! **Just works out of the box!** 🚀
+> **🔥 NEW v1.5**: Performance Budgets with Custom Thresholds + Modern HTML5 & ARIA Analysis! **Just works out of the box!** 🚀
 
 A comprehensive command-line tool for **modern accessibility testing** featuring **enhanced HTML5 element analysis**, **advanced ARIA evaluation**, **Chrome 135 performance optimizations**, and **semantic quality scoring**. Test any website by just providing a sitemap URL.
 
@@ -22,7 +22,13 @@ auditmysite https://your-site.com/sitemap.xml --expert
 
 ## ✨ Key Features
 
-### 🔥 **New in v1.3**
+### 🔥 **New in v1.5**
+- 📊 **Performance Budgets** - Configurable Web Vitals thresholds with business-focused templates (E-commerce, Corporate, Blog)
+- 🎯 **Smart Budget Templates** - Conversion-optimized thresholds for different site types
+- 📈 **Budget Violation Tracking** - Real-time pass/fail status with actionable recommendations
+- ⚙️ **Custom Budget Configuration** - Set individual LCP, CLS, FCP, INP, TTFB thresholds via CLI or Expert Mode
+
+### 🔥 **Enhanced in v1.3**
 - 🎯 **Enhanced HTML5 Analysis** - Modern `<details>`, `<dialog>`, `<main>` element testing with axe-core v4.10
 - ⚡ **Advanced ARIA Evaluation** - Impact-based scoring (Critical, Serious, Moderate, Minor)
 - 🚀 **Chrome 135 Optimizations** - Enhanced accessibility tree, improved dialog support
@@ -33,6 +39,7 @@ auditmysite https://your-site.com/sitemap.xml --expert
 ### 🏆 **Core Features**
 - 🎯 **Simplified CLI** - Just 6 essential options + enhanced expert mode
 - ⚡ **Core Web Vitals** - Real FCP, LCP, CLS, INP, TTFB metrics with smart fallbacks
+- 📊 **Performance Budgets** - Configurable thresholds with business templates (E-commerce, Corporate, Blog)
 - 🏆 **Smart Defaults** - Works perfectly without configuration
 - 📊 **Professional Reports** - Enhanced HTML reports with modern analysis sections
 - 🚀 **Fast & Reliable** - Parallel processing with intelligent error recovery
@@ -42,14 +49,20 @@ auditmysite https://your-site.com/sitemap.xml --expert
 
 ## 📋 CLI Options
 
-| Option | Description | Default |
-|--------|-------------|---------|
-| `--full` | Test all pages instead of just 5 | `false` |
-| `--expert` | Interactive expert mode with custom settings | `false` |
-| `--format <type>` | Report format: `html` or `markdown` | `html` |
-| `--output-dir <dir>` | Output directory for reports | `./reports` |
-| `--non-interactive` | Skip prompts for CI/CD (use defaults) | `false` |
-| `--verbose` | Show detailed progress information | `false` |
+|| Option | Description | Default |
+||--------|-------------|---------|
+|| `--full` | Test all pages instead of just 5 | `false` |
+|| `--expert` | Interactive expert mode with custom settings | `false` |
+|| `--format <type>` | Report format: `html` or `markdown` | `html` |
+|| `--output-dir <dir>` | Output directory for reports | `./reports` |
+|| `--non-interactive` | Skip prompts for CI/CD (use defaults) | `false` |
+|| `--verbose` | Show detailed progress information | `false` |
+|| `--budget <template>` | Performance budget: `ecommerce`, `corporate`, `blog`, `default` | `default` |
+|| `--lcp-budget <ms>` | Custom LCP threshold in milliseconds | Template value |
+|| `--cls-budget <score>` | Custom CLS threshold score (e.g. 0.1) | Template value |
+|| `--fcp-budget <ms>` | Custom FCP threshold in milliseconds | Template value |
+|| `--inp-budget <ms>` | Custom INP threshold in milliseconds | Template value |
+|| `--ttfb-budget <ms>` | Custom TTFB threshold in milliseconds | Template value |
 
 ## 💡 Usage Examples
 
@@ -69,11 +82,28 @@ auditmysite https://example.com/sitemap.xml --full
 - ✅ Tests **all pages** in sitemap
 - ✅ Perfect for comprehensive audits
 
-### **Expert Mode** 🆕 **Enhanced in v1.3!**
+### **Performance Budgets** 🆆 **New in v1.5!**
+```bash
+# E-commerce optimized (strict for conversion)
+auditmysite https://shop.example.com/sitemap.xml --budget ecommerce
+
+# Corporate standards (professional thresholds)
+auditmysite https://company.example.com/sitemap.xml --budget corporate
+
+# Custom budgets
+auditmysite https://example.com/sitemap.xml --lcp-budget 2000 --cls-budget 0.05
+```
+- ✅ **Business Templates** - E-commerce, Corporate, Blog, Default
+- ✅ **Custom Thresholds** - Set individual Web Vitals budgets
+- ✅ **Budget Violations** - Real-time pass/fail status with recommendations
+- ✅ **Expert Mode Integration** - Interactive budget configuration
+
+### **Expert Mode** 🆆 **Enhanced in v1.3!**
 ```bash
 auditmysite https://example.com/sitemap.xml --expert
 ```
 - ✅ **Interactive prompts** for pages, standards, format, concurrency
+- ✅ **Performance Budget Templates** - Choose E-commerce, Corporate, Blog, or Custom
 - ✅ **Time estimates** for each configuration option
 - ✅ **Advanced settings** including concurrent test controls
 - ✅ **Performance options** - Enable/disable Web Vitals collection
@@ -104,9 +134,11 @@ auditmysite https://example.com/sitemap.xml --non-interactive --format markdown
 ### **Performance Report** ⚡
 - ⚡ **Core Web Vitals** (LCP, FCP, CLS, INP, TTFB)
 - 📊 **Real performance metrics** using Google's official library
+- 📈 **Budget Status Tracking** - Pass/fail against custom thresholds with violation details
+- 🎯 **Smart Budget Templates** - Business-focused thresholds (E-commerce: LCP 2000ms, Corporate: 2200ms)
 - 🚀 **Chrome 135 optimizations** - Enhanced measurement accuracy
 - 🏆 **Performance score & grade** (A-F rating)
-- 💡 **Actionable recommendations** for improvements
+- 💡 **Actionable recommendations** - Budget-aware suggestions with severity levels
 
 ### **Professional Reports** 📊
 - 📄 **Enhanced HTML format** - Modern analysis sections with feature badges
@@ -126,10 +158,12 @@ auditmysite https://example.com/sitemap.xml --non-interactive --format markdown
 ## 🎯 Perfect For
 
 - ✅ **Quick accessibility checks** before deployment
-- ✅ **Performance monitoring** with real Web Vitals
+- ✅ **Performance monitoring** with real Web Vitals and custom budgets
+- ✅ **E-commerce optimization** - Conversion-focused performance thresholds
+- ✅ **Corporate compliance** - Professional performance standards
 - ✅ **WCAG compliance** testing for legal requirements
-- ✅ **CI/CD integration** with `--non-interactive` flag
-- ✅ **Client reports** with professional HTML output
+- ✅ **CI/CD integration** with `--non-interactive` flag and budget validation
+- ✅ **Client reports** with professional HTML output and budget status
 
 ## 🛠️ Technical Details
 

@@ -17,9 +17,72 @@ export interface CoreWebVitals {
   score: number;
   grade: 'A' | 'B' | 'C' | 'D' | 'F';
   recommendations: string[];
+  
+  // Budget status
+  budgetStatus?: BudgetStatus;
 }
 
+export interface PerformanceBudget {
+  lcp: { good: number; poor: number };
+  cls: { good: number; poor: number };
+  fcp: { good: number; poor: number };
+  inp: { good: number; poor: number };
+  ttfb: { good: number; poor: number };
+}
+
+export interface BudgetStatus {
+  passed: boolean;
+  violations: BudgetViolation[];
+  summary: string;
+}
+
+export interface BudgetViolation {
+  metric: keyof PerformanceBudget;
+  actual: number;
+  threshold: number;
+  severity: 'warning' | 'error';
+  message: string;
+}
+
+// Predefined budget templates
+export const BUDGET_TEMPLATES: Record<string, PerformanceBudget> = {
+  ecommerce: {
+    lcp: { good: 2000, poor: 3000 }, // Stricter for conversion
+    cls: { good: 0.05, poor: 0.15 },
+    fcp: { good: 1500, poor: 2500 },
+    inp: { good: 150, poor: 300 },
+    ttfb: { good: 300, poor: 600 }
+  },
+  blog: {
+    lcp: { good: 2500, poor: 4000 }, // Standard thresholds
+    cls: { good: 0.1, poor: 0.25 },
+    fcp: { good: 1800, poor: 3000 },
+    inp: { good: 200, poor: 500 },
+    ttfb: { good: 400, poor: 800 }
+  },
+  corporate: {
+    lcp: { good: 2200, poor: 3500 }, // Professional standards
+    cls: { good: 0.08, poor: 0.2 },
+    fcp: { good: 1600, poor: 2800 },
+    inp: { good: 180, poor: 400 },
+    ttfb: { good: 350, poor: 700 }
+  },
+  default: {
+    lcp: { good: 2500, poor: 4000 }, // Google's standard thresholds
+    cls: { good: 0.1, poor: 0.25 },
+    fcp: { good: 1800, poor: 3000 },
+    inp: { good: 200, poor: 500 },
+    ttfb: { good: 400, poor: 800 }
+  }
+};
+
 export class WebVitalsCollector {
+  private budget: PerformanceBudget;
+  
+  constructor(budget?: PerformanceBudget) {
+    this.budget = budget || BUDGET_TEMPLATES.default;
+  }
+  
   /**
    * Collect Core Web Vitals using Google's official web-vitals library
    * This ensures 100% accuracy vs. Lighthouse methodology
@@ -115,12 +178,14 @@ export class WebVitalsCollector {
       const score = this.calculateScore(enhancedMetrics);
       const grade = this.calculateGrade(score);
       const recommendations = this.generateRecommendations(enhancedMetrics);
+      const budgetStatus = this.evaluateBudget(enhancedMetrics);
       
       return {
         ...enhancedMetrics,
         score,
         grade,
-        recommendations
+        recommendations,
+        budgetStatus
       };
       
     } catch (error) {
@@ -185,31 +250,31 @@ export class WebVitalsCollector {
   }
   
   /**
-   * Calculate performance score based on Core Web Vitals
-   * Uses Google's scoring methodology
+   * Calculate performance score based on configurable budget thresholds
+   * Uses custom scoring methodology based on user-defined budgets
    */
   private calculateScore(metrics: any): number {
     let score = 100;
     
     // LCP scoring (25% weight)
-    if (metrics.lcp > 4000) score -= 25;
-    else if (metrics.lcp > 2500) score -= 15;
+    if (metrics.lcp > this.budget.lcp.poor) score -= 25;
+    else if (metrics.lcp > this.budget.lcp.good) score -= 15;
     
     // CLS scoring (25% weight) 
-    if (metrics.cls > 0.25) score -= 25;
-    else if (metrics.cls > 0.1) score -= 15;
+    if (metrics.cls > this.budget.cls.poor) score -= 25;
+    else if (metrics.cls > this.budget.cls.good) score -= 15;
     
     // FCP scoring (20% weight)
-    if (metrics.fcp > 3000) score -= 20;
-    else if (metrics.fcp > 1800) score -= 10;
+    if (metrics.fcp > this.budget.fcp.poor) score -= 20;
+    else if (metrics.fcp > this.budget.fcp.good) score -= 10;
     
     // INP scoring (15% weight)
-    if (metrics.inp > 500) score -= 15;
-    else if (metrics.inp > 200) score -= 8;
+    if (metrics.inp > this.budget.inp.poor) score -= 15;
+    else if (metrics.inp > this.budget.inp.good) score -= 8;
     
     // TTFB scoring (15% weight)
-    if (metrics.ttfb > 800) score -= 15;
-    else if (metrics.ttfb > 400) score -= 8;
+    if (metrics.ttfb > this.budget.ttfb.poor) score -= 15;
+    else if (metrics.ttfb > this.budget.ttfb.good) score -= 8;
     
     return Math.max(0, Math.round(score));
   }
@@ -226,35 +291,117 @@ export class WebVitalsCollector {
     const recommendations: string[] = [];
     
     // LCP recommendations
-    if (metrics.lcp > 2500) {
-      recommendations.push('Optimize Largest Contentful Paint: Compress images, use CDN, enable lazy loading');
+    if (metrics.lcp > this.budget.lcp.good) {
+      const status = metrics.lcp > this.budget.lcp.poor ? 'CRITICAL' : 'WARNING';
+      recommendations.push(`${status}: LCP (${metrics.lcp}ms) exceeds budget (${this.budget.lcp.good}ms good, ${this.budget.lcp.poor}ms poor). Compress images, use CDN, enable lazy loading`);
     }
     
     // CLS recommendations  
-    if (metrics.cls > 0.1) {
-      recommendations.push('Improve layout stability: Set explicit dimensions for images and ads');
+    if (metrics.cls > this.budget.cls.good) {
+      const status = metrics.cls > this.budget.cls.poor ? 'CRITICAL' : 'WARNING';
+      recommendations.push(`${status}: CLS (${metrics.cls.toFixed(3)}) exceeds budget (${this.budget.cls.good} good, ${this.budget.cls.poor} poor). Set explicit dimensions for images and ads`);
     }
     
     // FCP recommendations
-    if (metrics.fcp > 1800) {
-      recommendations.push('Speed up First Contentful Paint: Minimize CSS, optimize fonts, reduce JavaScript');
+    if (metrics.fcp > this.budget.fcp.good) {
+      const status = metrics.fcp > this.budget.fcp.poor ? 'CRITICAL' : 'WARNING';
+      recommendations.push(`${status}: FCP (${metrics.fcp}ms) exceeds budget (${this.budget.fcp.good}ms good, ${this.budget.fcp.poor}ms poor). Minimize CSS, optimize fonts, reduce JavaScript`);
     }
     
     // INP recommendations
-    if (metrics.inp > 200) {
-      recommendations.push('Reduce interaction delay: Optimize JavaScript execution, reduce main thread work');
+    if (metrics.inp > this.budget.inp.good) {
+      const status = metrics.inp > this.budget.inp.poor ? 'CRITICAL' : 'WARNING';
+      recommendations.push(`${status}: INP (${metrics.inp}ms) exceeds budget (${this.budget.inp.good}ms good, ${this.budget.inp.poor}ms poor). Optimize JavaScript execution, reduce main thread work`);
     }
     
     // TTFB recommendations
-    if (metrics.ttfb > 400) {
-      recommendations.push('Improve server response: Optimize backend, use CDN, enable compression');
+    if (metrics.ttfb > this.budget.ttfb.good) {
+      const status = metrics.ttfb > this.budget.ttfb.poor ? 'CRITICAL' : 'WARNING';
+      recommendations.push(`${status}: TTFB (${metrics.ttfb}ms) exceeds budget (${this.budget.ttfb.good}ms good, ${this.budget.ttfb.poor}ms poor). Optimize backend, use CDN, enable compression`);
     }
     
     if (recommendations.length === 0) {
-      recommendations.push('Excellent performance! All Core Web Vitals are within good thresholds.');
+      recommendations.push('🎉 Excellent performance! All Core Web Vitals meet your performance budget.');
     }
     
     return recommendations;
+  }
+  
+  /**
+   * Evaluate performance against budget and return status
+   */
+  private evaluateBudget(metrics: any): BudgetStatus {
+    const violations: BudgetViolation[] = [];
+    
+    // Check each metric against budget
+    if (metrics.lcp > this.budget.lcp.good) {
+      violations.push({
+        metric: 'lcp',
+        actual: metrics.lcp,
+        threshold: metrics.lcp > this.budget.lcp.poor ? this.budget.lcp.poor : this.budget.lcp.good,
+        severity: metrics.lcp > this.budget.lcp.poor ? 'error' : 'warning',
+        message: `LCP ${metrics.lcp}ms exceeds ${metrics.lcp > this.budget.lcp.poor ? 'poor' : 'good'} threshold`
+      });
+    }
+    
+    if (metrics.cls > this.budget.cls.good) {
+      violations.push({
+        metric: 'cls',
+        actual: metrics.cls,
+        threshold: metrics.cls > this.budget.cls.poor ? this.budget.cls.poor : this.budget.cls.good,
+        severity: metrics.cls > this.budget.cls.poor ? 'error' : 'warning',
+        message: `CLS ${metrics.cls.toFixed(3)} exceeds ${metrics.cls > this.budget.cls.poor ? 'poor' : 'good'} threshold`
+      });
+    }
+    
+    if (metrics.fcp > this.budget.fcp.good) {
+      violations.push({
+        metric: 'fcp',
+        actual: metrics.fcp,
+        threshold: metrics.fcp > this.budget.fcp.poor ? this.budget.fcp.poor : this.budget.fcp.good,
+        severity: metrics.fcp > this.budget.fcp.poor ? 'error' : 'warning',
+        message: `FCP ${metrics.fcp}ms exceeds ${metrics.fcp > this.budget.fcp.poor ? 'poor' : 'good'} threshold`
+      });
+    }
+    
+    if (metrics.inp > this.budget.inp.good) {
+      violations.push({
+        metric: 'inp',
+        actual: metrics.inp,
+        threshold: metrics.inp > this.budget.inp.poor ? this.budget.inp.poor : this.budget.inp.good,
+        severity: metrics.inp > this.budget.inp.poor ? 'error' : 'warning',
+        message: `INP ${metrics.inp}ms exceeds ${metrics.inp > this.budget.inp.poor ? 'poor' : 'good'} threshold`
+      });
+    }
+    
+    if (metrics.ttfb > this.budget.ttfb.good) {
+      violations.push({
+        metric: 'ttfb',
+        actual: metrics.ttfb,
+        threshold: metrics.ttfb > this.budget.ttfb.poor ? this.budget.ttfb.poor : this.budget.ttfb.good,
+        severity: metrics.ttfb > this.budget.ttfb.poor ? 'error' : 'warning',
+        message: `TTFB ${metrics.ttfb}ms exceeds ${metrics.ttfb > this.budget.ttfb.poor ? 'poor' : 'good'} threshold`
+      });
+    }
+    
+    const passed = violations.length === 0;
+    const criticalViolations = violations.filter(v => v.severity === 'error').length;
+    const warningViolations = violations.filter(v => v.severity === 'warning').length;
+    
+    let summary: string;
+    if (passed) {
+      summary = '🎉 All metrics within budget';
+    } else if (criticalViolations > 0) {
+      summary = `❌ Budget failed: ${criticalViolations} critical, ${warningViolations} warnings`;
+    } else {
+      summary = `⚠️ Budget warnings: ${warningViolations} metrics exceed thresholds`;
+    }
+    
+    return {
+      passed,
+      violations,
+      summary
+    };
   }
   
   private getFallbackMetrics(): CoreWebVitals {

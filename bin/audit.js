@@ -26,6 +26,14 @@ program
   .option('--non-interactive', 'Skip prompts for CI/CD (use defaults)')
   .option('-v, --verbose', 'Show detailed progress information')
   
+  // 📊 Performance Budget Options
+  .option('--budget <template>', 'Performance budget template: ecommerce, blog, corporate, or default', 'default')
+  .option('--lcp-budget <ms>', 'Custom LCP budget in milliseconds (good threshold)')
+  .option('--cls-budget <score>', 'Custom CLS budget score (good threshold)')
+  .option('--fcp-budget <ms>', 'Custom FCP budget in milliseconds (good threshold)')
+  .option('--inp-budget <ms>', 'Custom INP budget in milliseconds (good threshold)')
+  .option('--ttfb-budget <ms>', 'Custom TTFB budget in milliseconds (good threshold)')
+  
   // 🚀 Tauri Integration Options
   .option('--stream', 'Enable streaming output for desktop integration')
   .option('--session-id <id>', 'Session ID for tracking (required with --stream)')
@@ -150,17 +158,129 @@ program
           name: 'semanticAnalysis',
           message: '📊 Enable semantic structure analysis and recommendations?',
           default: true
+        },
+        {
+          type: 'list',
+          name: 'budgetTemplate',
+          message: '📈 Performance budget template?',
+          choices: [
+            { name: '🏢 Corporate - Professional standards (stricter thresholds)', value: 'corporate' },
+            { name: '🏬 E-commerce - Conversion-focused (very strict for revenue)', value: 'ecommerce' },
+            { name: '📝 Blog - Content-focused (standard Google thresholds)', value: 'blog' },
+            { name: '⚙️ Default - Google Web Vitals standard thresholds', value: 'default' },
+            { name: '🔧 Custom - Set individual thresholds manually', value: 'custom' }
+          ],
+          default: 'default'
         }
       ]);
+      
+      // If custom budget selected, ask for individual thresholds
+      if (answers.budgetTemplate === 'custom') {
+        const customBudget = await inquirer.prompt([
+          {
+            type: 'number',
+            name: 'lcpBudget',
+            message: '📈 LCP (Largest Contentful Paint) good threshold in ms?',
+            default: 2500,
+            validate: (value) => value > 0 && value < 10000 ? true : 'Please enter a value between 0 and 10000ms'
+          },
+          {
+            type: 'input',
+            name: 'clsBudget',
+            message: '📈 CLS (Cumulative Layout Shift) good threshold (e.g. 0.1)?',
+            default: '0.1',
+            validate: (value) => {
+              const num = parseFloat(value);
+              return num >= 0 && num <= 1 ? true : 'Please enter a value between 0 and 1';
+            }
+          },
+          {
+            type: 'number',
+            name: 'fcpBudget',
+            message: '📈 FCP (First Contentful Paint) good threshold in ms?',
+            default: 1800,
+            validate: (value) => value > 0 && value < 10000 ? true : 'Please enter a value between 0 and 10000ms'
+          },
+          {
+            type: 'number',
+            name: 'inpBudget',
+            message: '📈 INP (Interaction to Next Paint) good threshold in ms?',
+            default: 200,
+            validate: (value) => value >= 0 && value < 5000 ? true : 'Please enter a value between 0 and 5000ms'
+          },
+          {
+            type: 'number',
+            name: 'ttfbBudget',
+            message: '📈 TTFB (Time to First Byte) good threshold in ms?',
+            default: 400,
+            validate: (value) => value > 0 && value < 5000 ? true : 'Please enter a value between 0 and 5000ms'
+          }
+        ]);
+        
+        answers.customBudgetValues = {
+          lcp: customBudget.lcpBudget,
+          cls: parseFloat(customBudget.clsBudget),
+          fcp: customBudget.fcpBudget,
+          inp: customBudget.inpBudget,
+          ttfb: customBudget.ttfbBudget
+        };
+      }
       
       config = { ...config, ...answers };
     }
     
-    // 📊 Show configuration
+    // 🐎 Create performance budget
+    const { BUDGET_TEMPLATES } = require('../dist/core/performance/web-vitals-collector');
+    let performanceBudget;
+    
+    // Priority: CLI options > Expert mode > Default template
+    if (options.lcpBudget || options.clsBudget || options.fcpBudget || options.inpBudget || options.ttfbBudget) {
+      // Custom CLI budget
+      const defaultBudget = BUDGET_TEMPLATES[options.budget || 'default'];
+      performanceBudget = {
+        lcp: { 
+          good: parseInt(options.lcpBudget) || defaultBudget.lcp.good, 
+          poor: (parseInt(options.lcpBudget) || defaultBudget.lcp.good) * 1.6 
+        },
+        cls: { 
+          good: parseFloat(options.clsBudget) || defaultBudget.cls.good, 
+          poor: (parseFloat(options.clsBudget) || defaultBudget.cls.good) * 2.5 
+        },
+        fcp: { 
+          good: parseInt(options.fcpBudget) || defaultBudget.fcp.good, 
+          poor: (parseInt(options.fcpBudget) || defaultBudget.fcp.good) * 1.7 
+        },
+        inp: { 
+          good: parseInt(options.inpBudget) || defaultBudget.inp.good, 
+          poor: (parseInt(options.inpBudget) || defaultBudget.inp.good) * 2.5 
+        },
+        ttfb: { 
+          good: parseInt(options.ttfbBudget) || defaultBudget.ttfb.good, 
+          poor: (parseInt(options.ttfbBudget) || defaultBudget.ttfb.good) * 2 
+        }
+      };
+    } else if (config.budgetTemplate === 'custom' && config.customBudgetValues) {
+      // Expert mode custom budget
+      const custom = config.customBudgetValues;
+      performanceBudget = {
+        lcp: { good: custom.lcp, poor: custom.lcp * 1.6 },
+        cls: { good: custom.cls, poor: custom.cls * 2.5 },
+        fcp: { good: custom.fcp, poor: custom.fcp * 1.7 },
+        inp: { good: custom.inp, poor: custom.inp * 2.5 },
+        ttfb: { good: custom.ttfb, poor: custom.ttfb * 2 }
+      };
+    } else {
+      // Template budget
+      const template = config.budgetTemplate || options.budget || 'default';
+      performanceBudget = BUDGET_TEMPLATES[template] || BUDGET_TEMPLATES.default;
+    }
+    
+    // 📈 Show configuration
     console.log(`\n📋 Configuration:`);
     console.log(`   📄 Pages: ${config.maxPages === 1000 ? 'All' : config.maxPages}`);
     console.log(`   📋 Standard: ${config.standard}`);
     console.log(`   📊 Performance: ${config.generatePerformanceReport ? 'Yes' : 'No'}`);
+    console.log(`   📊 Budget: ${config.budgetTemplate || options.budget || 'default'} (LCP: ${performanceBudget.lcp.good}ms, CLS: ${performanceBudget.cls.good})`);
     console.log(`   📄 Format: ${config.format.toUpperCase()}`);
     console.log(`   📁 Output: ${config.outputDir}`);
     
@@ -204,11 +324,14 @@ program
         testColorContrast: false,          // Fokus auf Core-Tests
         testFocusManagement: false,         // Fokus auf Core-Tests
         
-        // 🔥 Enhanced v1.3 Features  
+        // 🎆 Enhanced v1.3 Features  
         modernHtml5: config.modernHtml5 !== undefined ? config.modernHtml5 : true,
         ariaEnhanced: config.ariaEnhanced !== undefined ? config.ariaEnhanced : true,
         chrome135Features: config.chrome135Features !== undefined ? config.chrome135Features : true,
-        semanticAnalysis: config.semanticAnalysis !== undefined ? config.semanticAnalysis : true
+        semanticAnalysis: config.semanticAnalysis !== undefined ? config.semanticAnalysis : true,
+        
+        // 📊 Performance Budget
+        performanceBudget: performanceBudget
       };
       
       // 🔍 Smart Sitemap Discovery first
