@@ -1,0 +1,41 @@
+/**
+ * 🔧 AuditMySite SDK - Main Entry Point
+ * 
+ * This is the main entry point for the AuditMySite SDK.
+ * Provides everything needed for programmatic accessibility testing.
+ */
+
+// Main SDK class
+export { AuditSDK } from './audit-sdk';
+
+// API Server for remote access
+export { AuditAPIServer } from '../api/server';
+
+// Complete type definitions
+export * from './types';
+
+// Convenience exports for common use cases
+export {
+  // Report system
+  UnifiedReportSystem,
+  type ReportFormat,
+  type ReportData,
+  type ReportOptions,
+  type GeneratedReport as ReportResult
+} from '../reports/unified';
+
+// Configuration management
+export { ConfigManager } from '../config';
+
+// Core components for advanced users
+export { StandardPipeline } from '../core/pipeline/standard-pipeline';
+export { AccessibilityChecker } from '../core/accessibility-checker';
+export { UnifiedQueue, QueueType } from '../queues/unified';
+
+// Default export for simple require/import
+const AuditMySiteSDK = {
+  AuditSDK,
+  AuditAPIServer
+};
+
+export default AuditMySiteSDK;
