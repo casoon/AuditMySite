@@ -49,20 +49,20 @@ auditmysite https://your-site.com/sitemap.xml --expert
 
 ## 📋 CLI Options
 
-|| Option | Description | Default |
-||--------|-------------|---------|
-|| `--full` | Test all pages instead of just 5 | `false` |
-|| `--expert` | Interactive expert mode with custom settings | `false` |
-|| `--format <type>` | Report format: `html` or `markdown` | `html` |
-|| `--output-dir <dir>` | Output directory for reports | `./reports` |
-|| `--non-interactive` | Skip prompts for CI/CD (use defaults) | `false` |
-|| `--verbose` | Show detailed progress information | `false` |
-|| `--budget <template>` | Performance budget: `ecommerce`, `corporate`, `blog`, `default` | `default` |
-|| `--lcp-budget <ms>` | Custom LCP threshold in milliseconds | Template value |
-|| `--cls-budget <score>` | Custom CLS threshold score (e.g. 0.1) | Template value |
-|| `--fcp-budget <ms>` | Custom FCP threshold in milliseconds | Template value |
-|| `--inp-budget <ms>` | Custom INP threshold in milliseconds | Template value |
-|| `--ttfb-budget <ms>` | Custom TTFB threshold in milliseconds | Template value |
+| Option | Description | Default |
+|--------|-------------|---------|
+| `--full` | Test all pages instead of just 5 | `false` |
+| `--expert` | Interactive expert mode with custom settings | `false` |
+| `--format <type>` | Report format: `html` or `markdown` | `html` |
+| `--output-dir <dir>` | Output directory for reports | `./reports` |
+| `--non-interactive` | Skip prompts for CI/CD (use defaults) | `false` |
+| `--verbose` | Show detailed progress information | `false` |
+| `--budget <template>` | Performance budget: `ecommerce`, `corporate`, `blog`, `default` | `default` |
+| `--lcp-budget <ms>` | Custom LCP threshold in milliseconds | Template value |
+| `--cls-budget <score>` | Custom CLS threshold score (e.g. 0.1) | Template value |
+| `--fcp-budget <ms>` | Custom FCP threshold in milliseconds | Template value |
+| `--inp-budget <ms>` | Custom INP threshold in milliseconds | Template value |
+| `--ttfb-budget <ms>` | Custom TTFB threshold in milliseconds | Template value |
 
 ## 💡 Usage Examples
 
@@ -114,13 +114,24 @@ auditmysite https://example.com/sitemap.xml --expert
 
 ### **CI/CD Integration**
 ```bash
+# Run in CI with markdown output
 auditmysite https://example.com/sitemap.xml --non-interactive --format markdown
+
+# Enforce strict performance budgets (example)
+auditmysite https://shop.example.com/sitemap.xml --non-interactive --budget ecommerce \
+  --lcp-budget 2000 --cls-budget 0.1 --fcp-budget 1200 --inp-budget 200 --ttfb-budget 200
+
+# Parse report in a follow-up CI step (pseudo-code)
+# grep -q "Severity: high" reports/example.com/performance-issues-*.md || echo "No high severity perf issues"
 ```
 - ✅ **No prompts** - perfect for automation
 - ✅ **Markdown output** for easy parsing
-- ✅ **Exit codes** for pipeline integration
+- ✅ **Exit codes** for pipeline integration (see section below)
+- ✅ Combine with a simple grep/assert step to enforce budgets in your pipeline
 
 ## 📊 What You Get
+
+Below is an overview of what is tested, what the output looks like, and how to interpret the results.
 
 ### **Enhanced Accessibility Report** 🔥
 - 🎯 **WCAG 2.1 AA compliance** testing with pa11y v9
@@ -133,11 +144,11 @@ auditmysite https://example.com/sitemap.xml --non-interactive --format markdown
 
 ### **Performance Report** ⚡
 - ⚡ **Core Web Vitals** (LCP, FCP, CLS, INP, TTFB)
-- 📊 **Real performance metrics** using Google's official library
+- 📊 **Real performance metrics** using Google's official web-vitals library (injected during tests)
 - 📈 **Budget Status Tracking** - Pass/fail against custom thresholds with violation details
 - 🎯 **Smart Budget Templates** - Business-focused thresholds (E-commerce: LCP 2000ms, Corporate: 2200ms)
 - 🚀 **Chrome 135 optimizations** - Enhanced measurement accuracy
-- 🏆 **Performance score & grade** (A-F rating)
+- 🏆 **Performance score & grade** (A–F rating)
 - 💡 **Actionable recommendations** - Budget-aware suggestions with severity levels
 
 ### **Professional Reports** 📊
@@ -164,6 +175,63 @@ auditmysite https://example.com/sitemap.xml --non-interactive --format markdown
 - ✅ **WCAG compliance** testing for legal requirements
 - ✅ **CI/CD integration** with `--non-interactive` flag and budget validation
 - ✅ **Client reports** with professional HTML output and budget status
+
+## 📦 Output Files and Structure
+
+- Reports are saved under `./reports/<domain>/` with date-based filenames.
+- Examples (HTML default):
+  - `reports/example.com/accessibility-report-YYYY-MM-DD.html`
+  - `reports/example.com/detailed-issues-YYYY-MM-DD.md`
+  - `reports/example.com/performance-issues-YYYY-MM-DD.md`
+
+### Sample CLI run output
+```text
+🚀 AuditMySite v1.5.0 - Enhanced Accessibility Testing
+📄 Sitemap: https://example.com/sitemap.xml
+📋 Configuration:
+   📄 Pages: 5
+   📋 Standard: WCAG2AA
+   📊 Performance: Yes (budget: default)
+   📄 Format: HTML
+   📁 Output: ./reports
+...
+✅ Queue processing completed: 5/5 URLs in 58s
+```
+
+### Sample performance issues excerpt
+```markdown
+# 📊 Performance Issue Report
+Generated: 2025-09-04T05:55:00.000Z
+Total Issues: 3
+
+## Page: https://example.com/product/123
+- Type: web-vitals
+- Severity: high
+- Metric: LCP
+- Score: 3200ms (budget 2500ms)
+- Recommendation: Optimize hero image and defer below-the-fold resources.
+```
+
+### Exit codes and how to interpret them
+- `0` — The tool ran successfully. There may still be accessibility/performance issues in the reports; check them, but CI should treat this as success unless you enforce budgets separately.
+- `1` — One or more pages experienced a technical failure or crash during testing (e.g., navigation timeout, browser error). Investigate logs and rerun.
+
+Note: Accessibility failures alone do NOT cause a non-zero exit code. Use performance budgets or your CI logic to fail the pipeline based on report contents if desired.
+
+## 🧭 What Is Tested (Scope) and Current Status
+
+- Accessibility (WCAG 2.1 AA via pa11y/axe-core):
+  - Labels, alt text, landmarks, headings, color contrast, link names, form labeling, and many more rules.
+  - HTML5 and ARIA enhancements: `<dialog>`, `<details>`, `<main>`, ARIA roles/states evaluated with modern rule sets.
+- Performance (Core Web Vitals):
+  - LCP, FCP, CLS, INP, TTFB collected using Google's web-vitals in the test browser, plus basic navigation timings.
+  - Budget evaluation using templates or custom thresholds, with recommendations per violation.
+- Not included (by design for v1.5):
+  - SEO audits, security scans, PDF export, Lighthouse integration (removed to keep core fast and focused).
+
+### Maturity / Accuracy
+- Accessibility: Mature and robust through pa11y + axe-core v4.10 with additional semantic checks.
+- Performance: Lightweight and practical. Metrics come from web-vitals in-browser collection. A formal comparison suite against Lighthouse is planned/ongoing to validate parity for typical cases.
 
 ## 🛠️ Technical Details
 

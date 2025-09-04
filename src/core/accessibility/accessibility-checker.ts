@@ -331,6 +331,7 @@ export class AccessibilityChecker {
           errors: [`Test failed: ${error}`],
           warnings: [],
           passed: false,
+          crashed: true,  // 🆕 Mark as crashed for technical errors
           duration,
         };
         results.push(errorResult);
@@ -628,8 +629,14 @@ export class AccessibilityChecker {
           loadTime: navigation.loadEventEnd - navigation.loadEventStart,
           domContentLoaded: navigation.domContentLoadedEventEnd - navigation.domContentLoadedEventStart,
           firstPaint: performance.getEntriesByName('first-paint')[0]?.startTime || 0,
+          renderTime: navigation.loadEventEnd - navigation.fetchStart || 0,
           firstContentfulPaint: performance.getEntriesByName('first-contentful-paint')[0]?.startTime || 0,
-          largestContentfulPaint: performance.getEntriesByName('largest-contentful-paint')[0]?.startTime || 0
+          largestContentfulPaint: performance.getEntriesByName('largest-contentful-paint')[0]?.startTime || 0,
+          cumulativeLayoutShift: 0,  // Not available in fallback
+          interactionToNextPaint: 0, // Not available in fallback
+          timeToFirstByte: navigation.responseStart - navigation.fetchStart || 0,
+          performanceScore: 50,      // Default fallback score
+          performanceGrade: 'C' as 'C' // Default fallback grade
         };
       });
 

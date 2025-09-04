@@ -18,17 +18,15 @@ export interface AccessibilityResult {
   errors: string[];
   warnings: string[];
   passed: boolean;
+  crashed?: boolean;  // 🆕 Technical error (browser crash, network failure, etc.)
   duration: number;
-  pa11yIssues?: Pa11yIssue[];
   pa11yScore?: number;
+  pa11yIssues?: any[];
   performanceMetrics?: {
-    // Navigation timing
     loadTime: number;
     domContentLoaded: number;
     firstPaint: number;
-    renderTime?: number;
-    
-    // Core Web Vitals
+    renderTime: number;
     firstContentfulPaint: number;
     largestContentfulPaint: number;
     cumulativeLayoutShift?: number;
@@ -129,6 +127,7 @@ export interface TestSummary {
   testedPages: number;
   passedPages: number;
   failedPages: number;
+  crashedPages: number;  // 🆕 Technical errors/crashes (not accessibility failures)
   totalErrors: number;
   totalWarnings: number;
   totalDuration: number;

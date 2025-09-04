@@ -284,8 +284,10 @@ program
     console.log(`   📄 Format: ${config.format.toUpperCase()}`);
     console.log(`   📁 Output: ${config.outputDir}`);
     
-    // Declare spinner in outer scope for error handling
+    // Declare variables in outer scope for error handling
     let spinner;
+    let progress;
+    let progressInterval;
     
     try {
       // Extract domain for report organization
@@ -369,7 +371,7 @@ program
       }
       
       // Create enhanced progress tracker
-      const progress = new EnhancedProgress(
+      progress = new EnhancedProgress(
         actualPageCount, 
         `🚀 Initializing test for ${actualPageCount} pages...`
       );
@@ -381,7 +383,7 @@ program
       
       // Mock progress tracking (real integration would require pipeline changes)
       let currentPage = 0;
-      const progressInterval = setInterval(() => {
+      progressInterval = setInterval(() => {
         if (currentPage < actualPageCount) {
           currentPage++;
           const mockUrl = `${finalSitemapUrl.replace('/sitemap.xml', '')}/page-${currentPage}`;
@@ -423,14 +425,23 @@ program
         });
       }
       
-      if (summary.failedPages > 0) {
-        console.log(`\n⚠️  ${summary.failedPages} pages failed accessibility tests`);
+      // Only exit with code 1 for technical errors, not accessibility failures
+      if (summary.crashedPages > 0) {
+        console.log(`\n❌ ${summary.crashedPages} pages crashed due to technical errors`);
         process.exit(1);
+      } else if (summary.failedPages > 0) {
+        console.log(`\n⚠️  ${summary.failedPages} pages failed accessibility tests (this is normal for real websites)`);
+        console.log(`💡 Check the detailed report for specific issues to fix`);
+        // Exit with 0 for accessibility failures - this is expected behavior
       }
       
     } catch (error) {
-      clearInterval(progressInterval);
-      progress?.fail('❌ Test failed');
+      if (progressInterval) {
+        clearInterval(progressInterval);
+      }
+      if (progress) {
+        progress.fail('❌ Test failed');
+      }
       
       // Enhanced error categorization and recovery
       const errorType = categorizeError(error);
@@ -474,7 +485,8 @@ program
           }
           
           console.log('\n💡 Recommendation: Try running with --expert mode for more control');
-          process.exit(summary.failedPages > 0 ? 1 : 0);
+          // Only exit with code 1 for technical crashes, not accessibility failures
+          process.exit(summary.crashedPages > 0 ? 1 : 0);
           
         } catch (recoveryError) {
           console.error('❌ Recovery attempt failed:', categorizeError(recoveryError).message);
@@ -692,7 +704,8 @@ async function runStreamingAudit(sitemapUrl, options) {
     streamingReporter.complete(summary, summary.testedPages, summary.passedPages);
     
     // Clean exit for streaming mode
-    process.exit(summary.failedPages > 0 ? 1 : 0);
+    // Only exit with code 1 for technical crashes, not accessibility failures
+    process.exit(summary.crashedPages > 0 ? 1 : 0);
     
   } catch (error) {
     streamingReporter.reportError(

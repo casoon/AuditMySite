@@ -156,7 +156,8 @@ export class StandardPipeline {
       totalPages: limitedUrls.length, // 🆕 Use limitedUrls instead of localUrls
       testedPages: results.length,
       passedPages: results.filter(r => r.passed).length,
-      failedPages: results.filter(r => !r.passed).length,
+      failedPages: results.filter(r => !r.passed && !r.crashed).length, // Only accessibility failures
+      crashedPages: results.filter(r => r.crashed === true).length, // 🆕 Technical crashes
       totalErrors: results.reduce((sum, r) => sum + r.errors.length, 0),
       totalWarnings: results.reduce((sum, r) => sum + r.warnings.length, 0),
       totalDuration: results.reduce((sum, r) => sum + r.duration, 0),
@@ -216,14 +217,8 @@ export class StandardPipeline {
     // Generate performance report (if requested)
     if (options.generatePerformanceReport !== false && options.collectPerformanceMetrics) {
       console.log('   📊 Generating performance report...');
-      const { PerformanceReportGenerator } = require('@reports');
-      const performanceReportGenerator = new PerformanceReportGenerator();
-      const performanceReportContent = performanceReportGenerator.generateReport(summary.results || []);
-      const performanceReportPath = path.join(outputDir, `performance-report-${dateOnly}.md`);
-      fs.writeFileSync(performanceReportPath, performanceReportContent, 'utf8');
-      outputFiles.push(performanceReportPath);
-
-      // 🆕 Create performance issues as AuditIssue[] and generate Markdown report
+      
+      // Create performance issues as AuditIssue[] and generate Markdown report
       const { PerformanceIssueMarkdownReport } = require('@reports');
       const perfIssues = PerformanceIssueCollector.collectAll(summary) || [];
       console.log('DEBUG: perfIssues', perfIssues);
@@ -231,6 +226,7 @@ export class StandardPipeline {
       const perfMd = PerformanceIssueMarkdownReport.generate(perfIssues);
       const perfMdPath = path.join(outputDir, `performance-issues-${dateOnly}.md`);
       fs.writeFileSync(perfMdPath, perfMd, 'utf8');
+      outputFiles.push(perfMdPath);
     }
     
     

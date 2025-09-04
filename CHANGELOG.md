@@ -2,6 +2,42 @@
 
 All notable changes to this project will be documented in this file.
 
+## [1.5.1] - 2025-09-04
+
+### 🐛 Bugfix Release
+
+**Fixed critical runtime error preventing performance report generation + enhanced documentation.**
+
+### ✅ Fixed
+- **PerformanceReportGenerator Runtime Error** - Fixed `PerformanceReportGenerator is not a constructor` error that occurred after successful test completion
+- **Performance Report Generation** - Streamlined to use existing `PerformanceIssueMarkdownReport` for reliable performance issue reporting
+- **Exit Code Logic** - Properly distinguishes between technical crashes (exit 1) and accessibility failures (exit 0 with warnings)
+- **Report Output** - All reports (HTML, detailed issues, performance issues) now generate correctly
+
+### 📚 Documentation Improvements
+- **README.md** - Fixed broken markdown table, added comprehensive examples section
+- **CLI Examples** - Added realistic usage examples with expected outputs
+- **Exit Code Documentation** - Clear explanation of when tool exits with 0 vs 1
+- **Output Structure** - Detailed explanation of generated files and their contents
+- **Scope Documentation** - Clear description of what is tested (accessibility, performance) and what isn't (SEO, security)
+- **CI/CD Integration** - Enhanced examples with budget enforcement and report parsing
+- **Sample Outputs** - Added CLI output examples and performance issue report snippets
+- **Interpretation Guide** - How to understand and act on results
+
+### 🔧 Technical Improvements
+- **Error Handling** - Better distinction between crashes and test failures
+- **Code Cleanup** - Removed references to non-existent PerformanceReportGenerator
+- **Build Stability** - Ensured clean compilation and runtime execution
+- **Test Validation** - Verified successful operation against real test sites
+
+### 🎯 Impact
+- **Reliability** - Tool now completes successfully without runtime errors
+- **User Experience** - Clear documentation helps users understand results and integrate into workflows
+- **CI/CD Ready** - Proper exit codes and documentation for automated pipeline integration
+- **Professional** - Enhanced documentation suitable for stakeholder communication
+
+---
+
 ## [1.3.1] - 2025-01-03
 
 ### 🧹 Documentation Cleanup

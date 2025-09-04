@@ -104,7 +104,8 @@ program
         totalPages: localUrls.length,
         testedPages: results.length,
         passedPages: results.filter((r: any) => r.passed).length,
-        failedPages: results.filter((r: any) => !r.passed).length,
+        failedPages: results.filter((r: any) => !r.passed && !r.crashed).length,
+        crashedPages: results.filter((r: any) => r.crashed === true).length,
         totalErrors: results.reduce((sum: number, r: any) => sum + r.errors.length, 0),
         totalWarnings: results.reduce((sum: number, r: any) => sum + r.warnings.length, 0),
         totalDuration: results.reduce((sum: number, r: any) => sum + r.duration, 0),
@@ -176,8 +177,13 @@ function displayResults(summary: TestSummary, options: any): void {
     });
   }
 
-  if (summary.failedPages > 0) {
+  // Only exit with code 1 for technical crashes, not accessibility failures
+  if (summary.crashedPages > 0) {
+    console.log(`\n❌ ${summary.crashedPages} pages crashed due to technical errors`);
     process.exit(1);
+  } else if (summary.failedPages > 0) {
+    console.log(`\n⚠️  Note: ${summary.failedPages} pages have accessibility issues (this is normal)`);
+    console.log(`💡 Check the detailed report for specific issues to fix`);
   }
 }
 

@@ -166,6 +166,7 @@ export class AccessibilityService {
       totalWarnings,
       passedPages,
       failedPages,
+      crashedPages: 0, // 🆕 No crashes tracked in batch tests yet
       testedPages: urls.length,
       totalPages: urls.length, // Add missing property
       results,

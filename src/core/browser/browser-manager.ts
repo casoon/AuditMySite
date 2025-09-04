@@ -14,6 +14,7 @@ export class BrowserManager {
   private context: BrowserContext | null = null;
   private wsEndpoint: string | null = null;
   private port: number;
+  private userDataDir: string | null = null;
 
   constructor(private config: BrowserConfig = {}) {
     this.port = config.port || 9222;
@@ -22,27 +23,97 @@ export class BrowserManager {
   async initialize(): Promise<void> {
     console.log('🚀 Initializing shared browser instance...');
     
+    // Environment detection for better error handling
+    const platform = process.platform;
+    const isRoot = process.getuid?.() === 0;
+    
+    if (isRoot) {
+      console.log('⚠️  Running as root user - will use no-sandbox mode');
+    }
+    
+    console.log(`ℹ️  Platform: ${platform}, User: ${process.env.USER || 'unknown'}`);
+    
+    
     // Browser mit Remote Debugging starten
-    this.browser = await chromium.launch({
-      headless: this.config.headless !== false,
-      slowMo: this.config.slowMo || 0,
-      devtools: this.config.devtools || false,
-      args: [
-        '--disable-web-security',
-        '--disable-features=VizDisplayCompositor',
-        '--no-sandbox',
-        '--disable-setuid-sandbox',
-        '--remote-debugging-port=' + this.port,
-        '--remote-debugging-address=127.0.0.1',
-        ...(this.config.args || [])
-      ]
-    });
-
-    // Browser Context erstellen
-    this.context = await this.browser.newContext({
-      viewport: { width: 1920, height: 1080 },
-      userAgent: 'auditmysite/1.0 (+https://github.com/casoon/AuditMySite)'
-    });
+    const browserArgs = [
+      '--disable-web-security',
+      '--disable-features=VizDisplayCompositor',
+      '--remote-debugging-port=' + this.port,
+      '--remote-debugging-address=127.0.0.1',
+      '--disable-dev-shm-usage',
+      '--disable-gpu',
+      '--disable-background-timer-throttling',
+      '--disable-backgrounding-occluded-windows',
+      '--disable-renderer-backgrounding',
+      '--no-first-run',
+      '--no-default-browser-check',
+      ...(this.config.args || [])
+    ];
+    
+    // Add sandbox flags conditionally based on environment
+    const isDocker = process.env.DOCKER_CONTAINER === 'true';
+    const needsSandboxDisable = isDocker || process.getuid?.() === 0;
+    
+    if (needsSandboxDisable) {
+      browserArgs.push('--no-sandbox', '--disable-setuid-sandbox');
+    }
+    
+    // Create user data directory in accessible location
+    const os = require('os');
+    const path = require('path');
+    this.userDataDir = path.join(os.tmpdir(), 'auditmysite-browser-' + Date.now());
+    
+    try {
+      // Use launchPersistentContext for user data directory support
+      if (!this.userDataDir) {
+        throw new Error('User data directory not initialized');
+      }
+      
+      const context = await chromium.launchPersistentContext(this.userDataDir, {
+        headless: this.config.headless !== false,
+        slowMo: this.config.slowMo || 0,
+        devtools: this.config.devtools || false,
+        viewport: { width: 1920, height: 1080 },
+        userAgent: 'auditmysite/1.5.0 (+https://github.com/casoon/AuditMySite)',
+        args: browserArgs
+      });
+      
+      // Extract browser from context
+      this.browser = context.browser()!;
+      this.context = context;
+      
+    } catch (error: any) {
+      // Handle permission errors with fallback configuration
+      if (error.message?.includes('permission') || error.message?.includes('Operation not permitted') || error.message?.includes('userDataDir')) {
+        console.warn('⚠️  Browser launch failed, trying fallback without persistent context...');
+        
+        const fallbackArgs = [
+          '--headless=new',
+          '--disable-gpu',
+          '--no-sandbox',
+          '--disable-setuid-sandbox',
+          '--disable-dev-shm-usage',
+          '--remote-debugging-port=' + this.port
+        ];
+        
+        this.browser = await chromium.launch({
+          headless: true,
+          args: fallbackArgs
+        });
+        
+        // Create context manually without user data dir
+        this.context = await this.browser.newContext({
+          viewport: { width: 1920, height: 1080 },
+          userAgent: 'auditmysite/1.5.0 (+https://github.com/casoon/AuditMySite)'
+        });
+        
+        console.log('✅ Browser launched with fallback configuration');
+      } else {
+        throw error;
+      }
+    }
+    
+    // Context was already created above, check if we need to create WebSocket endpoint
 
     // WebSocket Endpoint für pa11y/Lighthouse
     this.wsEndpoint = `ws://127.0.0.1:${this.port}`;
@@ -76,6 +147,19 @@ export class BrowserManager {
     if (this.browser) {
       await this.browser.close();
     }
+    
+    // Clean up user data directory
+    if (this.userDataDir) {
+      try {
+        const fs = require('fs');
+        if (fs.existsSync(this.userDataDir)) {
+          fs.rmSync(this.userDataDir, { recursive: true, force: true });
+        }
+      } catch (error) {
+        console.warn('⚠️  Could not clean up browser user data directory:', error);
+      }
+    }
+    
     console.log('🧹 Shared browser cleaned up');
   }
 
