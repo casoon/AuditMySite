@@ -162,7 +162,7 @@ export class StandardPipeline {
 
     // 🆕 Create DetailedIssue array and generate Markdown report
     const { DetailedIssueCollector } = require('@core/accessibility');
-    const { DetailedIssueMarkdownReport } = require('@reports');
+    const { DetailedIssueMarkdownReport } = require('../../reports/index.js');
     const detailedIssues = (DetailedIssueCollector.collectAll(results) || []);
     const detailedMd = DetailedIssueMarkdownReport.generate(detailedIssues || []);
     const detailedMdPath = path.join(outputDir, `detailed-issues-${dateOnly}.md`);
@@ -184,7 +184,7 @@ export class StandardPipeline {
     if (options.outputFormat === 'html') {
       console.log('   🌐 Generating HTML report...');
       const { prepareOutputData } = require('@generators/output-generator');
-      const { generateHtmlReport } = require('@reports/html-report');
+      const { generateHtmlReport } = require('../../reports/html-report');
       const outputOptions = { includeDetails: true, summaryOnly: false };
       const timestamp = new Date().toISOString();
       const htmlData = prepareOutputData(summary, timestamp, outputOptions);
@@ -213,7 +213,7 @@ export class StandardPipeline {
       console.log('   📊 Generating performance report...');
       
       // Create performance issues as AuditIssue[] and generate Markdown report
-      const { PerformanceIssueMarkdownReport } = require('@reports');
+      const { PerformanceIssueMarkdownReport } = require('../../reports/index.js');
       const perfIssues = PerformanceIssueCollector.collectAll(summary) || [];
       const perfMd = PerformanceIssueMarkdownReport.generate(perfIssues);
       const perfMdPath = path.join(outputDir, `performance-issues-${dateOnly}.md`);

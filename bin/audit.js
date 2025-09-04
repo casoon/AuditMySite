@@ -2,7 +2,6 @@
 
 const { Command } = require('commander');
 const { StandardPipeline } = require('../dist/core');
-const { EnhancedProgress } = require('../dist/core/utils');
 const { SitemapDiscovery } = require('../dist/core/parsers');
 const inquirer = require('inquirer').default;
 const path = require('path');
@@ -310,9 +309,8 @@ program
     console.log(`   📁 Output: ${config.outputDir}`);
     
     // Declare variables in outer scope for error handling
-    let spinner;
-    let progress;
-    let progressInterval;
+    let pipelineOptions;
+    let pipeline;
     
     try {
       // Extract domain for report organization
@@ -328,9 +326,9 @@ program
       }
       
       // 🚀 Run the pipeline with simplified options
-      const pipeline = new StandardPipeline();
+      pipeline = new StandardPipeline();
       
-      const pipelineOptions = {
+      pipelineOptions = {
         sitemapUrl,
         maxPages: config.maxPages,
         timeout: config.timeout,
@@ -395,34 +393,17 @@ program
         console.log('⚠️  Could not parse sitemap, using default page count');
       }
       
-      // Create enhanced progress tracker
-      progress = new EnhancedProgress(
-        actualPageCount, 
-        `🚀 Initializing test for ${actualPageCount} pages...`
-      );
-      
       const startTime = Date.now();
       
       // Update pipeline options with discovered sitemap URL
       pipelineOptions.sitemapUrl = finalSitemapUrl;
       
-      // Mock progress tracking (real integration would require pipeline changes)
-      let currentPage = 0;
-      progressInterval = setInterval(() => {
-        if (currentPage < actualPageCount) {
-          currentPage++;
-          const mockUrl = `${finalSitemapUrl.replace('/sitemap.xml', '')}/page-${currentPage}`;
-          const stage = currentPage === actualPageCount ? 'Generating report' : 'Testing pages';
-          progress.update(currentPage, mockUrl, stage);
-        }
-      }, 3000); // Update every 3 seconds
+      console.log(`✨ ${actualPageCount === 1 ? '1 page' : actualPageCount + ' pages'} will be tested...`);
       
       const { summary, outputFiles } = await pipeline.run(pipelineOptions);
       
-      // Clear progress interval and show completion
-      clearInterval(progressInterval);
       const totalTime = Math.round((Date.now() - startTime) / 1000);
-      progress.succeed(`✅ Completed ${summary.testedPages} pages in ${formatTime(totalTime)}`);
+      console.log(`✅ Completed ${summary.testedPages} pages in ${formatTime(totalTime)}`);
       
       // Add performance summary
       const avgSpeed = summary.testedPages / (totalTime / 60); // pages per minute
@@ -444,7 +425,7 @@ program
       
       // Show generated files
       if (outputFiles.length > 0) {
-        console.log(`\\n📁 Generated reports:`);
+        console.log(`\n📁 Generated reports:`);
         outputFiles.forEach(file => {
           console.log(`   📄 ${path.basename(file)}`);
         });
@@ -461,12 +442,6 @@ program
       }
       
     } catch (error) {
-      if (progressInterval) {
-        clearInterval(progressInterval);
-      }
-      if (progress) {
-        progress.fail('❌ Test failed');
-      }
       
       // Enhanced error categorization and recovery
       const errorType = categorizeError(error);
@@ -480,12 +455,17 @@ program
           console.log('🔄 Retrying with conservative settings...');
           
           const saferOptions = {
-            ...pipelineOptions,
+            ...(pipelineOptions || {}),
             maxConcurrent: 1,
             timeout: 20000,
             collectPerformanceMetrics: false,
-            maxPages: Math.min(pipelineOptions.maxPages, 3)
+            maxPages: Math.min((pipelineOptions?.maxPages || 10), 3)
           };
+          
+          // Ensure pipeline is initialized
+          if (!pipeline) {
+            pipeline = new StandardPipeline();
+          }
           
           const { summary, outputFiles } = await pipeline.run(saferOptions);
           
@@ -497,7 +477,7 @@ program
             (summary.passedPages / summary.testedPages * 100).toFixed(1) : 0;
           
           console.log(`\n📊 Partial Results:`);
-          console.log(`   📄 Tested: ${summary.testedPages} pages (reduced from ${pipelineOptions.maxPages})`);
+          console.log(`   📄 Tested: ${summary.testedPages} pages (reduced from ${pipelineOptions?.maxPages || 'unknown'})`);
           console.log(`   ✅ Passed: ${summary.passedPages}`);
           console.log(`   ❌ Failed: ${summary.failedPages}`);
           console.log(`   ⚠️  Success Rate: ${successRate}%`);

@@ -27,7 +27,20 @@ Transform AuditMySite from a solid accessibility testing tool into an **intellig
 
 ## 🚀 **PHASE 1: Intelligence Foundation**
 
-### 📦 Batch Processing 🎆 **HIGH PRIORITY**
+### 🚧 Development Mode Integration 🎆 **HIGH PRIORITY** 🆕
+- **Config-Based Testing** - `audit.config.js` with development/ci/production profiles
+- **Local Development Server Support** - Test localhost, dev servers, and static builds
+- **Framework Auto-Detection** - Vite, Webpack, Next.js, Angular CLI integration
+- **Route Discovery** - Automatic detection of React Router, Vue Router, Angular routes
+- **Git-Aware Testing** - Only test changed routes, pre-commit/pre-push hooks
+- **Interactive Terminal UI** - Real-time feedback with fix suggestions and file references
+- **Source-Map Integration** - Direct links from errors to source code files/lines
+- **Auto-Fix System** - Automated fixes for common accessibility issues
+- **CI/CD Ready** - JUnit XML output, GitHub Actions integration, fail thresholds
+
+*📖 See [DEVELOPMENT-MODE-CONCEPT.md](./DEVELOPMENT-MODE-CONCEPT.md) for detailed specifications*
+
+### 📦 Batch Processing
 - **Multiple Sitemaps** - Process multiple websites in a single run
 - **Concurrent Domain Testing** - Parallel processing with resource management  
 - **Bulk Reports** - Consolidated reporting for agencies and enterprise users

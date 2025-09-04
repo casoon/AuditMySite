@@ -488,11 +488,11 @@ export class AccessibilityChecker {
       maxRetries: options.maxRetries || 3,
       retryDelay: options.retryDelay || 2000,
       enableShortStatus: true,
-      statusUpdateInterval: 2000,
+      statusUpdateInterval: 5000,
       eventCallbacks: {
         onShortStatus: (status: string) => {
-          // Overwrite the current line with the status
-          process.stdout.write(`\r${status}`);
+          // Clear line and write status (prevents duplicate lines)
+          process.stdout.write(`\r\x1b[K${status}`);
         },
         onUrlCompleted: (url: string, result: any, duration: number) => {
           const shortUrl = url.split('/').pop() || url;
