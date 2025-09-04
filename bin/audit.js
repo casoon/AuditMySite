@@ -18,8 +18,9 @@ program
   .version(packageJson.version)
   .argument('<sitemapUrl>', 'URL of the sitemap.xml to test')
   
-  // ✅ Only these 6 ESSENTIAL options:
+  // ✅ Only these 7 ESSENTIAL options:
   .option('--full', 'Test all pages instead of just 5 (default: 5 pages)')
+  .option('--max-pages <number>', 'Maximum number of pages to test (overrides --full)', (value) => parseInt(value))
   .option('--expert', 'Interactive expert mode with custom settings')
   .option('--format <type>', 'Report format: html or markdown', 'html')
   .option('--output-dir <dir>', 'Output directory for reports', './reports')
@@ -55,7 +56,7 @@ program
     
     // 🎯 SMART DEFAULTS
     const QUICK_DEFAULTS = {
-      maxPages: options.full ? 1000 : 5,
+      maxPages: options.maxPages || (options.full ? 1000 : 5),
       standard: 'WCAG2AA',
       format: options.format || 'html',
       outputDir: options.outputDir || './reports',

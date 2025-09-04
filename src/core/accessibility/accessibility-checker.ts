@@ -43,7 +43,7 @@ export class AccessibilityChecker {
     url: string,
     options: TestOptions = {},
   ): Promise<AccessibilityResult> {
-    console.log('TESTREACHED', url);
+    if (options.verbose) console.log('🔍 Testing:', url);
     if (!this.browserManager) {
       throw new Error("Browser Manager not initialized");
     }
@@ -91,7 +91,7 @@ export class AccessibilityChecker {
           `${result.imagesWithoutAlt} images without alt attribute`,
         );
       }
-      console.log('DEBUG: Nach Alt-Check', {url: result.url, errors: result.errors.length, warnings: result.warnings.length});
+      // if (options.verbose) console.log('DEBUG: Nach Alt-Check', {url: result.url, errors: result.errors.length, warnings: result.warnings.length}); // Hidden - use --verbose for debug logs
 
       // Buttons without aria-label
       if (options.verbose) console.log(`   🔘 Checking buttons for aria labels...`);
@@ -104,7 +104,7 @@ export class AccessibilityChecker {
           `${result.buttonsWithoutLabel} buttons without aria-label`,
         );
       }
-      console.log('DEBUG: Nach Button-Label-Check', {url: result.url, errors: result.errors.length, warnings: result.warnings.length});
+      // if (options.verbose) console.log('DEBUG: Nach Button-Label-Check', {url: result.url, errors: result.errors.length, warnings: result.warnings.length}); // Hidden - use --verbose for debug logs
 
       // Heading hierarchy
       if (options.verbose) console.log(`   📝 Checking heading hierarchy...`);
@@ -114,7 +114,7 @@ export class AccessibilityChecker {
       if (result.headingsCount === 0) {
         result.errors.push("No headings found");
       }
-      console.log('DEBUG: Nach Heading-Check', {url: result.url, errors: result.errors.length, warnings: result.warnings.length});
+      // if (options.verbose) console.log('DEBUG: Nach Heading-Check', {url: result.url, errors: result.errors.length, warnings: result.warnings.length}); // Hidden - use --verbose for debug logs
 
       // 🆕 Extended accessibility tests
       if (options.testKeyboardNavigation) {
@@ -195,7 +195,7 @@ export class AccessibilityChecker {
             result.warnings.push(`Notice: ${message}`);
           }
         });
-        console.log('DEBUG: Nach pa11y', {url: result.url, errors: result.errors.length, warnings: result.warnings.length, pa11yIssues: result.pa11yIssues?.length});
+        // if (options.verbose) console.log('DEBUG: Nach pa11y', {url: result.url, errors: result.errors.length, warnings: result.warnings.length, pa11yIssues: result.pa11yIssues?.length}); // Hidden - use --verbose for debug logs
 
         // Additional pa11y metrics
         if (pa11yResult.documentTitle) {
@@ -226,7 +226,7 @@ export class AccessibilityChecker {
           result.warnings.push(`pa11y test failed: ${errorMessage}`);
         }
       }
-      console.log('DEBUG: Nach pa11y/Ende', {url: result.url, errors: result.errors.length, warnings: result.warnings.length, pa11yIssues: result.pa11yIssues?.length});
+      // if (options.verbose) console.log('DEBUG: Nach pa11y/Ende', {url: result.url, errors: result.errors.length, warnings: result.warnings.length, pa11yIssues: result.pa11yIssues?.length}); // Hidden - use --verbose for debug logs
 
       // Lighthouse integration removed
 

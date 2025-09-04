@@ -386,19 +386,18 @@ export class EventDrivenQueue extends EventEmitter {
    */
   private generateShortStatus(stats: QueueStats): string {
     const progress = Math.round(stats.progress);
-    const workers = `${stats.activeWorkers}/${this.options.maxConcurrent}`;
-    const memory = Math.round(stats.memoryUsage);
+    const progressBar = this.createProgressBar(stats.progress, 20);
     
     // Improved ETA calculation
-    let eta = '?';
+    let eta = '';
     if (stats.estimatedTimeRemaining > 0) {
       const seconds = Math.round(stats.estimatedTimeRemaining / 1000);
       if (seconds < 60) {
-        eta = `${seconds}s`;
+        eta = `ETA: ${seconds}s | `;
       } else if (seconds < 3600) {
-        eta = `${Math.round(seconds / 60)}m`;
+        eta = `ETA: ${Math.round(seconds / 60)}m | `;
       } else {
-        eta = `${Math.round(seconds / 3600)}h`;
+        eta = `ETA: ${Math.round(seconds / 3600)}h | `;
       }
     }
     
@@ -407,10 +406,17 @@ export class EventDrivenQueue extends EventEmitter {
       ? Math.round((stats.completed / ((Date.now() - this.startTime.getTime()) / 60000)) * 10) / 10
       : 0;
     
-    // Memory warning
-    const memoryWarning = stats.memoryUsage > 500 ? ' ⚠️' : '';
+    const elapsed = this.startTime ? Math.round((Date.now() - this.startTime.getTime()) / 1000) : 0;
     
-    return `📊 ${progress}% | ${stats.completed}/${stats.total} | 🔧 ${workers} | 💾 ${memory}MB${memoryWarning} | ⏱️ ${eta} | 🚀 ${speed}/min`;
+    return `🚀 Testing pages... ${progressBar} ${progress}% (${stats.completed}/${stats.total})\n   ${eta}Speed: ${speed.toFixed(1)} pages/min | Elapsed: ${elapsed}s`;
+  }
+  
+  /**
+   * Create a simple progress bar
+   */
+  private createProgressBar(percentage: number, length: number = 20): string {
+    const filled = Math.round((percentage / 100) * length);
+    return '█'.repeat(filled) + '░'.repeat(length - filled);
   }
 
   // Public API für Event-Listener

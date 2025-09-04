@@ -205,7 +205,6 @@ export class WebVitalsCollector {
     if (enhanced.lcp === 0 && enhanced.loadTime > 0) {
       // For small pages, LCP often equals load time or FCP
       enhanced.lcp = enhanced.fcp > 0 ? enhanced.fcp * 1.2 : enhanced.loadTime * 0.8;
-      console.log(`LCP fallback applied: ${enhanced.lcp}ms (calculated from ${enhanced.fcp > 0 ? 'FCP' : 'loadTime'})`);
     }
     
     // Additional LCP fallback using document timing
@@ -228,9 +227,7 @@ export class WebVitalsCollector {
     }
     
     // INP Fallback: Pages without interaction get 0, which is normal
-    if (enhanced.inp === 0) {
-      console.log('INP is 0 - no user interactions detected (normal for static pages)');
-    }
+    // (No logging needed - this is expected for static pages)
     
     // TTFB Fallback: Calculate from navigation timing if available
     if (enhanced.ttfb === 0 && enhanced.domContentLoaded > 0) {

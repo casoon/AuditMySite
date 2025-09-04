@@ -61,13 +61,11 @@ export class StandardPipeline {
     
     // Parse sitemap
     const urls = await parser.parseSitemap(options.sitemapUrl);
-    console.log('DEBUG: Sitemap-URLs:', urls);
     console.log(`📄 Sitemap loaded: ${urls.length} URLs found`);
     
     // Filter URLs
     const filterPatterns = ['[...slug]', '[category]', '/demo/'];
     const filteredUrls = parser.filterUrls(urls, { filterPatterns });
-    console.log('DEBUG: Gefilterte URLs:', filteredUrls);
     console.log(`🔍 URLs filtered: ${filteredUrls.length} URLs to test`);
     
     // Convert URLs to local URLs
@@ -132,7 +130,6 @@ export class StandardPipeline {
     };
     
     // Choose between queue (default) and sequential processing
-    console.log('DEBUG: URLs an AccessibilityChecker:', limitedUrls.map((url: any) => url.loc));
     let results: AccessibilityResult[];
     if (options.useSequentialTesting) {
       console.log('📋 Use sequential tests (Legacy mode)...');
@@ -147,7 +144,6 @@ export class StandardPipeline {
         testOptions
       );
     }
-    console.log('DEBUG: Accessibility-Testergebnisse:', JSON.stringify(results, null, 2));
     
     console.log('\n📋 Creating test summary...');
     
@@ -168,8 +164,6 @@ export class StandardPipeline {
     const { DetailedIssueCollector } = require('@core/accessibility');
     const { DetailedIssueMarkdownReport } = require('@reports');
     const detailedIssues = (DetailedIssueCollector.collectAll(results) || []);
-    console.log('DEBUG: detailedIssues', detailedIssues);
-    console.log('DEBUG: typeof DetailedIssueMarkdownReport.generate', typeof DetailedIssueMarkdownReport.generate);
     const detailedMd = DetailedIssueMarkdownReport.generate(detailedIssues || []);
     const detailedMdPath = path.join(outputDir, `detailed-issues-${dateOnly}.md`);
     fs.writeFileSync(detailedMdPath, detailedMd, 'utf8');
@@ -221,8 +215,6 @@ export class StandardPipeline {
       // Create performance issues as AuditIssue[] and generate Markdown report
       const { PerformanceIssueMarkdownReport } = require('@reports');
       const perfIssues = PerformanceIssueCollector.collectAll(summary) || [];
-      console.log('DEBUG: perfIssues', perfIssues);
-      console.log('DEBUG: typeof PerformanceIssueMarkdownReport.generate', typeof PerformanceIssueMarkdownReport.generate);
       const perfMd = PerformanceIssueMarkdownReport.generate(perfIssues);
       const perfMdPath = path.join(outputDir, `performance-issues-${dateOnly}.md`);
       fs.writeFileSync(perfMdPath, perfMd, 'utf8');
