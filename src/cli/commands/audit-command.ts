@@ -120,22 +120,26 @@ export class AuditCommand extends BaseCommand {
   }
 
   private async buildConfiguration(args: AuditCommandArgs): Promise<StandardPipelineOptions> {
-    // Smart defaults
+    // Smart defaults - sitemapUrl will be set later in runAudit
     const baseConfig: StandardPipelineOptions = {
+      sitemapUrl: args.sitemapUrl, // Required property
       maxPages: args.maxPages || (args.full ? 1000 : 5),
       timeout: 10000,
       pa11yStandard: 'WCAG2AA',
       outputDir: args.outputDir || './reports',
-      outputFormat: Array.isArray(args.format) ? (args.format[0] === 'json' ? 'html' : args.format[0]) : (args.format === 'json' ? 'html' : (args.format || 'html')),
+      outputFormat: Array.isArray(args.format) ? 
+        (args.format[0] === 'json' ? 'html' : 
+         args.format[0] === 'markdown' ? 'markdown' : 'html') : 
+        (args.format === 'json' ? 'html' : 
+         args.format === 'markdown' ? 'markdown' : 'html'),
       maxConcurrent: 2,
       generateDetailedReport: true,
       generatePerformanceReport: true,
-      generateSeoReport: false,
-      generateSecurityReport: false,
-      usePa11y: true,
+      // generateSeoReport: false, // Not in StandardPipelineOptions
+      // generateSecurityReport: false, // Not in StandardPipelineOptions
+      // usePa11y: true, // Not in StandardPipelineOptions
       collectPerformanceMetrics: true,
-      useUnifiedQueue: args.unifiedQueue || false, // NEW: Use unified queue system
-      verbose: args.verbose || false
+      useUnifiedQueue: args.unifiedQueue || false // NEW: Use unified queue system
     };
     
     // Store all formats for unified report system
@@ -218,15 +222,20 @@ export class AuditCommand extends BaseCommand {
       }
     ]);
 
-    return {
+    // Store additional formats in extended config for the unified system
+    const result: StandardPipelineOptions = {
       ...baseConfig,
       maxPages: answers.maxPages,
       pa11yStandard: answers.standard,
-      outputFormat: answers.formats[0], // Use first format for legacy compatibility
-      formats: answers.formats, // Store all formats for unified system
+      outputFormat: (answers.formats[0] === 'markdown' ? 'markdown' : 'html') as 'markdown' | 'html',
       useUnifiedQueue: answers.useUnifiedQueue,
       maxConcurrent: answers.maxConcurrent
     };
+    
+    // Store all formats for unified system (not in StandardPipelineOptions interface)
+    (result as any).outputFormats = answers.formats;
+    
+    return result;
   }
 
   private buildPerformanceBudget(args: AuditCommandArgs): any {
@@ -314,8 +323,8 @@ export class AuditCommand extends BaseCommand {
     const startTime = Date.now();
 
     const result = await pipeline.run({
-      sitemapUrl,
       ...config,
+      sitemapUrl,
       outputDir: outputInfo.dir
     });
 

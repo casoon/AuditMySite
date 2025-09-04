@@ -38,29 +38,20 @@ export class ConfigManager {
    */
   getDefaults(): AuditConfig {
     return {
-      server: {
-        maxPages: 5,
-        timeout: 30000,
-        verbose: false,
-        maxConcurrent: 3
-      },
+      maxPages: 5,
       standards: {
         wcag: 'WCAG2AA',
-        includeWarnings: true
+        strictMode: false
       },
       performance: {
-        collectWebVitals: true,
-        budgets: {
-          lcp: 2500,
-          fcp: 1800,
-          cls: 0.1,
-          inp: 200,
-          ttfb: 600
-        }
+        budgets: 'default',
+        collectMetrics: ['LCP', 'CLS', 'FCP'],
+        ignoreThresholds: false
       },
       output: {
-        formats: ['html'],
-        directory: './reports'
+        format: 'html',
+        outputDir: './reports',
+        interactive: false
       }
     };
   }
@@ -72,20 +63,16 @@ export class ConfigManager {
     const config: Partial<AuditConfig> = {};
 
     if (args.maxPages !== undefined) {
-      config.server = { ...config.server, maxPages: args.maxPages };
+      config.maxPages = args.maxPages;
     }
 
     if (args.format) {
-      const formats = Array.isArray(args.format) ? args.format : [args.format];
-      config.output = { ...config.output, formats };
-    }
-
-    if (args.verbose !== undefined) {
-      config.server = { ...config.server, verbose: args.verbose };
-    }
-
-    if (args.outputDir) {
-      config.output = { ...config.output, directory: args.outputDir };
+      // Take the first format for the main format field, store others in extended config
+      const format = Array.isArray(args.format) ? args.format[0] : args.format;
+      config.output = { 
+        format: format as 'html' | 'markdown' | 'json' | 'junit' | 'terminal',
+        outputDir: args.outputDir || './reports'
+      };
     }
 
     return config;
@@ -100,12 +87,8 @@ export class ConfigManager {
     if (process.env.AUDIT_MAX_PAGES) {
       const maxPages = parseInt(process.env.AUDIT_MAX_PAGES);
       if (!isNaN(maxPages)) {
-        config.server = { ...config.server, maxPages };
+        config.maxPages = maxPages;
       }
-    }
-
-    if (process.env.AUDIT_VERBOSE === 'true') {
-      config.server = { ...config.server, verbose: true };
     }
 
     return config;
@@ -119,17 +102,15 @@ export class ConfigManager {
     let result = { ...defaults };
 
     for (const config of configs) {
-      if (config.server) {
-        result.server = { ...result.server, ...config.server };
+      // Merge top-level properties
+      if (config.maxPages !== undefined) {
+        result.maxPages = config.maxPages;
       }
       if (config.standards) {
         result.standards = { ...result.standards, ...config.standards };
       }
       if (config.performance) {
         result.performance = { ...result.performance, ...config.performance };
-        if (config.performance.budgets) {
-          result.performance.budgets = { ...result.performance.budgets, ...config.performance.budgets };
-        }
       }
       if (config.output) {
         result.output = { ...result.output, ...config.output };
@@ -147,38 +128,22 @@ export class ConfigManager {
     const warnings: string[] = [];
     const suggestions: string[] = [];
 
-    // Validate server config
-    if (config.server) {
-      if (config.server.maxPages !== undefined && (config.server.maxPages < 1 || config.server.maxPages > 1000)) {
-        errors.push('maxPages must be between 1 and 1000');
-      }
-      if (config.server.timeout !== undefined && (config.server.timeout < 5000 || config.server.timeout > 120000)) {
-        errors.push('timeout must be between 5000 and 120000 milliseconds');
-      }
-      if (config.server.maxConcurrent !== undefined && (config.server.maxConcurrent < 1 || config.server.maxConcurrent > 10)) {
-        errors.push('maxConcurrent must be between 1 and 10');
-      }
+    // Validate maxPages
+    if (config.maxPages !== undefined && (config.maxPages < 1 || config.maxPages > 1000)) {
+      errors.push('maxPages must be between 1 and 1000');
     }
 
     // Validate output config
     if (config.output) {
-      if (config.output.formats && config.output.formats.length === 0) {
-        errors.push('At least one output format must be specified');
+      const validFormats = ['html', 'markdown', 'json', 'junit', 'terminal'];
+      if (config.output.format && !validFormats.includes(config.output.format)) {
+        errors.push(`Invalid output format. Must be one of: ${validFormats.join(', ')}`);
       }
     }
 
     // Generate warnings
-    if (config.server?.maxPages && config.server.maxPages > 50) {
+    if (config.maxPages && config.maxPages > 50) {
       warnings.push('Testing more than 50 pages may result in high resource usage and long processing times');
-    }
-
-    // Generate suggestions
-    if (config.server?.maxConcurrent && config.server.maxConcurrent > 5) {
-      suggestions.push('Consider reducing concurrency for better system stability');
-    }
-
-    if (config.output?.formats && config.output.formats.length > 2) {
-      suggestions.push('Multiple output formats may increase processing time');
     }
 
     return {
@@ -196,48 +161,45 @@ export class ConfigManager {
     switch (presetName) {
       case 'react':
         return {
-          server: { maxPages: 10, maxConcurrent: 2 },
-          standards: { wcag: 'WCAG2AA' },
-          performance: { collectWebVitals: true },
-          frameworks: { detection: { react: true } }
+          maxPages: 10,
+          standards: { wcag: 'WCAG2AA', strictMode: false },
+          performance: { budgets: 'development', collectMetrics: ['LCP', 'CLS', 'FCP'] },
+          framework: { type: 'react', router: 'react-router' }
         };
 
       case 'vue':
         return {
-          server: { maxPages: 8, maxConcurrent: 2 },
-          standards: { wcag: 'WCAG2AA' },
-          frameworks: { detection: { vue: true } }
+          maxPages: 8,
+          standards: { wcag: 'WCAG2AA', strictMode: false },
+          framework: { type: 'vue', router: 'vue-router' }
         };
 
       case 'angular':
         return {
-          server: { maxPages: 10, maxConcurrent: 3 },
-          standards: { wcag: 'WCAG2AA' },
-          frameworks: { detection: { angular: true } }
+          maxPages: 10,
+          standards: { wcag: 'WCAG2AA', strictMode: false },
+          framework: { type: 'angular' }
         };
 
       case 'ecommerce':
         return {
-          server: { maxPages: 25, maxConcurrent: 2 },
-          performance: {
-            budgets: { lcp: 2000, fcp: 1500, cls: 0.05 }
-          }
+          maxPages: 25,
+          standards: { wcag: 'WCAG2AA', strictMode: true },
+          performance: { budgets: 'ecommerce', enforceThresholds: true }
         };
 
       case 'corporate':
         return {
-          server: { maxPages: 15, maxConcurrent: 3 },
-          performance: {
-            budgets: { lcp: 2200, fcp: 1600 }
-          }
+          maxPages: 15,
+          standards: { wcag: 'WCAG2AAA', strictMode: true },
+          performance: { budgets: 'corporate' }
         };
 
       case 'blog':
         return {
-          server: { maxPages: 20, maxConcurrent: 2 },
-          performance: {
-            budgets: { lcp: 2400, fcp: 1700 }
-          }
+          maxPages: 20,
+          standards: { wcag: 'WCAG2AA', strictMode: false },
+          performance: { budgets: 'blog' }
         };
 
       default:

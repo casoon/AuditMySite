@@ -2,10 +2,10 @@
  * 🚀 AuditMySite REST API Server
  * 
  * Express.js-based REST API for remote accessibility auditing.
- * Simplified implementation for v1.7.1 TypeScript compatibility.
+ * Clean implementation for v1.8.0 with full TypeScript compatibility.
  */
 
-import express, { Express, Request, Response, NextFunction } from 'express';
+import express, { Express, Request, Response, NextFunction, RequestHandler, ErrorRequestHandler } from 'express';
 import cors from 'cors';
 import helmet from 'helmet';
 import rateLimit from 'express-rate-limit';
@@ -17,12 +17,25 @@ import {
   AuditJobRequest,
   AuditOptions,
   AuditResult,
-  SDKConfig
+  SDKConfig,
+  ProgressData
 } from '../sdk/types';
 
 // =============================================================================
-// Types & Interfaces
+// Type Definitions
 // =============================================================================
+
+// Extend Express Request globally
+declare global {
+  namespace Express {
+    interface Request {
+      requestId: string;
+      apiKey?: string;
+    }
+  }
+}
+
+type AuthenticatedRequest = Request;
 
 interface APIConfig {
   port: number;
@@ -33,11 +46,6 @@ interface APIConfig {
   jobTimeout: number;
   enableSwagger: boolean;
   corsOrigins: string[];
-}
-
-interface AuthenticatedRequest extends Request {
-  apiKey?: string;
-  requestId: string;
 }
 
 interface JobManager {
@@ -135,27 +143,23 @@ export class AuditAPIServer {
     this.app.use(limiter);
 
     // Request ID middleware
-    this.app.use((req: AuthenticatedRequest, res: Response, next: NextFunction) => {
+    const requestIdHandler: RequestHandler = (req: Request, res: Response, next: NextFunction) => {
       req.requestId = uuidv4();
       res.setHeader('X-Request-ID', req.requestId);
       next();
-    });
-
-    // API Key authentication
-    if (this.config.apiKeyRequired) {
-      this.app.use(this.authenticateApiKey.bind(this));
-    }
+    };
+    this.app.use(requestIdHandler);
   }
 
   private setupRoutes(): void {
-    // Health check
-    this.app.get('/health', (req: AuthenticatedRequest, res: Response) => {
+    // Health check (no auth required)
+    this.app.get('/health', (req: Request, res: Response) => {
       res.json({
         success: true,
         data: {
           status: 'healthy',
           timestamp: new Date().toISOString(),
-          version: '1.7.0',
+          version: '1.8.0',
           uptime: process.uptime(),
           jobs: {
             total: this.jobManager.jobs.size,
@@ -165,13 +169,18 @@ export class AuditAPIServer {
       });
     });
     
+    // Apply API Key authentication to API endpoints only
+    if (this.config.apiKeyRequired) {
+      this.app.use('/api/v1/*', this.authenticateApiKey.bind(this));
+    }
+    
     // API info
-    this.app.get('/api/v1/info', (req: AuthenticatedRequest, res: Response) => {
+    this.app.get('/api/v1/info', (req: Request, res: Response) => {
       res.json({
         success: true,
         data: {
           name: 'AuditMySite API',
-          version: '1.7.0',
+          version: '1.8.0',
           description: 'REST API for accessibility testing',
           endpoints: ['/health', '/api/v1/audit', '/api/v1/audit/quick'],
           maxConcurrentJobs: this.config.maxConcurrentJobs
@@ -202,7 +211,7 @@ export class AuditAPIServer {
   }
 
   private setupErrorHandling(): void {
-    this.app.use((error: Error, req: AuthenticatedRequest, res: Response, next: NextFunction) => {
+    this.app.use((error: Error, req: Request, res: Response, next: NextFunction) => {
       console.error(`API Error [${req.requestId}]:`, error);
       
       const statusCode = (error as any).statusCode || 500;
@@ -215,7 +224,7 @@ export class AuditAPIServer {
     });
   }
 
-  private async authenticateApiKey(req: AuthenticatedRequest, res: Response, next: NextFunction): Promise<void> {
+  private async authenticateApiKey(req: Request, res: Response, next: NextFunction): Promise<void> {
     const apiKey = req.headers['x-api-key'] as string || req.query.apiKey as string;
     
     if (!apiKey) {
@@ -232,7 +241,7 @@ export class AuditAPIServer {
     next();
   }
 
-  private async handleCreateAudit(req: AuthenticatedRequest, res: Response): Promise<void> {
+  private async handleCreateAudit(req: Request, res: Response): Promise<void> {
     try {
       const jobRequest: AuditJobRequest = req.body;
       const jobId = uuidv4();
@@ -260,7 +269,7 @@ export class AuditAPIServer {
         sitemapUrl: jobRequest.sitemapUrl,
         options: jobRequest.options || {},
         createdAt: new Date(),
-        progress: 0
+        progress: { current: 0, total: 100, percentage: 0 }
       };
       
       this.jobManager.jobs.set(jobId, job);
@@ -286,7 +295,7 @@ export class AuditAPIServer {
     }
   }
 
-  private async handleGetAudit(req: AuthenticatedRequest, res: Response): Promise<void> {
+  private async handleGetAudit(req: Request, res: Response): Promise<void> {
     const { jobId } = req.params;
     const job = this.jobManager.jobs.get(jobId);
     
@@ -303,7 +312,7 @@ export class AuditAPIServer {
     });
   }
 
-  private async handleCancelAudit(req: AuthenticatedRequest, res: Response): Promise<void> {
+  private async handleCancelAudit(req: Request, res: Response): Promise<void> {
     const { jobId } = req.params;
     const job = this.jobManager.jobs.get(jobId);
     
@@ -324,7 +333,7 @@ export class AuditAPIServer {
     });
   }
 
-  private async handleListAudits(req: AuthenticatedRequest, res: Response): Promise<void> {
+  private async handleListAudits(req: Request, res: Response): Promise<void> {
     const { status, limit = '10', offset = '0' } = req.query;
     
     let jobs = Array.from(this.jobManager.jobs.values());
@@ -348,7 +357,7 @@ export class AuditAPIServer {
     });
   }
 
-  private async handleQuickAudit(req: AuthenticatedRequest, res: Response): Promise<void> {
+  private async handleQuickAudit(req: Request, res: Response): Promise<void> {
     try {
       const { sitemapUrl, options } = req.body;
       
@@ -371,7 +380,7 @@ export class AuditAPIServer {
     }
   }
 
-  private async handleTestConnection(req: AuthenticatedRequest, res: Response): Promise<void> {
+  private async handleTestConnection(req: Request, res: Response): Promise<void> {
     try {
       const { sitemapUrl } = req.body;
       
@@ -394,7 +403,7 @@ export class AuditAPIServer {
     }
   }
 
-  private async handleGetReports(req: AuthenticatedRequest, res: Response): Promise<void> {
+  private async handleGetReports(req: Request, res: Response): Promise<void> {
     const { jobId } = req.params;
     const job = this.jobManager.jobs.get(jobId);
     
@@ -420,7 +429,7 @@ export class AuditAPIServer {
     });
   }
 
-  private async handleDownloadReport(req: AuthenticatedRequest, res: Response): Promise<void> {
+  private async handleDownloadReport(req: Request, res: Response): Promise<void> {
     const { jobId, format } = req.params;
     const job = this.jobManager.jobs.get(jobId);
     
@@ -466,7 +475,7 @@ export class AuditAPIServer {
       job.status = 'completed';
       job.result = result;
       job.completedAt = new Date();
-      job.progress = 100;
+      job.progress = { current: 100, total: 100, percentage: 100 };
       
     } catch (error) {
       job.status = 'failed';

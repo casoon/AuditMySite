@@ -8,7 +8,7 @@
 import { AuditSDK } from '../../src/sdk/audit-sdk';
 import { AuditAPIServer } from '../../src/api/server';
 import { UnifiedReportSystem } from '../../src/reports/unified/unified-report-system';
-import { ConfigManager } from '../../src/config/config-manager';
+import { ConfigManager } from '../../src/core/config/config-manager';
 import { createMockAuditResult, createMockPageResult } from '../setup';
 import request from 'supertest';
 

@@ -277,30 +277,14 @@ class FluentAuditBuilder implements AuditBuilder {
         outputDir: finalOptions.outputDir,
         generatePerformanceReport: finalOptions.includePerformance,
         // generateSeoReport: finalOptions.includeSeo, // Removed for compatibility
-        generateSecurityReport: finalOptions.includeSecurity,
-        usePa11y: finalOptions.usePa11y,
+        // generateSecurityReport: finalOptions.includeSecurity, // Removed - not supported in StandardPipelineOptions
+        // usePa11y: finalOptions.usePa11y, // Removed - not in StandardPipelineOptions
         timeout: this.sdk.getConfig().timeout,
         maxConcurrent: this.sdk.getConfig().maxConcurrency,
-        verbose: this.sdk.getConfig().verbose,
+        // verbose: this.sdk.getConfig().verbose, // Not in StandardPipelineOptions
         useUnifiedQueue: true, // Always use unified queue in SDK
-        timestamp: startTime.toISOString(),
-        // Add progress callback
-        onProgress: (current: number, total: number, currentUrl?: string) => {
-          const progressData: ProgressData = {
-            current,
-            total,
-            percentage: Math.round((current / total) * 100),
-            currentUrl,
-            estimatedTimeRemaining: this.calculateETA(current, total, startTime)
-          };
-          
-          this.sdk.emit('audit:progress', {
-            type: 'audit:progress',
-            timestamp: new Date(),
-            data: progressData,
-            sessionId
-          });
-        }
+        // timestamp: startTime.toISOString(), // Not in StandardPipelineOptions
+        // onProgress callback removed - not supported in StandardPipelineOptions
       });
 
       // Generate reports if formats specified

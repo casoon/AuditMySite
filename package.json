@@ -1,15 +1,16 @@
 {
   "name": "@casoon/auditmysite",
-  "version": "1.7.1",
+  "version": "1.8.0",
   "description": "Simplified accessibility testing tool with Performance Budgets & Core Web Vitals - just works out of the box! Test websites for WCAG compliance with configurable performance thresholds.",
   "main": "dist/index.js",
   "bin": {
     "auditmysite": "./bin/audit.js"
   },
   "scripts": {
-    "build": "tsc && tsc-alias",
+    "build": "npm run type-check && tsc && tsc-alias",
     "dev": "tsc --watch",
-    "test": "jest",
+    "type-check": "tsc --noEmit",
+    "test": "npm run type-check && jest",
     "test:watch": "jest --watch",
     "test:coverage": "jest --coverage",
     "test:unit": "jest tests/unit",
@@ -119,31 +120,5 @@
   "organization": {
     "name": "CASOON",
     "url": "https://casoon.de"
-  },
-  "jest": {
-    "preset": "ts-jest",
-    "testEnvironment": "node",
-    "setupFilesAfterEnv": [
-      "<rootDir>/tests/setup.ts"
-    ],
-    "testMatch": [
-      "<rootDir>/tests/**/*.test.ts"
-    ],
-    "collectCoverageFrom": [
-      "src/**/*.ts",
-      "!src/**/*.d.ts",
-      "!src/**/*.config.ts",
-      "!src/index.ts"
-    ],
-    "coverageDirectory": "coverage",
-    "coverageReporters": [
-      "text",
-      "lcov",
-      "html",
-      "json-summary"
-    ],
-    "testTimeout": 10000,
-    "verbose": false,
-    "silent": true
   }
 }

@@ -1,23 +1,19 @@
 {
+  "extends": "./tsconfig.json",
   "compilerOptions": {
     "target": "ES2020",
     "module": "commonjs",
     "lib": ["ES2020", "DOM"],
-    "outDir": "./dist",
-    "rootDir": "./src",
     "strict": true,
     "esModuleInterop": true,
     "skipLibCheck": true,
     "forceConsistentCasingInFileNames": true,
-    "declaration": true,
-    "declarationMap": true,
-    "sourceMap": true,
     "resolveJsonModule": true,
     "moduleResolution": "node",
-    "noEmitOnError": true,
     "allowSyntheticDefaultImports": true,
     "experimentalDecorators": true,
     "emitDecoratorMetadata": true,
+    "isolatedModules": true,
     "baseUrl": "./src",
     "paths": {
       "@core/*": ["core/*"],
@@ -26,15 +22,15 @@
       "@reports": ["reports/index.ts"],
       "@generators": ["generators/index.ts"],
       "@parsers/*": ["parsers/*"],
-      "@tests/*": ["tests/*"]
+      "@tests/*": ["../tests/*"]
     }
   },
   "include": [
-    "src/**/*"
+    "src/**/*",
+    "tests/**/*"
   ],
   "exclude": [
     "node_modules",
-    "dist",
-    "**/*.test.ts"
+    "dist"
   ]
-} 
+}

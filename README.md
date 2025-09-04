@@ -1,13 +1,14 @@
-# 🎯 AuditMySite - Enhanced Accessibility Testing v1.7
+# 🎯 AuditMySite - Professional Web Auditing Suite v1.8.0
 
-> **🔥 NEW v1.7**: Comprehensive Automated Testing Suite + Developer Experience Improvements! **Production-ready reliability!** 🚀
-> **🔥 v1.6**: Improved CLI Experience + --max-pages Parameter! **Just works out of the box!**
-> **📊 v1.5**: Performance Budgets with Custom Thresholds + Modern HTML5 & ARIA Analysis!
+> **🚀 NEW v1.8.0**: Comprehensive Jest Testing Suite + CLI/API Optimization! **Rock-solid test coverage for production reliability!** 🔥
+> **🧪 v1.7**: Comprehensive Automated Testing Suite + Developer Experience Improvements! **Production-ready reliability!**
+> **📊 v1.6**: Improved CLI Experience + --max-pages Parameter! **Just works out of the box!**
 
-A comprehensive command-line tool for **modern accessibility testing** featuring **enhanced HTML5 element analysis**, **advanced ARIA evaluation**, **Chrome 135 performance optimizations**, and **semantic quality scoring**. Test any website by just providing a sitemap URL.
+A comprehensive **three-in-one solution** for professional web auditing: **CLI tool**, **REST API server**, and **JavaScript SDK**. Features modern accessibility testing, performance analysis, security validation, and professional reporting. Deploy as a service or integrate programmatically.
 
 ## 🚀 Quick Start
 
+### 1. CLI Usage (Classic)
 ```bash
 # Install globally
 npm install -g @casoon/auditmysite
@@ -15,16 +16,56 @@ npm install -g @casoon/auditmysite
 # Test any website (simplest usage)
 auditmysite https://your-site.com/sitemap.xml
 
-# Test with all pages
-auditmysite https://your-site.com/sitemap.xml --full
-
-# Expert mode with custom settings
+# Test with custom settings
 auditmysite https://your-site.com/sitemap.xml --expert
+```
+
+### 2. REST API Server 🆕
+```bash
+# Start API server with authentication
+auditmysite --api --port 3000 --api-key your-secret-key
+
+# Test via HTTP API
+curl -X POST http://localhost:3000/api/audits \
+  -H "X-API-Key: your-secret-key" \
+  -H "Content-Type: application/json" \
+  -d '{"url": "https://example.com", "options": {"pages": 5}}'
+```
+
+### 3. SDK Integration 🆕
+```javascript
+const { AuditSDK } = require('@casoon/auditmysite');
+
+const sdk = new AuditSDK();
+const results = await sdk.auditUrl('https://example.com', {
+  pages: 5,
+  includePerformance: true
+});
+
+console.log('Audit completed:', results.summary);
 ```
 
 ## ✨ Key Features
 
-### 🔥 **New in v1.7**
+### 🚀 **New in v1.8.0**
+- 🧪 **Comprehensive Jest Test Suite** - 103+ passing tests covering all core functionality
+- ⚙️ **Optimized Test Architecture** - Unit, integration, API, and CLI tests with proper mocking
+- 🔄 **Re-enabled CLI Tests** - Complete command validation and execution testing
+- 🚀 **Fixed Rate Limiting** - Optimized API rate limiting tests for reliable execution
+- 🔧 **Production-Ready Quality** - Rock-solid test coverage for maximum reliability
+- 🏁 **Fast Test Execution** - Optimized mocks and efficient test doubles
+- 🔍 **Enhanced Debugging** - Clear test structure matching current architecture
+
+### 🔌 **New in v1.7.1**
+- 🔌 **REST API Server** - Production-ready HTTP endpoints with job queue system
+- 📦 **Enhanced SDK** - Promise-based JavaScript/TypeScript integration library
+- 🔐 **API Authentication** - Secure API key-based authentication system
+- 🔄 **Asynchronous Processing** - Background job processing with real-time status updates
+- 📋 **Multiple Response Formats** - JSON, HTML, and Markdown report generation
+- 🐍 **Docker Ready** - Container deployment with environment variable configuration
+- 📊 **Enterprise Ready** - Rate limiting, health checks, and production monitoring
+
+### 🧪 **New in v1.7**
 - 🧪 **Comprehensive Test Suite** - Complete automated testing with Jest covering all components
 - 🚀 **Production-Ready Quality** - Unit, integration, API, CLI, and E2E tests for maximum reliability
 - ⚡ **Fast Test Execution** - Optimized mocks and test doubles for rapid feedback loops
@@ -65,6 +106,7 @@ auditmysite https://your-site.com/sitemap.xml --expert
 
 ## 📋 CLI Options
 
+### Core Audit Options
 | Option | Description | Default |
 |--------|-------------|---------|
 | `--full` | Test all pages instead of just 5 | `false` |
@@ -80,6 +122,44 @@ auditmysite https://your-site.com/sitemap.xml --expert
 | `--fcp-budget <ms>` | Custom FCP threshold in milliseconds | Template value |
 | `--inp-budget <ms>` | Custom INP threshold in milliseconds | Template value |
 | `--ttfb-budget <ms>` | Custom TTFB threshold in milliseconds | Template value |
+
+### API Server Options 🆕
+| Option | Description | Default |
+|--------|-------------|---------|  
+| `--api` | Start in API server mode | `false` |
+| `--port <number>` | API server port number | `3000` |
+| `--api-key <key>` | API authentication key (or use AUDITMYSITE_API_KEY env var) | Required |
+| `--max-concurrent <number>` | Maximum concurrent audit jobs | `3` |
+| `--timeout <ms>` | Audit timeout in milliseconds | `30000` |
+| `--cors` | Enable CORS for cross-origin requests | `false` |
+
+### API Endpoints 🆕
+
+| Method | Endpoint | Description |
+|--------|----------|-------------|
+| `POST` | `/api/audits` | Start a new audit job |
+| `GET` | `/api/audits/{jobId}` | Get audit job status |
+| `GET` | `/api/audits/{jobId}/results` | Get audit results |
+| `DELETE` | `/api/audits/{jobId}` | Cancel/delete audit job |
+| `GET` | `/api/health` | Server health check |
+| `GET` | `/api/status` | Server status and statistics |
+
+**Authentication**: All endpoints except `/api/health` require `X-API-Key` header.
+
+**Example API Usage**:
+```bash
+# Start audit
+curl -X POST http://localhost:3000/api/audits \
+  -H "X-API-Key: your-key" \
+  -H "Content-Type: application/json" \
+  -d '{"url": "https://example.com", "options": {"pages": 10}}'
+
+# Check status  
+curl http://localhost:3000/api/audits/audit_123 -H "X-API-Key: your-key"
+
+# Get results
+curl http://localhost:3000/api/audits/audit_123/results -H "X-API-Key: your-key"
+```
 
 ## 💡 Usage Examples
 
@@ -293,7 +373,7 @@ tests/
 
 ### Sample CLI run output
 ```text
-🚀 AuditMySite v1.7.0 - Enhanced Accessibility Testing
+🚀 AuditMySite v1.8.0 - Enhanced Accessibility Testing
 📄 Sitemap: https://example.com/sitemap.xml
 📋 Configuration:
    📄 Pages: 5

@@ -11,6 +11,10 @@ export { AuditSDK } from './audit-sdk';
 // API Server for remote access
 export { AuditAPIServer } from '../api/server';
 
+// Import for default export
+import { AuditSDK } from './audit-sdk';
+import { AuditAPIServer } from '../api/server';
+
 // Complete type definitions
 export * from './types';
 

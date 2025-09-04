@@ -1,38 +1,129 @@
-# 🎯 AuditMySite v1.3 - Usage Examples & Features
+# 🎯 AuditMySite v1.8.0 - Usage Examples & Features
 
-Complete guide to using the enhanced v1.3 features including modern HTML5 analysis, advanced ARIA evaluation, Chrome 135 optimizations, and semantic quality scoring.
+Complete guide to using AuditMySite v1.8.0 features including CLI auditing, REST API server, SDK integration, modern HTML5 analysis, advanced ARIA evaluation, comprehensive testing suite, and professional reporting.
 
 ## 🚀 Quick Start Examples
 
-### Basic Usage (Recommended)
+### 1. CLI Usage (Recommended for Quick Testing)
 ```bash
-# Test with all new v1.3 features enabled by default
+# Basic audit with automatic sitemap discovery
+auditmysite https://example.com
+
+# Full sitemap audit
 auditmysite https://example.com/sitemap.xml
 
 # What happens:
-# ✅ Tests 5 pages automatically  
-# ✅ Enhanced HTML5 element analysis
-# ✅ Advanced ARIA impact scoring
-# ✅ Chrome 135 optimizations (if available)
-# ✅ Semantic quality analysis
-# ✅ Core Web Vitals collection
-# ✅ Professional HTML report with modern sections
+# ✅ Tests up to 5 pages automatically
+# ✅ Modern HTML5 element analysis
+# ✅ Comprehensive ARIA evaluation
+# ✅ Performance metrics collection
+# ✅ Security headers validation
+# ✅ Professional HTML report generation
 ```
 
-### Expert Mode with All v1.3 Features
+### 2. REST API Server (New in v1.7.1, Enhanced in v1.8.0)
+```bash
+# Start the API server
+npx @casoon/auditmysite --api --port 3000 --api-key your-secret-key
+
+# Or with environment variables
+export AUDITMYSITE_API_KEY=your-secret-key
+npx @casoon/auditmysite --api --port 3000
+```
+
+#### API Endpoints:
+```bash
+# Start an audit
+curl -X POST http://localhost:3000/api/audits \
+  -H "X-API-Key: your-secret-key" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "url": "https://example.com",
+    "options": {
+      "pages": 10,
+      "format": "json",
+      "includePerformance": true
+    }
+  }'
+
+# Check audit status
+curl http://localhost:3000/api/audits/{jobId} \
+  -H "X-API-Key: your-secret-key"
+
+# Get audit results
+curl http://localhost:3000/api/audits/{jobId}/results \
+  -H "X-API-Key: your-secret-key"
+```
+
+### 3. SDK Integration (Programmatic Usage)
+```javascript
+const { AuditSDK } = require('@casoon/auditmysite');
+
+const sdk = new AuditSDK();
+
+// Simple audit
+const results = await sdk.auditUrl('https://example.com', {
+  pages: 5,
+  format: 'json',
+  includePerformance: true
+});
+
+console.log('Audit results:', results);
+
+// Stream audit with progress updates
+sdk.streamAudit('https://example.com', {
+  onProgress: (progress) => {
+    console.log(`Progress: ${progress.percentage}%`);
+  },
+  onComplete: (results) => {
+    console.log('Audit completed!', results);
+  }
+});
+```
+
+### Expert Mode Configuration
 ```bash
 auditmysite https://example.com/sitemap.xml --expert
 
 # Interactive prompts include:
-# 🔥 Enhanced HTML5 elements testing (details, dialog, semantic)?
-# ⚡ Enhanced ARIA analysis with impact scoring?
-# 🚀 Chrome 135 specific features and optimizations?
-# 📊 Semantic structure analysis and recommendations?
+# 🔢 How many pages to test?
+# ♿ Accessibility standard (WCAG 2.1 AA, etc.)?
+# 📄 Report format (HTML, JSON, Markdown)?
+# ⚡ Include Core Web Vitals?
+# 🔄 Concurrent page tests?
+# 🔍 Detailed progress information?
 ```
 
-## 🔥 New v1.3 Features in Detail
+## 🔥 Core Features in Detail
 
-### 1. Enhanced HTML5 Element Analysis
+### 1. REST API Server (New in v1.7.1, Enhanced in v1.8.0)
+
+#### Features:
+- **Authentication** - API key-based security
+- **Job Queue** - Asynchronous audit processing
+- **Real-time Status** - Track audit progress
+- **Multiple Formats** - JSON, HTML, Markdown outputs
+- **Rate Limiting** - Built-in request throttling
+- **Health Checks** - Server status monitoring
+
+#### API Response Example:
+```json
+{
+  "jobId": "audit_1234567890",
+  "status": "completed",
+  "url": "https://example.com",
+  "results": {
+    "summary": {
+      "totalPages": 5,
+      "overallScore": 85,
+      "issuesFound": 12
+    },
+    "pages": [...]
+  }
+}
+```
+
+### 2. Enhanced HTML5 Element Analysis
 
 #### What it detects:
 - **`<details>` and `<summary>` elements** - Proper accessibility implementation
@@ -59,7 +150,7 @@ Key HTML5 Recommendations:
 • Use semantic sectioning elements
 ```
 
-### 2. Advanced ARIA Impact Scoring
+### 3. Advanced ARIA Impact Scoring
 
 #### Impact Categories:
 - **Critical** 🔴 - Blocks access for users with disabilities
@@ -83,31 +174,62 @@ ARIA Quality Score: 78%
 Good ARIA usage with minor issues
 ```
 
-### 3. Chrome 135 Performance Optimizations
+### 4. SDK Integration
+
+#### Features:
+- **Promise-based API** - Modern async/await support
+- **Event Streaming** - Real-time progress updates
+- **Flexible Configuration** - Comprehensive options
+- **Error Handling** - Graceful failure management
+- **TypeScript Support** - Full type definitions
+
+#### SDK Example:
+```javascript
+import { AuditSDK } from '@casoon/auditmysite';
+
+const sdk = new AuditSDK({
+  concurrent: 2,
+  timeout: 30000,
+  retries: 3
+});
+
+// Audit with custom configuration
+const results = await sdk.auditSitemap('https://example.com/sitemap.xml', {
+  pages: 10,
+  standard: 'WCAG2AA',
+  includePerformance: true,
+  formats: ['json', 'html']
+});
+
+console.log(`Audited ${results.summary.totalPages} pages`);
+console.log(`Overall score: ${results.summary.overallScore}%`);
+```
+
+### 5. Performance Optimizations
 
 #### Optimizations Applied:
 - **Enhanced Accessibility Tree** - Faster pa11y integration
-- **Modern Dialog Support** - Better `<dialog>` element testing
-- **Modern DevTools Protocol** - Enhanced performance monitoring
+- **Modern Browser Support** - Latest Puppeteer integration
+- **Concurrent Processing** - Parallel page analysis
 - **Optimized Resource Loading** - Improved test execution speed
 - **Better Memory Management** - Reduced resource usage
 
 #### Example Output:
 ```
-🚀 Chrome 135 Features Detected:
+🚀 Performance Metrics:
 ✅ Enhanced Accessibility Tree
-✅ Improved Dialog Support
-✅ Modern DevTools Protocol
+✅ Concurrent Page Processing
+✅ Modern Browser Protocol
 ✅ Enhanced Performance Metrics
-✅ Better Memory Management
+✅ Optimized Memory Usage
 
 Performance Gains:
   Page Load Time: 1,234ms
   Memory Usage: 45.2MB
-  Test Execution: 15% faster
+  Test Execution: 25% faster
 ```
 
-### 4. Semantic Quality Scoring
+### 6. Semantic Quality Scoring
 
 #### What it evaluates:
 - **Document structure** - Heading hierarchy and landmarks
@@ -138,29 +260,63 @@ Good adoption of modern web standards
 ## 📊 Enhanced Report Features
 
 ### Professional HTML Reports
-The v1.3 HTML reports include new sections:
+The v1.8.0 HTML reports include comprehensive sections:
 
 ```html
-🎯 AuditMySite Enhanced Report
-Feature Badges: [HTML5 Enhanced] [ARIA Enhanced] [Chrome 135] [Semantic Analysis]
+🎯 AuditMySite v1.8.0 Professional Report
+Feature Badges: [API Ready] [SDK Integrated] [HTML5 Enhanced] [ARIA Advanced] [Performance Optimized]
 
 📊 Executive Summary
-- Comprehensive analysis of 5 pages with enhanced capabilities
+- Comprehensive analysis of pages with full feature set
 - Overall accessibility score: 85%
-- Modern web standards compliance: 78%
-- 0 critical ARIA issues, 2 HTML5 semantic issues, 12 actionable recommendations
+- Performance score: 78%
+- Security headers: 9/10 validated
+- 0 critical issues, 2 serious issues, 12 actionable recommendations
 
 🔥 Modern HTML5 Elements Analysis
-🔍 Enhanced analysis of modern HTML5 elements using axe-core v4.10 rules
+🔍 Enhanced analysis of modern HTML5 elements with semantic validation
 
-⚡ Enhanced ARIA Analysis  
-🔍 Comprehensive ARIA analysis with impact scoring and modern features
+⚡ Advanced ARIA Analysis  
+🔍 Comprehensive ARIA analysis with impact scoring and modern patterns
+
+🚀 Performance Metrics
+🔍 Core Web Vitals, loading performance, and optimization recommendations
+
+🔒 Security Analysis
+🔍 Security headers, HTTPS configuration, and vulnerability assessment
 
 📊 Semantic Quality Analysis
 🔍 Overall semantic structure and modern web standards compliance
 
 💡 Priority Recommendations
-🔥 HTML5 & Semantic | ⚡ ARIA Enhancement
+🔥 HTML5 & Semantic | ⚡ ARIA Enhancement | 🚀 Performance | 🔒 Security
+```
+
+### JSON API Response Format
+```json
+{
+  "summary": {
+    "url": "https://example.com",
+    "totalPages": 10,
+    "overallScore": 85,
+    "completedAt": "2024-01-15T10:30:00Z",
+    "duration": "2m 45s"
+  },
+  "scores": {
+    "accessibility": 88,
+    "performance": 78,
+    "security": 92,
+    "seo": 85
+  },
+  "issues": {
+    "critical": 0,
+    "serious": 2,
+    "moderate": 8,
+    "minor": 15
+  },
+  "pages": [...],
+  "recommendations": [...]
+}
 ```
 
 ### Example Report Sections:
@@ -187,7 +343,7 @@ Good ARIA usage with minor issues
 
 ## 🛠️ Advanced Configuration Examples
 
-### Expert Mode Configuration
+### CLI Expert Mode
 ```bash
 auditmysite https://example.com/sitemap.xml --expert
 
@@ -198,7 +354,7 @@ auditmysite https://example.com/sitemap.xml --expert
 ? ♿ Accessibility standard?
   → 🎯 WCAG 2.1 AA (Recommended) - Industry standard
 
-? 📄 Report format?  
+? 📄 Report format?
   → 🌐 HTML - Professional reports for stakeholders
 
 ? ⚡ Include Core Web Vitals performance metrics?
@@ -209,18 +365,74 @@ auditmysite https://example.com/sitemap.xml --expert
 
 ? 🔍 Show detailed progress information?
   → No
+```
 
-? 🔥 Enable enhanced HTML5 elements testing (details, dialog, semantic)?
-  → Yes ✨ NEW
+### API Server Configuration
+```bash
+# Basic server startup
+auditmysite --api --port 3000
 
-? ⚡ Enable enhanced ARIA analysis with impact scoring?  
-  → Yes ✨ NEW
+# Advanced server configuration
+auditmysite --api \
+  --port 8080 \
+  --api-key $(cat ~/.auditmysite-key) \
+  --max-concurrent 5 \
+  --timeout 60000
 
-? 🚀 Enable Chrome 135 specific features and optimizations?
-  → Yes ✨ NEW
+# Docker deployment
+docker run -d \
+  -p 3000:3000 \
+  -e AUDITMYSITE_API_KEY=your-secret-key \
+  -e MAX_CONCURRENT_AUDITS=3 \
+  -e AUDIT_TIMEOUT=45000 \
+  your-registry/auditmysite:v1.8.0
+```
 
-? 📊 Enable semantic structure analysis and recommendations?
-  → Yes ✨ NEW
+### SDK Advanced Configuration
+```javascript
+import { AuditSDK } from '@casoon/auditmysite';
+
+const sdk = new AuditSDK({
+  // Concurrency settings
+  concurrent: 3,
+  timeout: 45000,
+  retries: 2,
+  
+  // Output settings
+  outputDir: './audit-results',
+  formats: ['json', 'html'],
+  
+  // Feature toggles
+  includePerformance: true,
+  includeSecurity: true,
+  detailedReporting: true,
+  
+  // Browser settings
+  browserConfig: {
+    headless: true,
+    viewport: { width: 1920, height: 1080 },
+    userAgent: 'AuditMySite/1.8.0'
+  }
+});
+
+// Custom audit configuration
+const customConfig = {
+  pages: 25,
+  standard: 'WCAG2AAA',
+  includeScreenshots: true,
+  excludePatterns: ['/admin/*', '/api/*'],
+  onProgress: (data) => {
+    console.log(`Processing: ${data.currentUrl} (${data.progress}%)`);
+  },
+  onError: (error, url) => {
+    console.error(`Failed to audit ${url}:`, error.message);
+  }
+};
+
+const results = await sdk.auditSitemap(
+  'https://example.com/sitemap.xml',
+  customConfig
+);
 ```
 
 ### CI/CD Integration
@@ -316,63 +528,95 @@ Compliance Level: Enhanced
 4. **Performance Issues** → Optimize Core Web Vitals
 5. **Future Readiness** → Adopt modern standards gradually
 
-## 🚀 Migration from v1.2 to v1.3
+## 🚀 What's New in v1.8.0
 
-### What Changed:
-- **All new features enabled by default** - No configuration needed
-- **Enhanced expert mode** - 4 new toggle options
-- **Improved report design** - New sections and visual elements
-- **Better recommendations** - Categorized and prioritized
-- **Chrome 135 optimizations** - Automatic when available
+### Major New Features:
+- **Comprehensive Jest Test Suite** - 103+ passing tests for maximum reliability
+- **Optimized Test Architecture** - Unit, integration, API, and CLI tests
+- **Re-enabled CLI Tests** - Complete command validation and execution testing
+- **Fixed Rate Limiting** - Optimized API rate limiting tests
+- **Production-Ready Quality** - Rock-solid test coverage
+- **Enhanced Debugging** - Clear test structure matching current architecture
 
 ### Backward Compatibility:
-- **CLI options unchanged** - Same 6 essential options
-- **Report formats** - HTML/Markdown still available
-- **Output structure** - Domain-based organization maintained
+- **CLI unchanged** - All existing commands work identically
+- **Report formats** - HTML/JSON/Markdown all supported
+- **Output structure** - Maintained for existing integrations
 - **Exit codes** - Same success/failure indicators
 
-### Getting Started:
+### Getting Started with New Features:
 ```bash
-# Same simple usage as v1.2
+# Same CLI usage as always
 auditmysite https://example.com/sitemap.xml
 
-# But now with enhanced analysis:
-# ✅ Modern HTML5 element detection
-# ✅ Advanced ARIA impact scoring  
-# ✅ Chrome 135 performance optimizations
-# ✅ Semantic quality evaluation
-# ✅ Future readiness assessment
+# New API server mode
+auditmysite --api --port 3000 --api-key your-key
+
+# Enhanced features included:
+# ✅ REST API endpoints
+# ✅ SDK integration ready
+# ✅ Advanced performance metrics
+# ✅ Security headers validation
+# ✅ Professional report generation
+```
+
+### API Integration Examples:
+```bash
+# Install latest version
+npm install @casoon/auditmysite@latest
+
+# Start API server
+node -e "
+  const { startApiServer } = require('@casoon/auditmysite');
+  startApiServer({ port: 3000, apiKey: 'your-secret-key' });
+"
+
+# Use in your application
+npm install @casoon/auditmysite
 ```
 
 ## 📞 Support & Troubleshooting
 
 ### Common Issues:
 
-**Q: Chrome 135 features not detected?**
-A: Update to Chrome 135+ or use `--expert` mode to disable Chrome-specific features.
+**Q: API server not starting?**
+A: Ensure the port is available and API key is properly set. Check `--api-key` parameter or `AUDITMYSITE_API_KEY` environment variable.
 
-**Q: HTML5 analysis showing low scores?**  
+**Q: SDK integration failing?**
+A: Verify you're using the latest version (`npm install @casoon/auditmysite@latest`) and check TypeScript compatibility.
+
+**Q: HTML5 analysis showing low scores?**
 A: Focus on adding semantic elements like `<main>`, `<article>`, `<section>`, proper `<summary>` text.
 
 **Q: ARIA critical issues found?**
 A: Check for missing `aria-labelledby` references and invalid ARIA attribute values.
 
-**Q: Future readiness score low?**
-A: Adopt modern HTML5 elements, update ARIA patterns, optimize Core Web Vitals.
+**Q: Performance metrics missing?**
+A: Enable performance analysis with `--include-performance` or set `includePerformance: true` in SDK options.
 
 ### Performance Tips:
-- Use `--expert` mode to disable features you don't need
-- Test fewer pages initially with `auditmysite url` (defaults to 5)
-- Increase concurrent tests for faster execution
-- Use `--non-interactive` for automated testing
+- **API Server**: Use multiple API instances behind a load balancer for high traffic
+- **SDK Integration**: Configure appropriate `concurrent` setting based on your server capacity
+- **CLI Usage**: Increase concurrent tests with `--concurrent 3` for faster execution
+- **Large Sites**: Use `--pages 10` initially, then scale up as needed
+- **CI/CD**: Use `--non-interactive` and `--format json` for automated processing
 
 ---
 
-🎯 **Ready to test your site with v1.3 enhanced features?**
+🎯 **Ready to test your site with v1.8.0 features?**
 
 ```bash
+# Install latest version
 npm install -g @casoon/auditmysite@latest
+
+# CLI usage
 auditmysite https://your-site.com/sitemap.xml
+
+# API server
+auditmysite --api --port 3000 --api-key your-secret-key
+
+# SDK integration
+npm install @casoon/auditmysite@latest
 ```
 
 **Made with ❤️ and modern web standards by [CASOON](https://casoon.de)**

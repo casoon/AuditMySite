@@ -1,12 +1,12 @@
 import { chromium, Browser, Page } from "playwright";
 import pa11y from "pa11y";
-import { AccessibilityResult, TestOptions, Pa11yIssue } from '@core/types';
-import { BrowserManager } from '@core/browser';
-import { WebVitalsCollector } from '@core/performance';
-import { SimpleQueue } from '@core/pipeline';
-import { ParallelTestManager, ParallelTestManagerOptions, ParallelTestResult } from '@core/accessibility';
-import { EventDrivenQueue, ProcessOptions } from '@core/accessibility';
-import { UnifiedQueue, QueueConfig, QueueEventCallbacks } from '@core/queue';
+import { AccessibilityResult, TestOptions, Pa11yIssue } from '../types';
+import { BrowserManager } from '../browser';
+import { WebVitalsCollector } from '../performance';
+import { SimpleQueue } from '../pipeline';
+import { ParallelTestManager, ParallelTestManagerOptions, ParallelTestResult } from './index';
+import { EventDrivenQueue, ProcessOptions } from './index';
+import { UnifiedQueue, QueueConfig, QueueEventCallbacks } from '../queue';
 import * as fs from 'fs';
 import * as path from 'path';
 
