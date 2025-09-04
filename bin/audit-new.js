@@ -35,7 +35,7 @@ program
   .option('--full', 'Test all pages instead of just 5 (default: 5 pages)')
   .option('--max-pages <number>', 'Maximum number of pages to test (overrides --full)', (value) => parseInt(value))
   .option('--expert', 'Interactive expert mode with custom settings')
-  .option('--format <type>', 'Report format: html or markdown', 'html')
+  .option('--format <formats>', 'Report formats (comma-separated): html,markdown,json,csv', 'html')
   .option('--output-dir <dir>', 'Output directory for reports', './reports')
   .option('--non-interactive', 'Skip prompts for CI/CD (use defaults)')
   .option('-v, --verbose', 'Show detailed progress information')
@@ -67,13 +67,16 @@ program
       return;
     }
 
+    // Parse formats from comma-separated string
+    const formats = options.format ? options.format.split(',').map(f => f.trim()) : ['html'];
+    
     // Execute audit command through registry
     const result = await commandRegistry.executeCommand('audit', {
       sitemapUrl,
       full: options.full,
       maxPages: options.maxPages,
       expert: options.expert,
-      format: options.format,
+      format: formats,
       outputDir: options.outputDir,
       nonInteractive: options.nonInteractive,
       verbose: options.verbose,

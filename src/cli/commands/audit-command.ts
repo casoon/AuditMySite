@@ -8,6 +8,7 @@
 import { BaseCommand, CommandArgs, CommandResult } from './base-command';
 import { StandardPipeline, StandardPipelineOptions } from '../../core/pipeline/standard-pipeline';
 import { SitemapDiscovery } from '../../core/parsers/sitemap-discovery';
+import { UnifiedReportSystem, ReportData, ReportOptions, ReportFormat } from '../../reports/unified';
 import inquirer from 'inquirer';
 import * as path from 'path';
 import * as fs from 'fs';
@@ -17,7 +18,7 @@ export interface AuditCommandArgs extends CommandArgs {
   full?: boolean;
   maxPages?: number;
   expert?: boolean;
-  format?: 'html' | 'markdown';
+  format?: ReportFormat[];
   outputDir?: string;
   nonInteractive?: boolean;
   verbose?: boolean;
@@ -51,9 +52,13 @@ export class AuditCommand extends BaseCommand {
       }
     }
 
-    // Validate format
-    if (args.format && !['html', 'markdown'].includes(args.format)) {
-      errors.push('format must be either "html" or "markdown"');
+    // Validate formats
+    if (args.format && args.format.length > 0) {
+      const validFormats: ReportFormat[] = ['html', 'markdown', 'json', 'csv'];
+      const invalidFormats = args.format.filter(f => !validFormats.includes(f));
+      if (invalidFormats.length > 0) {
+        errors.push(`Invalid formats: ${invalidFormats.join(', ')}. Valid formats: ${validFormats.join(', ')}`);
+      }
     }
 
     // Validate budget template
@@ -121,7 +126,7 @@ export class AuditCommand extends BaseCommand {
       timeout: 10000,
       pa11yStandard: 'WCAG2AA',
       outputDir: args.outputDir || './reports',
-      outputFormat: args.format || 'html',
+      outputFormat: Array.isArray(args.format) ? args.format[0] : (args.format || 'html'),
       maxConcurrent: 2,
       generateDetailedReport: true,
       generatePerformanceReport: true,
@@ -132,6 +137,11 @@ export class AuditCommand extends BaseCommand {
       useUnifiedQueue: args.unifiedQueue || false, // NEW: Use unified queue system
       verbose: args.verbose || false
     };
+    
+    // Store all formats for unified report system
+    if (Array.isArray(args.format) && args.format.length > 0) {
+      (baseConfig as any).outputFormats = args.format;
+    }
 
     // Expert mode - interactive configuration
     if (args.expert && !args.nonInteractive) {
@@ -173,14 +183,21 @@ export class AuditCommand extends BaseCommand {
         default: baseConfig.pa11yStandard
       },
       {
-        type: 'list',
-        name: 'format',
-        message: '📄 Report format?',
+        type: 'checkbox',
+        name: 'formats',
+        message: '📄 Report formats? (select multiple)',
         choices: [
-          { name: '🌐 HTML - Professional reports for stakeholders', value: 'html' },
-          { name: '📝 Markdown - Developer-friendly, version control', value: 'markdown' }
+          { name: '🌐 HTML - Professional reports for stakeholders', value: 'html', checked: true },
+          { name: '📝 Markdown - Developer-friendly, version control', value: 'markdown' },
+          { name: '📊 JSON - Machine-readable for CI/CD pipelines', value: 'json' },
+          { name: '📈 CSV - Data analysis and spreadsheet integration', value: 'csv' }
         ],
-        default: baseConfig.outputFormat
+        validate: (answer) => {
+          if (answer.length === 0) {
+            return 'Please select at least one format';
+          }
+          return true;
+        }
       },
       {
         type: 'confirm',
@@ -205,7 +222,8 @@ export class AuditCommand extends BaseCommand {
       ...baseConfig,
       maxPages: answers.maxPages,
       pa11yStandard: answers.standard,
-      outputFormat: answers.format,
+      outputFormat: answers.formats[0], // Use first format for legacy compatibility
+      outputFormats: answers.formats, // Store all formats for unified system
       useUnifiedQueue: answers.useUnifiedQueue,
       maxConcurrent: answers.maxConcurrent
     };
@@ -302,6 +320,11 @@ export class AuditCommand extends BaseCommand {
       timestamp: new Date().toISOString()
     });
 
+    // Generate reports using the Unified Report System
+    if (config.outputFormat) {
+      await this.generateUnifiedReports(result, config, outputInfo);
+    }
+
     const totalTime = Date.now() - startTime;
     const avgSpeed = result.summary.testedPages / (totalTime / 60000); // pages per minute
 
@@ -309,6 +332,61 @@ export class AuditCommand extends BaseCommand {
     this.logProgress(`Average speed: ${avgSpeed.toFixed(1)} pages/minute`);
 
     return result;
+  }
+
+  private async generateUnifiedReports(result: any, config: StandardPipelineOptions, outputInfo: any): Promise<void> {
+    try {
+      const reportSystem = new UnifiedReportSystem();
+      
+      // Prepare report data
+      const reportData: ReportData = {
+        summary: result.summary,
+        issues: result.issues || [],
+        metadata: {
+          timestamp: new Date().toISOString(),
+          version: require('../../../package.json').version,
+          duration: result.summary.totalDuration || 0,
+          sitemapUrl: result.sitemapUrl,
+          environment: process.env.NODE_ENV || 'development'
+        },
+        config: config
+      };
+
+      // Prepare report options
+      const reportOptions: ReportOptions = {
+        outputDir: outputInfo.dir,
+        includePa11yIssues: config.usePa11y,
+        summaryOnly: false,
+        prettyPrint: true,
+        branding: {
+          company: 'AuditMySite',
+          footer: 'Generated by AuditMySite - Professional Accessibility Testing'
+        }
+      };
+
+      // Determine formats to generate (from args or expert mode)
+      const formats: ReportFormat[] = (config as any).outputFormats || 
+        (config.outputFormat ? [config.outputFormat as ReportFormat] : ['html']);
+      
+      this.logProgress(`Generating reports in ${formats.join(', ')} format${formats.length > 1 ? 's' : ''}...`);
+      
+      // Generate all requested reports
+      const generatedReports = await reportSystem.generateMultipleReports(formats, reportData, reportOptions);
+      
+      // Log generated reports
+      generatedReports.forEach(report => {
+        const sizeKB = Math.round(report.size / 1024);
+        this.logSuccess(`Generated ${report.format.toUpperCase()} report: ${path.basename(report.path)} (${sizeKB}KB)`);
+      });
+      
+      // Add paths to result for legacy compatibility
+      result.outputFiles = result.outputFiles || [];
+      result.outputFiles.push(...generatedReports.map(r => r.path));
+      
+    } catch (error) {
+      this.logWarning(`Report generation failed: ${error}`);
+      this.logProgress('Audit results are still available, only report generation failed');
+    }
   }
 
   private showResults(result: any): void {
