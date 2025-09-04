@@ -2,6 +2,31 @@
 
 All notable changes to this project will be documented in this file.
 
+## [1.5.2] - 2025-09-04
+
+### 🧹 Dependency Cleanup
+
+**Eliminated deprecated dependency warning by replacing node-fetch with native fetch API.**
+
+### ✅ Fixed
+- **Deprecated Dependency Warning** - Removed `npm warn deprecated node-domexception@1.0.0` warning during installation
+- **Native Fetch Integration** - Replaced `node-fetch@3.3.2` with Node.js native `fetch()` API (available in Node.js 18+)
+- **Cleaner Installation** - Zero deprecation warnings during `npm install -g @casoon/auditmysite`
+
+### 🔧 Technical Improvements
+- **Reduced Dependencies** - Removed `node-fetch` and its indirect dependencies including `node-domexception`
+- **Modern Standards** - Leverages native Web APIs available in Node.js 18+ runtime
+- **Bundle Size** - Slightly smaller package size due to removed dependencies
+- **Future-Proof** - Uses platform-native implementation instead of polyfills
+
+### 🎯 Impact
+- **Clean Developer Experience** - No more deprecation warnings during global installation
+- **Maintained Functionality** - All sitemap parsing and HTTP requests work identically
+- **Performance** - Native fetch may offer slight performance improvements
+- **Compatibility** - Still requires Node.js 18+ as specified in package.json engines
+
+---
+
 ## [1.5.1] - 2025-09-04
 
 ### 🐛 Bugfix Release

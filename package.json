@@ -1,6 +1,6 @@
 {
   "name": "@casoon/auditmysite",
-  "version": "1.5.1",
+  "version": "1.5.2",
   "description": "Simplified accessibility testing tool with Performance Budgets & Core Web Vitals - just works out of the box! Test websites for WCAG compliance with configurable performance thresholds.",
   "main": "dist/index.js",
   "bin": {
@@ -63,7 +63,6 @@
     "fast-xml-parser": "^5.2.5",
     "inquirer": "^10.2.0",
     "js-yaml": "^4.1.0",
-    "node-fetch": "^3.3.2",
     "ora": "^8.2.0",
     "pa11y": "^9.0.0",
     "playwright": "^1.55.0"
