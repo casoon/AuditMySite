@@ -1,6 +1,7 @@
-# 🎯 AuditMySite - Enhanced Accessibility Testing v1.5
+# 🎯 AuditMySite - Enhanced Accessibility Testing v1.6
 
-> **🔥 NEW v1.5**: Performance Budgets with Custom Thresholds + Modern HTML5 & ARIA Analysis! **Just works out of the box!** 🚀
+> **🔥 NEW v1.6**: Improved CLI Experience + --max-pages Parameter! **Just works out of the box!** 🚀
+> **📊 v1.5**: Performance Budgets with Custom Thresholds + Modern HTML5 & ARIA Analysis!
 
 A comprehensive command-line tool for **modern accessibility testing** featuring **enhanced HTML5 element analysis**, **advanced ARIA evaluation**, **Chrome 135 performance optimizations**, and **semantic quality scoring**. Test any website by just providing a sitemap URL.
 
@@ -22,6 +23,12 @@ auditmysite https://your-site.com/sitemap.xml --expert
 
 ## ✨ Key Features
 
+### 🔥 **New in v1.6**
+- 🎯 **Improved CLI Experience** - Cleaner output with debug logs hidden behind --verbose flag
+- 📊 **--max-pages Parameter** - Precise control over the number of pages to test (e.g. --max-pages 10)
+- 🧹 **Enhanced User Interface** - Simplified progress messages and reduced visual noise
+- ⚡ **Better Parameter Logic** - --max-pages overrides --full for exact control
+
 ### 🔥 **New in v1.5**
 - 📊 **Performance Budgets** - Configurable Web Vitals thresholds with business-focused templates (E-commerce, Corporate, Blog)
 - 🎯 **Smart Budget Templates** - Conversion-optimized thresholds for different site types
@@ -37,7 +44,7 @@ auditmysite https://your-site.com/sitemap.xml --expert
 - 🔮 **Future Readiness Score** - Evaluation of modern web standards adoption
 
 ### 🏆 **Core Features**
-- 🎯 **Simplified CLI** - Just 6 essential options + enhanced expert mode
+- 🎯 **Simplified CLI** - Just 7 essential options + enhanced expert mode
 - ⚡ **Core Web Vitals** - Real FCP, LCP, CLS, INP, TTFB metrics with smart fallbacks
 - 📊 **Performance Budgets** - Configurable thresholds with business templates (E-commerce, Corporate, Blog)
 - 🏆 **Smart Defaults** - Works perfectly without configuration
@@ -52,6 +59,7 @@ auditmysite https://your-site.com/sitemap.xml --expert
 | Option | Description | Default |
 |--------|-------------|---------|
 | `--full` | Test all pages instead of just 5 | `false` |
+| `--max-pages <number>` | Maximum number of pages to test (overrides --full) | `5` |
 | `--expert` | Interactive expert mode with custom settings | `false` |
 | `--format <type>` | Report format: `html` or `markdown` | `html` |
 | `--output-dir <dir>` | Output directory for reports | `./reports` |
@@ -74,6 +82,18 @@ auditmysite https://example.com/sitemap.xml
 - ✅ **WCAG 2.1 AA** standard  
 - ✅ **Core Web Vitals** included
 - ✅ **HTML report** generated
+
+### **Custom Page Limit** 🆕 **New in v1.6!**
+```bash
+# Test exactly 10 pages
+auditmysite https://example.com/sitemap.xml --max-pages 10
+
+# Test exactly 25 pages (overrides --full)
+auditmysite https://example.com/sitemap.xml --max-pages 25
+```
+- ✅ **Precise Control** - Test exactly the number of pages you need
+- ✅ **Overrides --full** - --max-pages takes priority over --full
+- ✅ **Perfect for Testing** - Great for development and staging
 
 ### **Full Website Test**
 ```bash
@@ -116,6 +136,9 @@ auditmysite https://example.com/sitemap.xml --expert
 ```bash
 # Run in CI with markdown output
 auditmysite https://example.com/sitemap.xml --non-interactive --format markdown
+
+# Test specific number of pages in CI
+auditmysite https://example.com/sitemap.xml --non-interactive --max-pages 20
 
 # Enforce strict performance budgets (example)
 auditmysite https://shop.example.com/sitemap.xml --non-interactive --budget ecommerce \
@@ -186,7 +209,7 @@ Below is an overview of what is tested, what the output looks like, and how to i
 
 ### Sample CLI run output
 ```text
-🚀 AuditMySite v1.5.0 - Enhanced Accessibility Testing
+🚀 AuditMySite v1.6.0 - Enhanced Accessibility Testing
 📄 Sitemap: https://example.com/sitemap.xml
 📋 Configuration:
    📄 Pages: 5
