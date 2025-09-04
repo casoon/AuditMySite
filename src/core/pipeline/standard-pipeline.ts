@@ -42,6 +42,8 @@ export interface StandardPipelineOptions {
   useSequentialTesting?: boolean;
   // 🆕 Output format option
   outputFormat?: 'markdown' | 'html';
+  // 🔧 NEW: Use unified queue system
+  useUnifiedQueue?: boolean;
 }
 
 export class StandardPipeline {
@@ -82,18 +84,20 @@ export class StandardPipeline {
     await checker.initialize();
     
     console.log('🦪 Running accessibility tests...');
-    console.log(`   📊 Collect performance metrics: ${options.collectPerformanceMetrics ? 'Yes' : 'No'}`);
-    console.log(`   📸 Capture screenshots: ${options.captureScreenshots ? 'Yes' : 'No'}`);
-    console.log(`   ⌨️  Test keyboard navigation: ${options.testKeyboardNavigation ? 'Yes' : 'No'}`);
-    console.log(`   🎨 Test color contrast: ${options.testColorContrast ? 'Yes' : 'No'}`);
-    console.log(`   🎯 Test focus management: ${options.testFocusManagement ? 'Yes' : 'No'}`);
-    console.log(`   🚀 Parallel tests: ${options.useSequentialTesting ? 'No' : 'Yes'}`);
+    console.log('⚙️  Configuration:');
+    console.log('   Default mode:');
+    console.log('     📊 Collect performance metrics');
+    console.log('     🧪 Run accessibility tests (pa11y)');
+    console.log('     🚀 Parallel processing');
+    console.log('   Expert mode (use --expert):');
+    console.log(`     📸 Capture screenshots: ${options.captureScreenshots ? 'Yes' : 'No'} (--screenshots)`);
+    console.log(`     ⌨️  Test keyboard navigation: ${options.testKeyboardNavigation ? 'Yes' : 'No'} (--keyboard)`);
+    console.log(`     🎨 Test color contrast: ${options.testColorContrast ? 'Yes' : 'No'} (--contrast)`);
+    console.log(`     🎯 Test focus management: ${options.testFocusManagement ? 'Yes' : 'No'} (--focus)`);
     if (options.useSequentialTesting) {
-      console.log(`   📋 Use sequential tests (Legacy mode)...`);
+      console.log(`   📋 Sequential mode: Yes (--sequential)`);
     } else {
-      console.log(`   🔧 Parallel workers: ${options.maxConcurrent || 3}`);
-      console.log(`   🔄 Max retries: ${options.maxRetries || 3}`);
-      console.log(`   ⏱️  Retry delay: ${options.retryDelay || 2000}ms`);
+      console.log(`   🔧 Workers: ${options.maxConcurrent || 3} | Retries: ${options.maxRetries || 3} | Delay: ${options.retryDelay || 2000}ms`);
     }
     
     // Execute tests
@@ -129,16 +133,22 @@ export class StandardPipeline {
       maxCpuUsage: options.maxCpuUsage
     };
     
-    // Choose between queue (default) and sequential processing
+    // Choose between queue systems: unified (new), legacy event-driven, or sequential
     let results: AccessibilityResult[];
-    if (options.useSequentialTesting) {
+    if (options.useUnifiedQueue) {
+      console.log('🔧 Use NEW Unified Queue System (Recommended)...');
+      results = await checker.testMultiplePagesUnified(
+        limitedUrls.map((url: any) => url.loc),
+        testOptions
+      );
+    } else if (options.useSequentialTesting) {
       console.log('📋 Use sequential tests (Legacy mode)...');
       results = await checker.testMultiplePages(
         limitedUrls.map((url: any) => url.loc),
         testOptions
       );
     } else {
-      console.log('🚀 Use integrated queue processing with short status updates (Standard)...');
+      console.log('🚀 Use integrated queue processing with short status updates (Legacy Event-driven)...');
       results = await checker.testMultiplePagesWithQueue(
         limitedUrls.map((url: any) => url.loc),
         testOptions

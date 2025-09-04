@@ -6,6 +6,7 @@ import { WebVitalsCollector } from '@core/performance';
 import { SimpleQueue } from '@core/pipeline';
 import { ParallelTestManager, ParallelTestManagerOptions, ParallelTestResult } from '@core/accessibility';
 import { EventDrivenQueue, ProcessOptions } from '@core/accessibility';
+import { UnifiedQueue, QueueConfig, QueueEventCallbacks } from '@core/queue';
 import * as fs from 'fs';
 import * as path from 'path';
 
@@ -529,6 +530,95 @@ export class AccessibilityChecker {
     } finally {
       // Cleanup
       this.eventDrivenQueue = null;
+    }
+  }
+
+  /**
+   * 🔧 NEW: Test multiple pages with the Unified Queue System
+   * This replaces the legacy queue implementations with a single, consistent API
+   */
+  async testMultiplePagesUnified(
+    urls: string[],
+    options: TestOptions = {},
+  ): Promise<AccessibilityResult[]> {
+    console.log(`🔧 Starting Unified Queue processing for ${urls.length} URLs`);
+    
+    // Initialize browser
+    if (!this.browserManager) {
+      this.browserManager = new BrowserManager({
+        headless: true,
+        port: 9222
+      });
+      await this.browserManager.initialize();
+    }
+
+    // Configure queue callbacks for progress reporting
+    const callbacks: QueueEventCallbacks<string> = {
+      onProgressUpdate: (stats) => {
+        if (stats.progress > 0 && stats.progress % 20 === 0) {
+          process.stdout.write(`\r🚀 Testing: ${stats.progress.toFixed(1)}% (${stats.completed}/${stats.total}) | Workers: ${stats.activeWorkers}`);
+        }
+      },
+      onItemCompleted: (item, result) => {
+        const shortUrl = item.data.split('/').pop() || item.data;
+        if (options.verbose) {
+          console.log(`\n✅ ${shortUrl} (${item.duration}ms)`);
+        }
+      },
+      onItemFailed: (item, error) => {
+        const shortUrl = item.data.split('/').pop() || item.data;
+        console.log(`\n❌ ${shortUrl}: ${error}`);
+      },
+      onQueueEmpty: () => {
+        console.log('\n🎉 All tests completed!');
+      }
+    };
+
+    // Create unified queue optimized for accessibility testing
+    const queue = UnifiedQueue.forAccessibilityTesting<string>('parallel', {
+      maxConcurrent: options.maxConcurrent || 2,
+      maxRetries: options.maxRetries || 3,
+      retryDelay: options.retryDelay || 2000,
+      timeout: options.timeout || 30000,
+      enableProgressReporting: true,
+      progressUpdateInterval: 2000
+    }, callbacks);
+
+    try {
+      // Process all URLs with unified queue
+      const result = await queue.processWithProgress(urls, async (url: string) => {
+        return await this.testPage(url, options);
+      }, {
+        showProgress: !options.verbose, // Show progress bar unless verbose
+        progressInterval: 3000
+      });
+      
+      // Extract results from queue items
+      const results: AccessibilityResult[] = result.completed.map(item => item.result);
+      
+      // Add failed items as crashed results
+      result.failed.forEach(failedItem => {
+        results.push({
+          url: failedItem.data,
+          title: '',
+          imagesWithoutAlt: 0,
+          buttonsWithoutLabel: 0,
+          headingsCount: 0,
+          errors: [`Test failed: ${failedItem.error}`],
+          warnings: [],
+          passed: false,
+          crashed: true,
+          duration: failedItem.duration || 0
+        });
+      });
+
+      console.log(`📊 Unified Queue Results: ${result.completed.length} completed, ${result.failed.length} failed`);
+      const metrics = queue.getPerformanceMetrics();
+      console.log(`📈 Performance: ${metrics.efficiency.toFixed(1)}% efficiency, ${metrics.throughput.toFixed(2)} pages/sec`);
+      
+      return results;
+    } finally {
+      // Queue cleanup is automatic
     }
   }
 

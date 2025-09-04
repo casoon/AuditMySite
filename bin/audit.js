@@ -39,6 +39,9 @@ program
   .option('--session-id <id>', 'Session ID for tracking (required with --stream)')
   .option('--chunk-size <size>', 'Chunk size for large reports', '1000')
   
+  // 🔧 NEW: Unified Queue System Options
+  .option('--unified-queue', 'Use the new unified queue system (EXPERIMENTAL)')
+  
   .action(async (sitemapUrl, options) => {
     // 🚀 Tauri Integration: Streaming Mode
     if (options.stream) {
@@ -349,11 +352,14 @@ program
         testColorContrast: config.testColorContrast || false,
         testFocusManagement: config.testFocusManagement || false,
         
-        // 🎆 Enhanced v1.3 Features  
+        // 🔥 Enhanced v1.3 Features  
         modernHtml5: config.modernHtml5 !== undefined ? config.modernHtml5 : true,
         ariaEnhanced: config.ariaEnhanced !== undefined ? config.ariaEnhanced : true,
         chrome135Features: config.chrome135Features !== undefined ? config.chrome135Features : true,
         semanticAnalysis: config.semanticAnalysis !== undefined ? config.semanticAnalysis : true,
+        
+        // 🔧 NEW: Unified Queue System
+        useUnifiedQueue: options.unifiedQueue || false,
         
         // 📊 Performance Budget
         performanceBudget: performanceBudget
