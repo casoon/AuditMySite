@@ -161,6 +161,30 @@ program
           default: true
         },
         {
+          type: 'confirm',
+          name: 'captureScreenshots',
+          message: '📸 Capture desktop and mobile screenshots of pages?',
+          default: false
+        },
+        {
+          type: 'confirm',
+          name: 'testKeyboardNavigation',
+          message: '⌨️  Test keyboard navigation and focusable elements?',
+          default: false
+        },
+        {
+          type: 'confirm',
+          name: 'testColorContrast',
+          message: '🎨 Test color contrast ratios (basic analysis)?',
+          default: false
+        },
+        {
+          type: 'confirm',
+          name: 'testFocusManagement',
+          message: '🎯 Test focus management and indicators?',
+          default: false
+        },
+        {
           type: 'list',
           name: 'budgetTemplate',
           message: '📈 Performance budget template?',
@@ -322,10 +346,10 @@ program
         timestamp: new Date().toISOString(),
         // 🆕 Performance-Metriken aktivieren
         collectPerformanceMetrics: true,    // ✅ Web Vitals immer aktiviert
-        captureScreenshots: false,          // Optional für Tests
-        testKeyboardNavigation: false,      // Fokus auf Core-Tests
-        testColorContrast: false,          // Fokus auf Core-Tests
-        testFocusManagement: false,         // Fokus auf Core-Tests
+        captureScreenshots: config.captureScreenshots || false,
+        testKeyboardNavigation: config.testKeyboardNavigation || false,
+        testColorContrast: config.testColorContrast || false,
+        testFocusManagement: config.testFocusManagement || false,
         
         // 🎆 Enhanced v1.3 Features  
         modernHtml5: config.modernHtml5 !== undefined ? config.modernHtml5 : true,

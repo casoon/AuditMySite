@@ -131,6 +131,10 @@ auditmysite https://example.com/sitemap.xml --expert
 - ⚡ **ARIA enhanced mode** - Advanced impact scoring toggle
 - 🚀 **Chrome 135 features** - Performance optimizations toggle
 - 📊 **Semantic analysis** - Quality scoring and recommendations toggle
+- 📸 **Screenshot capture** - Desktop and mobile screenshots toggle
+- ⌨️  **Keyboard navigation testing** - Focusable elements analysis
+- 🎨 **Color contrast testing** - Basic contrast ratio analysis
+- 🎯 **Focus management testing** - Focus indicator validation
 
 ### **CI/CD Integration**
 ```bash
