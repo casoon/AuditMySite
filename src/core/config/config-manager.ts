@@ -1,3 +1,334 @@
+/**
+ * 🔧 Configuration Manager
+ * 
+ * Main class for configuration management.
+ * Handles loading, merging, and validation of configurations from multiple sources.
+ */
+
+import { 
+  AuditConfig, 
+  ResolvedConfig, 
+  ConfigSource, 
+  ConfigValidationResult,
+  PRESET_CONFIGS,
+  ConfigPreset
+} from './types';
+import {
+  BaseConfigSource,
+  CLIConfigSource,
+  JSConfigSource,
+  JSONConfigSource,
+  AuditRCSource,
+  PackageJsonConfigSource,
+  EnvironmentConfigSource,
+  DefaultConfigSource
+} from './config-sources';
+
+export class ConfigManager {
+  private sources: BaseConfigSource[] = [];
+  private basePath: string;
+  private environment: string;
+
+  constructor(basePath: string = process.cwd(), environment: string = 'development') {
+    this.basePath = basePath;
+    this.environment = environment;
+  }
+
+  /**
+   * Resolve configuration from CLI arguments and file sources
+   */
+  async resolve(cliArgs: Record<string, any> = {}): Promise<ResolvedConfig> {
+    // Initialize sources in priority order
+    this.initializeSources(cliArgs);
+
+    // Load configuration from all sources
+    const loadedSources = await this.loadAllSources();
+
+    // Merge configurations by priority
+    const mergedConfig = this.mergeConfigurations(loadedSources);
+
+    // Apply environment-specific configuration
+    const envConfig = this.applyEnvironmentConfig(mergedConfig, this.environment);
+
+    // Validate final configuration
+    const validation = this.validateConfig(envConfig);
+
+    // Resolve extends (presets)
+    const finalConfig = await this.resolveExtends(envConfig);
+
+    return {
+      ...finalConfig,
+      environment: this.environment,
+      configSources: loadedSources,
+      validationErrors: validation.errors,
+      validationWarnings: validation.warnings
+    } as ResolvedConfig;
+  }
+
+  /**
+   * Initialize configuration sources in priority order
+   */
+  private initializeSources(cliArgs: Record<string, any>): void {
+    this.sources = [
+      new CLIConfigSource(cliArgs),          // Priority 100
+      new JSConfigSource(),                  // Priority 90
+      new JSONConfigSource(),                // Priority 85
+      new AuditRCSource(),                   // Priority 80
+      new PackageJsonConfigSource(),         // Priority 70
+      new EnvironmentConfigSource(),         // Priority 60
+      new DefaultConfigSource()              // Priority 10
+    ];
+  }
+
+  /**
+   * Load configuration from all available sources
+   */
+  private async loadAllSources(): Promise<ConfigSource[]> {
+    const loadedSources: ConfigSource[] = [];
+
+    for (const source of this.sources) {
+      try {
+        if (await source.isAvailable(this.basePath)) {
+          const config = await source.load(this.basePath);
+          if (config) {
+            loadedSources.push(config);
+          }
+        }
+      } catch (error) {
+        console.warn(`Failed to load config source: ${error}`);
+      }
+    }
+
+    // Sort by priority (highest first)
+    loadedSources.sort((a, b) => b.priority - a.priority);
+
+    return loadedSources;
+  }
+
+  /**
+   * Merge configurations from multiple sources
+   */
+  private mergeConfigurations(sources: ConfigSource[]): AuditConfig {
+    let merged: AuditConfig = {};
+
+    // Merge in reverse priority order (lowest to highest)
+    for (const source of sources.reverse()) {
+      merged = this.deepMerge(merged, source.data);
+    }
+
+    return merged;
+  }
+
+  /**
+   * Apply environment-specific configuration
+   */
+  private applyEnvironmentConfig(config: AuditConfig, environment: string): AuditConfig {
+    if (!config.environments || !config.environments[environment]) {
+      return config;
+    }
+
+    const envConfig = config.environments[environment];
+    const result = { ...config };
+
+    // Merge environment-specific settings
+    if (envConfig.standards) {
+      result.standards = { ...result.standards, ...envConfig.standards };
+    }
+    if (envConfig.performance) {
+      result.performance = { ...result.performance, ...envConfig.performance };
+    }
+    if (envConfig.output) {
+      result.output = { ...result.output, ...envConfig.output };
+    }
+    if (envConfig.testing) {
+      result.testing = this.deepMerge(result.testing || {}, envConfig.testing);
+    }
+    if (envConfig.monitoring) {
+      result.monitoring = { ...result.monitoring, ...envConfig.monitoring };
+    }
+
+    return result;
+  }
+
+  /**
+   * Resolve extends (presets) configuration
+   */
+  private async resolveExtends(config: AuditConfig): Promise<AuditConfig> {
+    if (!config.extends || config.extends.length === 0) {
+      return config;
+    }
+
+    let result = { ...config };
+
+    for (const presetName of config.extends) {
+      const preset = await this.loadPreset(presetName);
+      if (preset) {
+        // Merge preset config (preset has lower priority than main config)
+        result = this.deepMerge(preset.config, result);
+      }
+    }
+
+    // Remove extends to avoid infinite recursion
+    delete result.extends;
+
+    return result;
+  }
+
+  /**
+   * Load preset configuration
+   */
+  private async loadPreset(presetName: string): Promise<ConfigPreset | null> {
+    // Check built-in presets first
+    if (PRESET_CONFIGS[presetName]) {
+      return PRESET_CONFIGS[presetName];
+    }
+
+    // Try to load external preset (npm package)
+    try {
+      const presetModule = require(`@auditmysite/config-${presetName}`);
+      return presetModule.default || presetModule;
+    } catch (error) {
+      console.warn(`Failed to load preset '${presetName}': ${error}`);
+      return null;
+    }
+  }
+
+  /**
+   * Validate configuration
+   */
+  private validateConfig(config: AuditConfig): ConfigValidationResult {
+    const errors: string[] = [];
+    const warnings: string[] = [];
+    const suggestions: string[] = [];
+
+    // Validate basic settings
+    if (config.maxPages && (config.maxPages < 1 || config.maxPages > 1000)) {
+      errors.push('maxPages must be between 1 and 1000');
+    }
+
+    // Validate performance budgets
+    if (config.performance?.customBudgets) {
+      const budgets = config.performance.customBudgets;
+      if (budgets.lcp && (budgets.lcp.good <= 0 || budgets.lcp.good > 10000)) {
+        errors.push('LCP budget must be between 0 and 10000ms');
+      }
+      if (budgets.cls && (budgets.cls.good < 0 || budgets.cls.good > 1)) {
+        errors.push('CLS budget must be between 0 and 1');
+      }
+    }
+
+    // Validate testing configuration
+    if (config.testing?.parallel?.maxConcurrent) {
+      const concurrent = config.testing.parallel.maxConcurrent;
+      if (concurrent < 1 || concurrent > 10) {
+        errors.push('maxConcurrent must be between 1 and 10');
+      }
+    }
+
+    // Warnings and suggestions
+    if (!config.sitemapUrl && !config.routes?.length) {
+      warnings.push('No sitemap URL or routes specified - only CLI arguments will be used');
+      suggestions.push('Consider adding a sitemapUrl or routes array to your configuration');
+    }
+
+    if (config.performance?.budgets === 'custom' && !config.performance?.customBudgets) {
+      warnings.push('Custom budget selected but no custom values provided');
+      suggestions.push('Add customBudgets configuration or use a predefined budget template');
+    }
+
+    return {
+      valid: errors.length === 0,
+      errors,
+      warnings,
+      suggestions
+    };
+  }
+
+  /**
+   * Deep merge two objects
+   */
+  private deepMerge<T extends Record<string, any>>(target: T, source: T): T {
+    const result = { ...target };
+
+    for (const key in source) {
+      if (source[key] !== null && typeof source[key] === 'object' && !Array.isArray(source[key])) {
+        result[key] = this.deepMerge(result[key] || {}, source[key]);
+      } else {
+        result[key] = source[key];
+      }
+    }
+
+    return result;
+  }
+
+  /**
+   * Get available presets
+   */
+  static getAvailablePresets(): ConfigPreset[] {
+    return Object.values(PRESET_CONFIGS);
+  }
+
+  /**
+   * Generate configuration file
+   */
+  async generateConfigFile(
+    preset: string = 'react',
+    outputPath: string = 'audit.config.js',
+    format: 'js' | 'json' = 'js'
+  ): Promise<void> {
+    const presetConfig = PRESET_CONFIGS[preset];
+    if (!presetConfig) {
+      throw new Error(`Unknown preset: ${preset}`);
+    }
+
+    const config = {
+      extends: [preset],
+      ...presetConfig.config
+    };
+
+    const fs = require('fs');
+    const path = require('path');
+
+    const fullPath = path.resolve(this.basePath, outputPath);
+
+    if (format === 'js') {
+      const content = `module.exports = ${JSON.stringify(config, null, 2)};`;
+      fs.writeFileSync(fullPath, content, 'utf8');
+    } else {
+      const content = JSON.stringify(config, null, 2);
+      fs.writeFileSync(fullPath, content, 'utf8');
+    }
+  }
+
+  /**
+   * Set environment
+   */
+  setEnvironment(environment: string): void {
+    this.environment = environment;
+  }
+
+  /**
+   * Get current environment
+   */
+  getEnvironment(): string {
+    return this.environment;
+  }
+
+  /**
+   * Set base path
+   */
+  setBasePath(basePath: string): void {
+    this.basePath = basePath;
+  }
+
+  /**
+   * Get current base path
+   */
+  getBasePath(): string {
+    return this.basePath;
+  }
+}
+
 import * as fs from 'fs';
 import * as path from 'path';
 import * as yaml from 'js-yaml';
