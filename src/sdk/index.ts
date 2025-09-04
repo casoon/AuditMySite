@@ -25,12 +25,12 @@ export {
 } from '../reports/unified';
 
 // Configuration management
-export { ConfigManager } from '../config';
+export { ConfigManager } from '../core/config/config-manager';
 
 // Core components for advanced users
 export { StandardPipeline } from '../core/pipeline/standard-pipeline';
-export { AccessibilityChecker } from '../core/accessibility-checker';
-export { UnifiedQueue, QueueType } from '../queues/unified';
+// export { AccessibilityChecker } from '../core/accessibility/accessibility-checker';
+// export { UnifiedQueue, QueueType } from '../core/queue/unified-queue';
 
 // Default export for simple require/import
 const AuditMySiteSDK = {

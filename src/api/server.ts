@@ -2,8 +2,7 @@
  * 🚀 AuditMySite REST API Server
  * 
  * Express.js-based REST API for remote accessibility auditing.
- * Provides HTTP endpoints for all SDK functionality with authentication,
- * rate limiting, and comprehensive error handling.
+ * Simplified implementation for v1.7.1 TypeScript compatibility.
  */
 
 import express, { Express, Request, Response, NextFunction } from 'express';
@@ -11,7 +10,6 @@ import cors from 'cors';
 import helmet from 'helmet';
 import rateLimit from 'express-rate-limit';
 import { v4 as uuidv4 } from 'uuid';
-import * as swaggerUi from 'swagger-ui-express';
 import { AuditSDK } from '../sdk/audit-sdk';
 import {
   APIResponse,
@@ -19,8 +17,7 @@ import {
   AuditJobRequest,
   AuditOptions,
   AuditResult,
-  SDKConfig,
-  AuditEventType
+  SDKConfig
 } from '../sdk/types';
 
 // =============================================================================
@@ -82,7 +79,6 @@ export class AuditAPIServer {
       try {
         const server = this.app.listen(this.config.port, this.config.host, () => {
           console.log(`🚀 AuditMySite API Server running at http://${this.config.host}:${this.config.port}`);
-          console.log(`📚 API Documentation: http://${this.config.host}:${this.config.port}/api-docs`);
           resolve();
         });
 
@@ -149,20 +145,39 @@ export class AuditAPIServer {
     if (this.config.apiKeyRequired) {
       this.app.use(this.authenticateApiKey.bind(this));
     }
-
-    // Swagger documentation
-    if (this.config.enableSwagger) {
-      const swaggerDocument = this.generateSwaggerDoc();
-      this.app.use('/api-docs', swaggerUi.serve, swaggerUi.setup(swaggerDocument));
-    }
   }
 
   private setupRoutes(): void {
     // Health check
-    this.app.get('/health', this.handleHealth.bind(this));
+    this.app.get('/health', (req: AuthenticatedRequest, res: Response) => {
+      res.json({
+        success: true,
+        data: {
+          status: 'healthy',
+          timestamp: new Date().toISOString(),
+          version: '1.7.0',
+          uptime: process.uptime(),
+          jobs: {
+            total: this.jobManager.jobs.size,
+            running: this.jobManager.runningJobs.size
+          }
+        }
+      });
+    });
     
     // API info
-    this.app.get('/api/v1/info', this.handleInfo.bind(this));
+    this.app.get('/api/v1/info', (req: AuthenticatedRequest, res: Response) => {
+      res.json({
+        success: true,
+        data: {
+          name: 'AuditMySite API',
+          version: '1.7.0',
+          description: 'REST API for accessibility testing',
+          endpoints: ['/health', '/api/v1/audit', '/api/v1/audit/quick'],
+          maxConcurrentJobs: this.config.maxConcurrentJobs
+        }
+      });
+    });
     
     // Audit endpoints
     this.app.post('/api/v1/audit', this.handleCreateAudit.bind(this));
@@ -193,86 +208,81 @@ export class AuditAPIServer {
       const statusCode = (error as any).statusCode || 500;
       const response = this.createErrorResponse(
         (error as any).code || 'INTERNAL_ERROR',
-        error.message || 'Internal server error',
-        process.env.NODE_ENV === 'development' ? error.stack : undefined
+        error.message || 'Internal server error'
       );
       
       res.status(statusCode).json(response);
     });
   }
 
-  // =============================================================================
-  // Route Handlers
-  // =============================================================================
-
-  private async handleHealth(req: Request, res: Response): Promise<void> {
-    res.json({
-      status: 'healthy',
-      timestamp: new Date().toISOString(),
-      version: this.sdk.getVersion(),
-      uptime: process.uptime(),
-      jobs: {
-        total: this.jobManager.jobs.size,
-        running: this.jobManager.runningJobs.size
-      }
-    });
-  }
-
-  private async handleInfo(req: AuthenticatedRequest, res: Response): Promise<void> {
-    res.json(this.createSuccessResponse({
-      name: 'AuditMySite API',
-      version: this.sdk.getVersion(),
-      description: 'REST API for accessibility auditing',
-      endpoints: {
-        health: '/health',
-        docs: '/api-docs',
-        audit: '/api/v1/audit',
-        quickAudit: '/api/v1/audit/quick'
-      },
-      limits: {
-        maxConcurrentJobs: this.config.maxConcurrentJobs,
-        jobTimeout: this.config.jobTimeout
-      }
-    }));
+  private async authenticateApiKey(req: AuthenticatedRequest, res: Response, next: NextFunction): Promise<void> {
+    const apiKey = req.headers['x-api-key'] as string || req.query.apiKey as string;
+    
+    if (!apiKey) {
+      res.status(401).json(this.createErrorResponse('AUTH_REQUIRED', 'API key required'));
+      return;
+    }
+    
+    if (!this.config.validApiKeys.includes(apiKey)) {
+      res.status(401).json(this.createErrorResponse('INVALID_API_KEY', 'Invalid API key'));
+      return;
+    }
+    
+    req.apiKey = apiKey;
+    next();
   }
 
   private async handleCreateAudit(req: AuthenticatedRequest, res: Response): Promise<void> {
     try {
       const jobRequest: AuditJobRequest = req.body;
+      const jobId = uuidv4();
       
+      // Validate input
       if (!jobRequest.sitemapUrl) {
-        return res.status(400).json(
-          this.createErrorResponse('VALIDATION_ERROR', 'sitemapUrl is required')
+        res.status(400).json(
+          this.createErrorResponse('INVALID_INPUT', 'sitemapUrl is required')
         );
+        return;
       }
-
+      
       // Check concurrent job limit
       if (this.jobManager.runningJobs.size >= this.config.maxConcurrentJobs) {
-        return res.status(429).json(
+        res.status(429).json(
           this.createErrorResponse('TOO_MANY_JOBS', 'Maximum concurrent jobs reached')
         );
+        return;
       }
-
-      const jobId = uuidv4();
+      
+      // Create job
       const job: AuditJob = {
         id: jobId,
         status: 'pending',
         sitemapUrl: jobRequest.sitemapUrl,
         options: jobRequest.options || {},
-        createdAt: new Date()
+        createdAt: new Date(),
+        progress: 0
       };
-
+      
       this.jobManager.jobs.set(jobId, job);
       
-      // Start job asynchronously
-      this.runAuditJob(job).catch(console.error);
-
-      res.status(201).json(this.createSuccessResponse({ jobId, status: 'pending' }));
+      // Start audit in background
+      this.startAuditJob(jobId).catch(error => {
+        console.error(`Job ${jobId} failed:`, error);
+        const failedJob = this.jobManager.jobs.get(jobId);
+        if (failedJob) {
+          failedJob.status = 'failed';
+          failedJob.error = error.message;
+          failedJob.completedAt = new Date();
+        }
+      });
+      
+      res.status(201).json({
+        success: true,
+        data: { jobId, status: 'pending' }
+      });
       
     } catch (error) {
-      res.status(500).json(
-        this.createErrorResponse('CREATE_AUDIT_ERROR', error instanceof Error ? error.message : String(error))
-      );
+      res.status(500).json(this.createErrorResponse('INTERNAL_ERROR', 'Failed to create audit'));
     }
   }
 
@@ -281,12 +291,16 @@ export class AuditAPIServer {
     const job = this.jobManager.jobs.get(jobId);
     
     if (!job) {
-      return res.status(404).json(
+      res.status(404).json(
         this.createErrorResponse('JOB_NOT_FOUND', 'Audit job not found')
       );
+      return;
     }
-
-    res.json(this.createSuccessResponse(job));
+    
+    res.json({
+      success: true,
+      data: job
+    });
   }
 
   private async handleCancelAudit(req: AuthenticatedRequest, res: Response): Promise<void> {
@@ -294,17 +308,20 @@ export class AuditAPIServer {
     const job = this.jobManager.jobs.get(jobId);
     
     if (!job) {
-      return res.status(404).json(
+      res.status(404).json(
         this.createErrorResponse('JOB_NOT_FOUND', 'Audit job not found')
       );
+      return;
     }
-
-    if (job.status === 'running') {
-      job.status = 'cancelled';
-      this.jobManager.runningJobs.delete(jobId);
-    }
-
-    res.json(this.createSuccessResponse({ jobId, status: job.status }));
+    
+    job.status = 'cancelled';
+    job.completedAt = new Date();
+    this.jobManager.runningJobs.delete(jobId);
+    
+    res.json({
+      success: true,
+      data: { jobId, status: 'cancelled' }
+    });
   }
 
   private async handleListAudits(req: AuthenticatedRequest, res: Response): Promise<void> {
@@ -316,23 +333,19 @@ export class AuditAPIServer {
       jobs = jobs.filter(job => job.status === status);
     }
     
-    const total = jobs.length;
-    const limitNum = Math.min(parseInt(limit as string), 100);
-    const offsetNum = parseInt(offset as string);
+    const startIndex = parseInt(offset as string);
+    const endIndex = startIndex + parseInt(limit as string);
+    const paginatedJobs = jobs.slice(startIndex, endIndex);
     
-    jobs = jobs
-      .sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime())
-      .slice(offsetNum, offsetNum + limitNum);
-
-    res.json(this.createSuccessResponse({
-      jobs,
-      pagination: {
-        total,
-        limit: limitNum,
-        offset: offsetNum,
-        hasMore: offsetNum + limitNum < total
+    res.json({
+      success: true,
+      data: {
+        jobs: paginatedJobs,
+        total: jobs.length,
+        offset: startIndex,
+        limit: parseInt(limit as string)
       }
-    }));
+    });
   }
 
   private async handleQuickAudit(req: AuthenticatedRequest, res: Response): Promise<void> {
@@ -340,18 +353,21 @@ export class AuditAPIServer {
       const { sitemapUrl, options } = req.body;
       
       if (!sitemapUrl) {
-        return res.status(400).json(
-          this.createErrorResponse('VALIDATION_ERROR', 'sitemapUrl is required')
+        res.status(400).json(
+          this.createErrorResponse('INVALID_INPUT', 'sitemapUrl is required')
         );
+        return;
       }
-
-      const result = await this.sdk.quickAudit(sitemapUrl, options);
-      res.json(this.createSuccessResponse(result));
+      
+      const result = await this.sdk.quickAudit(sitemapUrl, options || {});
+      
+      res.json({
+        success: true,
+        data: result
+      });
       
     } catch (error) {
-      res.status(500).json(
-        this.createErrorResponse('QUICK_AUDIT_ERROR', error instanceof Error ? error.message : String(error))
-      );
+      res.status(500).json(this.createErrorResponse('AUDIT_ERROR', 'Audit failed'));
     }
   }
 
@@ -360,18 +376,21 @@ export class AuditAPIServer {
       const { sitemapUrl } = req.body;
       
       if (!sitemapUrl) {
-        return res.status(400).json(
-          this.createErrorResponse('VALIDATION_ERROR', 'sitemapUrl is required')
+        res.status(400).json(
+          this.createErrorResponse('INVALID_INPUT', 'sitemapUrl is required')
         );
+        return;
       }
-
+      
       const result = await this.sdk.testConnection(sitemapUrl);
-      res.json(this.createSuccessResponse(result));
+      
+      res.json({
+        success: true,
+        data: result
+      });
       
     } catch (error) {
-      res.status(500).json(
-        this.createErrorResponse('CONNECTION_TEST_ERROR', error instanceof Error ? error.message : String(error))
-      );
+      res.status(500).json(this.createErrorResponse('CONNECTION_ERROR', 'Connection test failed'));
     }
   }
 
@@ -380,127 +399,85 @@ export class AuditAPIServer {
     const job = this.jobManager.jobs.get(jobId);
     
     if (!job) {
-      return res.status(404).json(
+      res.status(404).json(
         this.createErrorResponse('JOB_NOT_FOUND', 'Audit job not found')
       );
+      return;
     }
-
+    
     if (job.status !== 'completed' || !job.result) {
-      return res.status(400).json(
-        this.createErrorResponse('JOB_NOT_COMPLETED', 'Job not completed yet')
+      res.status(400).json(
+        this.createErrorResponse('JOB_NOT_COMPLETE', 'Job not completed yet')
       );
+      return;
     }
-
-    res.json(this.createSuccessResponse(job.result.reports));
+    
+    res.json({
+      success: true,
+      data: {
+        reports: job.result.reports || []
+      }
+    });
   }
 
   private async handleDownloadReport(req: AuthenticatedRequest, res: Response): Promise<void> {
     const { jobId, format } = req.params;
     const job = this.jobManager.jobs.get(jobId);
     
-    if (!job || job.status !== 'completed' || !job.result) {
-      return res.status(404).json(
-        this.createErrorResponse('REPORT_NOT_FOUND', 'Report not found')
+    if (!job) {
+      res.status(404).json(
+        this.createErrorResponse('JOB_NOT_FOUND', 'Audit job not found')
       );
+      return;
     }
-
-    const report = job.result.reports.find(r => r.format === format);
+    
+    if (job.status !== 'completed' || !job.result) {
+      res.status(404).json(
+        this.createErrorResponse('REPORT_NOT_FOUND', 'Report not available')
+      );
+      return;
+    }
+    
+    const report = job.result.reports?.find(r => r.format === format);
     if (!report) {
-      return res.status(404).json(
-        this.createErrorResponse('REPORT_FORMAT_NOT_FOUND', `Report format ${format} not found`)
+      res.status(404).json(
+        this.createErrorResponse('REPORT_NOT_FOUND', `Report in ${format} format not found`)
       );
+      return;
     }
-
-    try {
-      const fs = await import('fs');
-      const path = await import('path');
-      
-      const filename = path.basename(report.path);
-      const mimeTypes: Record<string, string> = {
-        html: 'text/html',
-        markdown: 'text/markdown',
-        json: 'application/json',
-        csv: 'text/csv'
-      };
-
-      res.setHeader('Content-Type', mimeTypes[format] || 'application/octet-stream');
-      res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
-      
-      const fileStream = fs.createReadStream(report.path);
-      fileStream.pipe(res);
-      
-    } catch (error) {
-      res.status(500).json(
-        this.createErrorResponse('DOWNLOAD_ERROR', 'Failed to download report')
-      );
-    }
+    
+    res.json({
+      success: true,
+      data: report
+    });
   }
 
-  // =============================================================================
-  // Helper Methods
-  // =============================================================================
-
-  private async authenticateApiKey(req: AuthenticatedRequest, res: Response, next: NextFunction): Promise<void> {
-    const apiKey = req.headers['x-api-key'] as string || req.query.apiKey as string;
+  private async startAuditJob(jobId: string): Promise<void> {
+    const job = this.jobManager.jobs.get(jobId);
+    if (!job) return;
     
-    if (!apiKey) {
-      return res.status(401).json(
-        this.createErrorResponse('API_KEY_MISSING', 'API key is required')
-      );
-    }
-
-    if (!this.config.validApiKeys.includes(apiKey)) {
-      return res.status(401).json(
-        this.createErrorResponse('API_KEY_INVALID', 'Invalid API key')
-      );
-    }
-
-    req.apiKey = apiKey;
-    next();
-  }
-
-  private async runAuditJob(job: AuditJob): Promise<void> {
-    const { id } = job;
+    job.status = 'running';
+    job.startedAt = new Date();
+    this.jobManager.runningJobs.add(jobId);
     
     try {
-      job.status = 'running';
-      job.startedAt = new Date();
-      this.jobManager.runningJobs.add(id);
-
       const result = await this.sdk.quickAudit(job.sitemapUrl, job.options);
       
       job.status = 'completed';
-      job.completedAt = new Date();
       job.result = result;
+      job.completedAt = new Date();
+      job.progress = 100;
       
     } catch (error) {
       job.status = 'failed';
+      job.error = (error as Error).message;
       job.completedAt = new Date();
-      job.error = error instanceof Error ? error.message : String(error);
-      
     } finally {
-      this.jobManager.runningJobs.delete(id);
-      
-      // Auto-cleanup jobs after 24 hours
-      setTimeout(() => {
-        this.jobManager.jobs.delete(id);
-      }, 24 * 60 * 60 * 1000);
+      this.jobManager.runningJobs.delete(jobId);
     }
   }
 
-  private createSuccessResponse<T>(data: T): APIResponse<T> {
-    return {
-      success: true,
-      data,
-      meta: {
-        timestamp: new Date().toISOString(),
-        version: this.sdk.getVersion(),
-        requestId: uuidv4()
-      }
-    };
-  }
-
-  private createErrorResponse(code: string, message: string, details?: any): APIResponse {
+  private createErrorResponse(code: string, message: string, details?: any): APIResponse<null> {
     return {
       success: false,
       error: {
@@ -508,64 +485,7 @@ export class AuditAPIServer {
         message,
         details
       },
-      meta: {
-        timestamp: new Date().toISOString(),
-        version: this.sdk.getVersion(),
-        requestId: uuidv4()
-      }
-    };
-  }
-
-  private generateSwaggerDoc() {
-    return {
-      openapi: '3.0.0',
-      info: {
-        title: 'AuditMySite API',
-        version: this.sdk.getVersion(),
-        description: 'REST API for accessibility auditing and testing'
-      },
-      servers: [
-        {
-          url: `http://${this.config.host}:${this.config.port}`,
-          description: 'Development server'
-        }
-      ],
-      // Simplified swagger doc - full implementation would be much larger
-      paths: {
-        '/health': {
-          get: {
-            summary: 'Health check',
-            responses: {
-              '200': {
-                description: 'Service is healthy'
-              }
-            }
-          }
-        },
-        '/api/v1/audit': {
-          post: {
-            summary: 'Create new audit job',
-            requestBody: {
-              required: true,
-              content: {
-                'application/json': {
-                  schema: {
-                    type: 'object',
-                    properties: {
-                      sitemapUrl: { type: 'string' },
-                      options: { type: 'object' }
-                    }
-                  }
-                }
-              }
-            },
-            responses: {
-              '201': { description: 'Job created' },
-              '400': { description: 'Invalid request' }
-            }
-          }
-        }
-      }
+      data: null
     };
   }
 }

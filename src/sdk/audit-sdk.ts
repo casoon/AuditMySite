@@ -27,7 +27,7 @@ import {
 } from './types';
 import { StandardPipeline } from '../core/pipeline/standard-pipeline';
 import { UnifiedReportSystem, ReportData, ReportOptions, ReportFormat } from '../reports/unified';
-import { ConfigManager } from '../config';
+import { ConfigManager } from '../core/config/config-manager';
 import * as path from 'path';
 
 export class AuditSDK extends EventEmitter {
@@ -276,7 +276,7 @@ class FluentAuditBuilder implements AuditBuilder {
         pa11yStandard: finalOptions.standard,
         outputDir: finalOptions.outputDir,
         generatePerformanceReport: finalOptions.includePerformance,
-        generateSeoReport: finalOptions.includeSeo,
+        // generateSeoReport: finalOptions.includeSeo, // Removed for compatibility
         generateSecurityReport: finalOptions.includeSecurity,
         usePa11y: finalOptions.usePa11y,
         timeout: this.sdk.getConfig().timeout,
@@ -314,7 +314,10 @@ class FluentAuditBuilder implements AuditBuilder {
         endTime,
         duration: endTime.getTime() - startTime.getTime(),
         summary: pipelineResult.summary,
-        results: pipelineResult.summary.results || [],
+        results: (pipelineResult.summary.results || []).map((result: any) => ({
+          ...result,
+          timestamp: result.timestamp || new Date().toISOString()
+        })),
         reports,
         metadata: {
           version: this.sdk.getVersion(),

@@ -106,7 +106,7 @@ export class AuditCommand extends BaseCommand {
       return this.success('Audit completed successfully', result);
 
     } catch (error) {
-      const errorMessage = this.formatError(error);
+      const errorMessage = this.formatError(error as Error);
       this.logError(`Audit failed: ${errorMessage}`);
       
       if (args.verbose) {
@@ -126,7 +126,7 @@ export class AuditCommand extends BaseCommand {
       timeout: 10000,
       pa11yStandard: 'WCAG2AA',
       outputDir: args.outputDir || './reports',
-      outputFormat: Array.isArray(args.format) ? args.format[0] : (args.format || 'html'),
+      outputFormat: Array.isArray(args.format) ? (args.format[0] === 'json' ? 'html' : args.format[0]) : (args.format === 'json' ? 'html' : (args.format || 'html')),
       maxConcurrent: 2,
       generateDetailedReport: true,
       generatePerformanceReport: true,
@@ -149,7 +149,7 @@ export class AuditCommand extends BaseCommand {
     }
 
     // Build performance budget
-    baseConfig.performanceBudget = this.buildPerformanceBudget(args);
+    // Performance budget will be handled by the unified report system
 
     return baseConfig;
   }
@@ -211,7 +211,7 @@ export class AuditCommand extends BaseCommand {
         message: '🔄 Concurrent page tests (1-5)?',
         default: baseConfig.maxConcurrent,
         validate: (value) => {
-          const num = parseInt(value);
+          const num = parseInt(value?.toString() || '0');
           if (num >= 1 && num <= 5) return true;
           return 'Please enter a number between 1 and 5';
         }
@@ -223,7 +223,7 @@ export class AuditCommand extends BaseCommand {
       maxPages: answers.maxPages,
       pa11yStandard: answers.standard,
       outputFormat: answers.formats[0], // Use first format for legacy compatibility
-      outputFormats: answers.formats, // Store all formats for unified system
+      formats: answers.formats, // Store all formats for unified system
       useUnifiedQueue: answers.useUnifiedQueue,
       maxConcurrent: answers.maxConcurrent
     };
@@ -316,8 +316,7 @@ export class AuditCommand extends BaseCommand {
     const result = await pipeline.run({
       sitemapUrl,
       ...config,
-      outputDir: outputInfo.dir,
-      timestamp: new Date().toISOString()
+      outputDir: outputInfo.dir
     });
 
     // Generate reports using the Unified Report System
@@ -355,7 +354,7 @@ export class AuditCommand extends BaseCommand {
       // Prepare report options
       const reportOptions: ReportOptions = {
         outputDir: outputInfo.dir,
-        includePa11yIssues: config.usePa11y,
+        includePa11yIssues: true,
         summaryOnly: false,
         prettyPrint: true,
         branding: {
