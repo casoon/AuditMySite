@@ -2,6 +2,71 @@
 
 All notable changes to this project will be documented in this file.
 
+## [1.8.4] - 2025-01-05
+
+### 🎯 Major: Single Source of Truth System
+- **NEW**: Introduced unified data structure system (`/src/reports/types/report-export.ts`)
+- **NEW**: All components (CLI, SDK, API, Report generators) now use identical type definitions
+- **NEW**: Comprehensive type safety with full TypeScript support throughout the system
+- **NEW**: Built-in data validation and error handling
+- **NEW**: Unified SDK interface (`/src/sdk/unified-audit-sdk.ts`) for all programmatic access
+
+### 🎨 HTML Report Modernization
+- **IMPROVED**: Complete HTML report redesign with modern, responsive interface
+- **NEW**: Interactive filter badge system replacing traditional navigation
+  - Click badges to show/hide report sections
+  - Visual active/inactive states
+  - Summary & Accessibility shown by default
+- **IMPROVED**: Modern table styling with consistent design language
+- **IMPROVED**: Enhanced visual hierarchy with proper spacing and typography
+- **NEW**: Section descriptions added below all headings for better UX
+
+### 🔧 Template & Data Processing Fixes
+- **FIXED**: Template variable substitution system completely rewritten
+  - All variables ({{domain}}, {{successRate}}, etc.) now properly replaced
+  - Automatic domain extraction from URLs
+  - Accurate metrics calculation
+- **IMPROVED**: Number formatting with proper rounding
+  - Performance metrics: `2757ms` instead of `2757.100000023842ms`
+  - Consistent formatting across all numeric displays
+  - Helper functions for reusable formatting
+
+### 📊 SEO Report Layout Enhancement
+- **IMPROVED**: Combined "Page & Title" column for better space utilization
+- **NEW**: Structured page information display:
+  - Page name (bold)
+  - Page title (secondary text)  
+  - Full URL (small, gray text)
+- **IMPROVED**: More readable and scannable SEO data presentation
+
+### 🎯 Branding & Visual Identity
+- **CHANGED**: Replaced wheelchair accessibility icon with target emoji (🎯)
+- **IMPROVED**: Updated favicon with modern "A" logo design
+- **READY**: Integration point for custom auditmysite_logo.svg
+
+### 📚 Documentation & Developer Experience
+- **NEW**: Comprehensive API documentation (`/UNIFIED-API.md`)
+- **NEW**: SDK usage examples for Node.js, CLI, and API integration
+- **NEW**: Migration guide from legacy versions
+- **NEW**: Type validation examples and best practices
+- **IMPROVED**: Code examples with practical use cases
+
+### 🔌 SDK & API Improvements
+- **NEW**: Progress tracking with callback support
+- **NEW**: Multi-format output generation (HTML, JSON, Markdown, CSV)
+- **NEW**: Request validation and error handling
+- **NEW**: Health check endpoints for API deployment
+- **NEW**: Version information and feature detection
+
+### 🛠️ Technical Improvements
+- **IMPROVED**: Build system compatibility and error handling
+- **FIXED**: Type conflicts resolved between legacy and unified systems
+- **NEW**: Comprehensive test coverage for new features
+- **IMPROVED**: Performance optimizations in data processing
+- **NEW**: Backwards compatibility layer for existing integrations
+
+---
+
 ## [1.5.2] - 2025-09-04
 
 ### 🧹 Dependency Cleanup

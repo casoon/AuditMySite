@@ -1,10 +1,12 @@
-# 🎯 AuditMySite - Professional Web Auditing Suite v1.8.0
+# 🎯 AuditMySite - Professional Web Auditing Suite v1.8.4
 
-> **🚀 NEW v1.8.0**: Comprehensive Jest Testing Suite + CLI/API Optimization! **Rock-solid test coverage for production reliability!** 🔥
+> **🎯 NEW v1.8.4**: Single Source of Truth System + Modern HTML Reports! **Unified data structures across CLI, SDK, and API!** 🔥
+> **🚀 v1.8.0**: Comprehensive Jest Testing Suite + CLI/API Optimization! **Rock-solid test coverage for production reliability!**
 > **🧪 v1.7**: Comprehensive Automated Testing Suite + Developer Experience Improvements! **Production-ready reliability!**
-> **📊 v1.6**: Improved CLI Experience + --max-pages Parameter! **Just works out of the box!**
 
-A comprehensive **three-in-one solution** for professional web auditing: **CLI tool**, **REST API server**, and **JavaScript SDK**. Features modern accessibility testing, performance analysis, security validation, and professional reporting. Deploy as a service or integrate programmatically.
+A comprehensive **three-in-one solution** for professional web auditing: **CLI tool**, **REST API server**, and **JavaScript SDK**. Features modern accessibility testing, performance analysis, security validation, and professional reporting with a **unified single source of truth data system** ensuring 100% consistency across all interfaces.
+
+⚡ **v1.8.4 Highlights**: Interactive HTML reports with filter badges, unified TypeScript SDK, and template variable fixes!
 
 ## 🚀 Quick Start
 
@@ -32,20 +34,41 @@ curl -X POST http://localhost:3000/api/audits \
   -d '{"url": "https://example.com", "options": {"pages": 5}}'
 ```
 
-### 3. SDK Integration 🆕
+### 3. SDK Integration 🆕 (Updated for v1.8.4)
 ```javascript
-const { AuditSDK } = require('@casoon/auditmysite');
+const { auditSDK, AuditRequest } = require('@casoon/auditmysite');
 
-const sdk = new AuditSDK();
-const results = await sdk.auditUrl('https://example.com', {
-  pages: 5,
-  includePerformance: true
+// New unified SDK with progress tracking
+const request = {
+  url: 'https://example.com/sitemap.xml',
+  options: {
+    maxPages: 20,
+    collectPerformanceMetrics: true,
+    outputFormats: ['html', 'json']
+  }
+};
+
+const response = await auditSDK.audit(request, (progress) => {
+  console.log(`${progress.step}: ${progress.progress}%`);
 });
 
-console.log('Audit completed:', results.summary);
+console.log('Success Rate:', response.report.summary.successRate + '%');
+console.log('Generated Files:', response.files);
 ```
 
 ## ✨ Key Features
+
+### 🎯 **New in v1.8.4**
+- 🎯 **Single Source of Truth System** - Unified data structures across CLI, SDK, and API for 100% consistency
+- 🎨 **Modern HTML Reports** - Complete redesign with interactive filter badges and responsive design
+- 📊 **Template Variable System** - Fixed all variable substitution issues ({{domain}}, {{successRate}}, etc.)
+- 🔢 **Number Formatting** - Performance metrics properly rounded (2757ms instead of 2757.100ms)
+- 📋 **Enhanced SEO Layout** - Combined Page & Title columns with structured information display
+- 🎯 **Updated Branding** - Modern target emoji replacing wheelchair icon + custom logo ready
+- 🔌 **Unified SDK** - Single interface for Node.js, CLI, and REST API with full TypeScript support
+- 📚 **Comprehensive Documentation** - Complete API docs in `/UNIFIED-API.md` with examples
+- ⚙️ **Filter Badge System** - Interactive show/hide sections with visual states
+- 🛠️ **Type Safety** - Full TypeScript support with validation throughout entire system
 
 ### 🚀 **New in v1.8.0**
 - 🧪 **Comprehensive Jest Test Suite** - 103+ passing tests covering all core functionality
