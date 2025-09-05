@@ -20,7 +20,7 @@ export function prepareOutputData(summary: any, timestamp: string, options: Outp
     metadata: {
       timestamp,
       tool: '@casoon/auditmysite',
-      version: '1.8.7',
+      version: '1.8.8',
       totalPages: summary.totalPages,
       testedPages: summary.testedPages,
       passedPages: summary.passedPages,

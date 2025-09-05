@@ -221,18 +221,8 @@ export class StandardPipeline {
       outputFiles.push(qualityMdPath);
     }
     
-    // Generate performance report (if requested)
-    if (options.generatePerformanceReport !== false && options.collectPerformanceMetrics) {
-      console.log('   📊 Generating performance report...');
-      
-      // Create performance issues as AuditIssue[] and generate Markdown report
-      const { PerformanceIssueMarkdownReport } = require('../../reports/index.js');
-      const perfIssues = PerformanceIssueCollector.collectAll(summary) || [];
-      const perfMd = PerformanceIssueMarkdownReport.generate(perfIssues);
-      const perfMdPath = path.join(outputDir, `performance-issues-${dateOnly}.md`);
-      fs.writeFileSync(perfMdPath, perfMd, 'utf8');
-      outputFiles.push(perfMdPath);
-    }
+    // Performance data is now integrated into HTML reports
+    // No separate markdown files needed
     
     
     return {
