@@ -1,0 +1,14 @@
+# Development files - keep it minimal to avoid accidentally excluding dist/reports
+src/
+tests/
+test/
+tsconfig*.json
+jest.config.js
+.eslintrc.js
+coverage/
+
+# Runtime reports directory (not the compiled dist/reports modules!)
+/reports
+
+# Development docs
+docs/

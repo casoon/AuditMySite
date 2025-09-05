@@ -91,7 +91,7 @@ public
 tmp/
 temp/
 
-# Reports directory
-reports/ 
+# Reports directory (runtime output only - not source or compiled)
+/reports/
 
 docs/
