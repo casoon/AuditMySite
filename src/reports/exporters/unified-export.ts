@@ -18,7 +18,7 @@ import { TestSummary, AccessibilityResult } from '../../types';
 export class UnifiedReportExporter {
   private version: string;
 
-  constructor(version: string = '1.8.3') {
+  constructor(version: string = '1.8.7') {
     this.version = version;
   }
 

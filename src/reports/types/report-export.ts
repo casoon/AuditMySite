@@ -437,7 +437,7 @@ export class ReportExportValidator {
     return {
       metadata: {
         timestamp: new Date().toISOString(),
-        version: '1.8.3',
+        version: '1.8.7',
         duration: 0,
         domain: 'error',
         config: {

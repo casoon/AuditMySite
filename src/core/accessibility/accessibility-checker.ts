@@ -226,6 +226,33 @@ export class AccessibilityChecker {
           // Add other pa11y errors as warnings
           result.warnings.push(`pa11y test failed: ${errorMessage}`);
         }
+        
+        // 🆕 Fallback pa11y score calculation when pa11y fails
+        // Calculate score based on basic accessibility checks we performed
+        let fallbackScore = 100;
+        
+        // Penalize for basic issues
+        if (result.errors.length > 0) {
+          fallbackScore -= result.errors.length * 15;  // 15 points per error
+        }
+        if (result.warnings.length > 0) {
+          fallbackScore -= result.warnings.length * 5;  // 5 points per warning
+        }
+        if (result.imagesWithoutAlt > 0) {
+          fallbackScore -= result.imagesWithoutAlt * 3;  // 3 points per missing alt
+        }
+        if (result.buttonsWithoutLabel > 0) {
+          fallbackScore -= result.buttonsWithoutLabel * 5;  // 5 points per missing label
+        }
+        if (result.headingsCount === 0) {
+          fallbackScore -= 20;  // 20 points for no headings
+        }
+        
+        result.pa11yScore = Math.max(0, fallbackScore);
+        
+        if (options.verbose) {
+          console.log(`   🔢 Calculated fallback pa11y score: ${result.pa11yScore}/100`);
+        }
       }
       // if (options.verbose) console.log('DEBUG: Nach pa11y/Ende', {url: result.url, errors: result.errors.length, warnings: result.warnings.length, pa11yIssues: result.pa11yIssues?.length}); // Hidden - use --verbose for debug logs
 

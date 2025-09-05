@@ -19,8 +19,8 @@ export function prepareOutputData(summary: any, timestamp: string, options: Outp
   return {
     metadata: {
       timestamp,
-      tool: '@casoon/accessibility-test-cli',
-      version: '1.0.1',
+      tool: '@casoon/auditmysite',
+      version: '1.8.7',
       totalPages: summary.totalPages,
       testedPages: summary.testedPages,
       passedPages: summary.passedPages,

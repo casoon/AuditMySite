@@ -29,7 +29,7 @@ export class AuditMySiteSDK {
   private version: string;
   private exporter: UnifiedReportExporter;
   
-  constructor(version: string = '1.8.3') {
+  constructor(version: string = '1.8.7') {
     this.version = version;
     this.exporter = new UnifiedReportExporter(version);
   }

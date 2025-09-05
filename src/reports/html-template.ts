@@ -56,13 +56,14 @@ export const htmlReportTemplate = `<!DOCTYPE html>
 
         /* Header */
         .report-header {
-            background: linear-gradient(135deg, var(--primary-color), #1d4ed8);
-            color: white;
+            background: #f8fafc;
+            color: #1e293b;
             padding: 1rem 0;
             box-shadow: var(--shadow-lg);
             position: sticky;
             top: 0;
             z-index: 100;
+            border-bottom: 1px solid #e2e8f0;
         }
 
         .report-nav {
@@ -83,9 +84,15 @@ export const htmlReportTemplate = `<!DOCTYPE html>
         }
         
         .logo-svg {
-            width: 32px;
-            height: 32px;
+            width: 48px;
+            height: 48px;
             flex-shrink: 0;
+        }
+        
+        .logo span {
+            color: #1e293b;
+            font-weight: 600;
+            font-size: 1.25rem;
         }
 
         /* Filter Section */
@@ -111,9 +118,9 @@ export const htmlReportTemplate = `<!DOCTYPE html>
         }
 
         .filter-badge {
-            background: var(--background-color);
+            background: white;
             color: var(--text-primary);
-            border: 2px solid var(--border-color);
+            border: 2px solid #e2e8f0;
             padding: 0.5rem 1rem;
             border-radius: 2rem;
             cursor: pointer;
@@ -121,23 +128,26 @@ export const htmlReportTemplate = `<!DOCTYPE html>
             font-size: 0.875rem;
             font-weight: 500;
             user-select: none;
+            box-shadow: 0 1px 3px 0 rgb(0 0 0 / 0.1);
         }
 
         .filter-badge:hover {
             background: var(--primary-color);
             color: white;
             border-color: var(--primary-color);
+            box-shadow: 0 4px 6px -1px rgb(0 0 0 / 0.1);
         }
 
         .filter-badge.active {
             background: var(--primary-color);
             color: white;
             border-color: var(--primary-color);
+            box-shadow: 0 4px 6px -1px rgb(0 0 0 / 0.1);
         }
 
         .filter-badge.inactive {
             opacity: 0.6;
-            background: var(--surface-color);
+            background: #f8fafc;
         }
 
         /* Main Content */
@@ -383,6 +393,284 @@ export const htmlReportTemplate = `<!DOCTYPE html>
             transform: translateX(0);
         }
 
+        /* Detailed Issues Styles */
+        .detailed-issues-container {
+            padding: 0;
+        }
+
+        .issues-summary {
+            background: var(--surface-color);
+            border-radius: 0.75rem;
+            padding: 1.5rem;
+            margin-bottom: 2rem;
+            border: 1px solid var(--border-color);
+        }
+
+        .summary-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
+            gap: 1rem;
+            margin-top: 1rem;
+        }
+
+        .summary-card {
+            background: white;
+            border-radius: 0.5rem;
+            padding: 1rem;
+            text-align: center;
+            border: 2px solid var(--border-color);
+            transition: all 0.2s ease;
+        }
+
+        .summary-card.error {
+            border-color: var(--error-color);
+            background: rgba(239, 68, 68, 0.05);
+        }
+
+        .summary-card.warning {
+            border-color: var(--warning-color);
+            background: rgba(245, 158, 11, 0.05);
+        }
+
+        .summary-card.notice {
+            border-color: #6b7280;
+            background: rgba(107, 114, 128, 0.05);
+        }
+
+        .summary-card.total {
+            border-color: var(--primary-color);
+            background: rgba(37, 99, 235, 0.05);
+        }
+
+        .summary-number {
+            font-size: 1.75rem;
+            font-weight: bold;
+            margin-bottom: 0.25rem;
+        }
+
+        .summary-label {
+            font-size: 0.875rem;
+            color: var(--text-secondary);
+            font-weight: 500;
+        }
+
+        .category-section {
+            background: var(--surface-color);
+            border-radius: 0.75rem;
+            margin-bottom: 2rem;
+            border: 1px solid var(--border-color);
+            overflow: hidden;
+        }
+
+        .category-header {
+            background: var(--background-color);
+            padding: 1.5rem;
+            border-bottom: 1px solid var(--border-color);
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .category-title {
+            font-size: 1.25rem;
+            font-weight: 600;
+            color: var(--text-primary);
+            margin: 0;
+        }
+
+        .issue-count {
+            font-weight: normal;
+            color: var(--text-secondary);
+            font-size: 1rem;
+        }
+
+        .copy-category-btn {
+            background: var(--primary-color);
+            color: white;
+            border: none;
+            padding: 0.5rem 1rem;
+            border-radius: 0.375rem;
+            cursor: pointer;
+            font-size: 0.875rem;
+            font-weight: 500;
+            transition: background-color 0.2s ease;
+        }
+
+        .copy-category-btn:hover {
+            background: #1d4ed8;
+        }
+
+        .page-issues-section {
+            border-bottom: 1px solid var(--border-color);
+        }
+
+        .page-issues-section:last-child {
+            border-bottom: none;
+        }
+
+        .page-header {
+            background: rgba(248, 250, 252, 0.5);
+            padding: 1rem 1.5rem;
+            border-bottom: 1px solid var(--border-color);
+        }
+
+        .page-title {
+            font-size: 1.1rem;
+            font-weight: 600;
+            color: var(--text-primary);
+            margin: 0 0 0.25rem 0;
+        }
+
+        .page-meta {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            font-size: 0.875rem;
+        }
+
+        .page-url {
+            color: var(--text-secondary);
+            word-break: break-all;
+        }
+
+        .page-issue-count {
+            color: var(--text-secondary);
+            background: white;
+            padding: 0.25rem 0.5rem;
+            border-radius: 0.25rem;
+            border: 1px solid var(--border-color);
+        }
+
+        .issues-list {
+            padding: 0;
+        }
+
+        .issue-item {
+            padding: 1.5rem;
+            border-bottom: 1px solid var(--border-color);
+            transition: background-color 0.2s ease;
+        }
+
+        .issue-item:hover {
+            background: rgba(248, 250, 252, 0.8);
+        }
+
+        .issue-item:last-child {
+            border-bottom: none;
+        }
+
+        .issue-item.error {
+            border-left: 4px solid var(--error-color);
+            background: rgba(239, 68, 68, 0.02);
+        }
+
+        .issue-item.warning {
+            border-left: 4px solid var(--warning-color);
+            background: rgba(245, 158, 11, 0.02);
+        }
+
+        .issue-item.notice {
+            border-left: 4px solid #6b7280;
+            background: rgba(107, 114, 128, 0.02);
+        }
+
+        .issue-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 1rem;
+        }
+
+        .issue-type-badge {
+            font-size: 0.75rem;
+            font-weight: 600;
+            padding: 0.25rem 0.5rem;
+            border-radius: 0.25rem;
+            text-transform: uppercase;
+        }
+
+        .issue-type-badge.error {
+            background: var(--error-color);
+            color: white;
+        }
+
+        .issue-type-badge.warning {
+            background: var(--warning-color);
+            color: white;
+        }
+
+        .issue-type-badge.notice {
+            background: #6b7280;
+            color: white;
+        }
+
+        .issue-source {
+            font-size: 0.75rem;
+            color: var(--text-secondary);
+            font-weight: 500;
+            background: var(--background-color);
+            padding: 0.25rem 0.5rem;
+            border-radius: 0.25rem;
+            border: 1px solid var(--border-color);
+        }
+
+        .copy-issue-btn {
+            background: none;
+            border: 1px solid var(--border-color);
+            padding: 0.25rem 0.5rem;
+            border-radius: 0.25rem;
+            cursor: pointer;
+            color: var(--text-secondary);
+            font-size: 0.875rem;
+            transition: all 0.2s ease;
+        }
+
+        .copy-issue-btn:hover {
+            background: var(--primary-color);
+            color: white;
+            border-color: var(--primary-color);
+        }
+
+        .issue-content {
+            line-height: 1.6;
+        }
+
+        .issue-message {
+            font-size: 1rem;
+            color: var(--text-primary);
+            margin-bottom: 0.75rem;
+            font-weight: 500;
+        }
+
+        .issue-code,
+        .issue-selector,
+        .issue-context,
+        .issue-help,
+        .issue-help-url {
+            margin-bottom: 0.5rem;
+            font-size: 0.875rem;
+            line-height: 1.5;
+        }
+
+        .issue-selector code,
+        .issue-context code {
+            background: var(--background-color);
+            border: 1px solid var(--border-color);
+            padding: 0.125rem 0.25rem;
+            border-radius: 0.25rem;
+            font-size: 0.8rem;
+            word-break: break-all;
+        }
+
+        .issue-help-url a {
+            color: var(--primary-color);
+            text-decoration: none;
+        }
+
+        .issue-help-url a:hover {
+            text-decoration: underline;
+        }
+
         /* Responsive Design */
         @media (max-width: 768px) {
             .nav-links {
@@ -403,6 +691,27 @@ export const htmlReportTemplate = `<!DOCTYPE html>
             .data-table td {
                 padding: 0.75rem 0.5rem;
             }
+
+            .summary-grid {
+                grid-template-columns: repeat(2, 1fr);
+            }
+
+            .category-header {
+                flex-direction: column;
+                gap: 1rem;
+                align-items: flex-start;
+            }
+
+            .page-meta {
+                flex-direction: column;
+                align-items: flex-start;
+                gap: 0.5rem;
+            }
+
+            .issue-header {
+                flex-wrap: wrap;
+                gap: 0.5rem;
+            }
         }
     </style>
 </head>
@@ -410,10 +719,23 @@ export const htmlReportTemplate = `<!DOCTYPE html>
     <header class="report-header">
         <nav class="report-nav">
             <div class="logo">
-                <svg class="logo-svg" viewBox="0 0 100 100" xmlns="http://www.w3.org/2000/svg">
-                    <circle cx="50" cy="50" r="40" fill="#ffffff" opacity="0.2"/>
-                    <path d="M30 45 L45 60 L70 35" stroke="#ffffff" stroke-width="6" fill="none" stroke-linecap="round" stroke-linejoin="round"/>
-                    <circle cx="50" cy="50" r="45" fill="none" stroke="#ffffff" stroke-width="3" opacity="0.3"/>
+                <svg class="logo-svg" viewBox="0 0 4858.1 3982" xmlns="http://www.w3.org/2000/svg">
+                    <defs>
+                        <style>
+                        .st0{fill:#f8b221;}.st1{fill:#4c84ad;}.st2{fill:#fff;}.st3{fill:#9ed9f1;}.st4{fill:none;stroke:#fff;stroke-linecap:round;stroke-linejoin:round;}.st5{fill:#3fc952;}
+                        </style>
+                    </defs>
+                    <g>
+                        <rect class="st3" x="1657.3" y="266.3" width="1887.2" height="104.8" rx="32.7" ry="32.7"/>
+                        <path class="st2" d="M4173.9,2710.2V552.9H703.9v2157.3c0,12.6,10.2,22.9,22.9,22.9h3424.2c12.6,0,22.9-10.3,22.9-22.9Z"/>
+                        <path class="st1" d="M3290.1,1383c-192.2,0-348.6,156.4-348.6,348.6s156.4,348.6,348.6,348.6,348.6-156.4,348.6-348.6-156.4-348.6-348.6-348.6Z"/>
+                        <path class="st5" d="M3171.5,1715.3c-11.3-10.2-28.8-9.4-39.1,1.9-10.3,11.3-9.4,28.8,1.9,39.1l103.3,93.8c7.8,7.1,17.7,10.6,27.5,10.6s20.8-3.9,28.7-11.8l168.8-249c8.6-12.7,5.2-29.9-7.4-38.4-12.7-8.5-29.9-5.2-38.4,7.4l-154.5,228.8-90.7-82.4Z"/>
+                        <path class="st1" d="M4229.2,2710.2V166.9c0-43.1-35.1-78.2-78.2-78.2H726.7c-43.1,0-78.2,35.1-78.2,78.2v2543.3c0,43.1,35.1,78.2,78.2,78.2h3424.2c43.1,0,78.2-35.1,78.2-78.2Z"/>
+                    </g>
+                    <g>
+                        <path class="st1" d="M69.4,3765.7v-49.5l42.4-5.9,200-516.8h66.4l196.5,516.8,42,5.9v49.5h-164.3v-49.5l43.2-7.5-37.7-105.3h-229.1l-38.9,105.3,43.2,7.5v49.5H69.4Z"/>
+                        <!-- More text paths for AuditMySite text -->
+                    </g>
                 </svg>
                 <span>AuditMySite</span>
             </div>
@@ -423,6 +745,7 @@ export const htmlReportTemplate = `<!DOCTYPE html>
                 <div class="filter-badges">
                     <span class="filter-badge active" data-section="summary">Summary</span>
                     <span class="filter-badge active" data-section="accessibility">Accessibility</span>
+                    <span class="filter-badge" data-section="detailed-issues">Detailed Issues</span>
                     <span class="filter-badge" data-section="performance">Performance</span>
                     <span class="filter-badge" data-section="seo">SEO</span>
                 </div>
@@ -463,6 +786,13 @@ export const htmlReportTemplate = `<!DOCTYPE html>
             <h2 class="section-title">Accessibility Issues</h2>
             <p class="section-description">Web accessibility compliance and WCAG violations analysis</p>
             {{accessibility}}
+        </section>
+
+        <!-- Detailed Issues Section -->
+        <section id="detailed-issues" class="issues-section">
+            <h2 class="section-title">Detailed Issues Analysis</h2>
+            <p class="section-description">Comprehensive breakdown of all accessibility issues grouped by category</p>
+            {{detailedIssues}}
         </section>
 
         <!-- Performance Section -->
@@ -578,12 +908,12 @@ export const htmlReportTemplate = `<!DOCTYPE html>
                 });
             });
             
-            // Initialize: Show summary and accessibility by default, hide others
+            // Initialize: Show summary, accessibility, and detailed issues by default, hide others
             sections.forEach(function(section) {
                 const sectionId = section.id;
                 const badge = document.querySelector('[data-section="' + sectionId + '"]');
                 
-                if (sectionId === 'summary' || sectionId === 'accessibility') {
+                if (sectionId === 'summary' || sectionId === 'accessibility' || sectionId === 'detailed-issues') {
                     section.classList.remove('hidden');
                     section.style.display = 'block';
                     if (badge) badge.classList.add('active');
@@ -612,6 +942,68 @@ export const htmlReportTemplate = `<!DOCTYPE html>
             });
         }
 
+        // Copy single issue to clipboard (AI-friendly format)
+        function copyIssue(issueId) {
+            const issueElement = document.getElementById(issueId);
+            if (!issueElement) return;
+            
+            const aiFormatElement = issueElement.querySelector('.issue-ai-format');
+            if (!aiFormatElement) return;
+            
+            const textarea = document.createElement('textarea');
+            textarea.value = aiFormatElement.textContent;
+            document.body.appendChild(textarea);
+            textarea.select();
+            
+            try {
+                document.execCommand('copy');
+                showToast('Issue copied to clipboard!');
+            } catch (err) {
+                showToast('Failed to copy issue!');
+            }
+            
+            document.body.removeChild(textarea);
+        }
+        
+        // Copy all issues in a category (AI-friendly format)
+        function copyCategoryIssues(categoryId) {
+            const categoryElement = document.getElementById('category-' + categoryId);
+            if (!categoryElement) return;
+            
+            const issues = categoryElement.querySelectorAll('.issue-ai-format');
+            let allIssuesText = '';
+            
+            // Add category header
+            const categoryTitle = categoryElement.querySelector('.category-title');
+            if (categoryTitle) {
+                allIssuesText += '# ' + categoryTitle.textContent + '\\n\\n';
+            }
+            
+            // Collect all issues
+            issues.forEach((issueFormat, index) => {
+                allIssuesText += '## Issue ' + (index + 1) + '\\n';
+                allIssuesText += issueFormat.textContent + '\\n';
+            });
+            
+            // Add footer with AI prompt suggestion
+            allIssuesText += '\\n---\\nPlease review these accessibility issues and provide specific code fixes for each one. Include the corrected HTML where applicable.';
+            
+            const textarea = document.createElement('textarea');
+            textarea.value = allIssuesText;
+            document.body.appendChild(textarea);
+            textarea.select();
+            
+            try {
+                document.execCommand('copy');
+                const categoryName = categoryTitle ? categoryTitle.textContent : 'this category';
+                showToast('Copied ' + issues.length + ' issues from ' + categoryName + ' to clipboard!');
+            } catch (err) {
+                showToast('Failed to copy category issues!');
+            }
+            
+            document.body.removeChild(textarea);
+        }
+        
         // Initialize everything when DOM is loaded
         document.addEventListener('DOMContentLoaded', function() {
             initSmoothScrolling();

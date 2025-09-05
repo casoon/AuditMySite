@@ -4,6 +4,7 @@ import { HtmlGenerator } from '../generators/html-generator';
 export function generateHtmlReport(data: any): string {
   const generator = new HtmlGenerator();
   const accessibilitySection = generator.generateAccessibilitySection(data);
+  const detailedIssuesSection = generator.generateDetailedIssuesSection(data);
   const performanceSection = generator.generatePerformanceSection(data);
   const seoSection = generator.generateSeoSection(data);
   const securitySection = generator.generateSecuritySection(data);
@@ -63,6 +64,7 @@ export function generateHtmlReport(data: any): string {
   let html = htmlReportTemplate
     // Replace sections
     .replace('{{accessibility}}', accessibilitySection)
+    .replace('{{detailedIssues}}', detailedIssuesSection)
     .replace('{{performance}}', performanceSection)
     .replace('{{seo}}', seoSection)
     .replace('{{security}}', securitySection)

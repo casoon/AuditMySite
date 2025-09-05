@@ -2,6 +2,67 @@
 
 All notable changes to this project will be documented in this file.
 
+## [1.8.7] - 2025-01-05
+
+### 🔧 Detailed Issues Analysis & Pa11y Score Improvements
+
+**Enhanced HTML report with comprehensive detailed issues section and improved pa11y score calculation.**
+
+### ✨ Added
+- **NEW**: Comprehensive "Detailed Issues Analysis" section in HTML reports
+- **NEW**: Intelligent issue categorization system with 10+ categories:
+  - Color & Contrast
+  - ARIA & Semantics  
+  - Forms & Labels
+  - Images & Media
+  - Document Structure
+  - Keyboard & Focus
+  - Links & Navigation
+  - Tables
+  - Page Landmarks
+  - General Accessibility
+- **NEW**: AI-friendly copy functionality for issues
+  - Individual issue copy with structured format
+  - Category-wise bulk copy with AI prompt suggestions
+  - Ready-to-paste format for AI code repair tools
+- **NEW**: Issues overview dashboard with error/warning/notice statistics
+- **NEW**: Fallback pa11y score calculation when pa11y tests fail
+
+### 🎨 Enhanced UI/UX
+- **IMPROVED**: Modern detailed issues interface with:
+  - Responsive card-based layout
+  - Color-coded severity levels (Error=Red, Warning=Yellow, Notice=Gray)
+  - Collapsible sections with visual hierarchy
+  - Copy buttons with toast notifications
+- **IMPROVED**: Enhanced filter system now includes "Detailed Issues" tab
+- **IMPROVED**: Better mobile responsiveness for issue cards and metadata
+- **NEW**: Professional styling with consistent design language
+
+### 🔧 Technical Improvements
+- **FIXED**: Pa11y score now shows calculated values instead of "N/A"
+  - Fallback scoring based on errors (-15 points), warnings (-5 points), missing alt attributes (-3 points), etc.
+  - Intelligent score calculation when pa11y fails (common with localhost)
+- **IMPROVED**: Data structure consolidation for better issue tracking
+- **IMPROVED**: HTML template processing with all relevant data included
+- **NEW**: Comprehensive CSS styles for detailed issues presentation
+- **NEW**: JavaScript functions for clipboard operations with error handling
+
+### 🚀 Developer Experience
+- **NEW**: Issues formatted specifically for AI code repair workflows
+- **NEW**: Structured data export with context, selectors, and recommendations
+- **NEW**: Debug logging for pa11y score calculation troubleshooting
+- **IMPROVED**: Better error categorization and source attribution
+- **NEW**: Copy-paste ready format for sharing with development teams
+
+### 🎯 Impact
+- **Better Accessibility Analysis**: Comprehensive breakdown of all issues by category
+- **AI Integration Ready**: Structured format perfect for ChatGPT/Claude/GitHub Copilot
+- **Improved Workflow**: Copy entire categories of issues for batch fixing
+- **Professional Reports**: Enterprise-ready HTML reports with full data coverage
+- **Enhanced Debugging**: Clear pa11y scores even when underlying tests fail
+
+---
+
 ## [1.8.4] - 2025-01-05
 
 ### 🎯 Major: Single Source of Truth System
