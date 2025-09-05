@@ -8,6 +8,7 @@
   },
   "scripts": {
     "build": "npm run type-check && tsc && tsc-alias",
+    "build:validate": "npm run build && node scripts/validate-build.js",
     "dev": "tsc --watch",
     "type-check": "tsc --noEmit",
     "test": "npm run type-check && jest",
@@ -24,7 +25,8 @@
     "test:legacy-mock-server": "node test/mock-server/server.js",
     "test:legacy-suite": "node test/test-suite.js",
     "format": "prettier --write \"src/**/*.ts\"",
-    "lint": "eslint \"src/**/*.ts\""
+    "lint": "eslint \"src/**/*.ts\"",
+    "prepublishOnly": "npm run build:validate"
   },
   "keywords": [
     "accessibility",
