@@ -75,29 +75,45 @@ export const htmlReportTemplate = `<!DOCTYPE html>
         }
 
         .logo {
-            font-size: 1.5rem;
-            font-weight: bold;
             display: flex;
             align-items: center;
-            gap: 0.5rem;
+            gap: 0.75rem;
+            font-size: 1.5rem;
+            font-weight: 600;
+        }
+        
+        .logo-svg {
+            width: 32px;
+            height: 32px;
+            flex-shrink: 0;
         }
 
-        .logo::before {
-            content: "🎯";
-            font-size: 1.8rem;
+        /* Filter Section */
+        .filter-section {
+            background: var(--surface-color);
+            border-bottom: 1px solid var(--border-color);
+            padding: 1rem 0;
+            box-shadow: var(--shadow);
         }
-
+        
+        .filter-container {
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 0 1rem;
+        }
+        
         .filter-badges {
             display: flex;
             list-style: none;
             gap: 1rem;
             flex-wrap: wrap;
+            justify-content: center;
         }
 
         .filter-badge {
-            background: rgba(255, 255, 255, 0.15);
-            color: white;
-            border: 2px solid rgba(255, 255, 255, 0.3);
+            background: var(--background-color);
+            color: var(--text-primary);
+            border: 2px solid var(--border-color);
             padding: 0.5rem 1rem;
             border-radius: 2rem;
             cursor: pointer;
@@ -108,19 +124,20 @@ export const htmlReportTemplate = `<!DOCTYPE html>
         }
 
         .filter-badge:hover {
-            background: rgba(255, 255, 255, 0.25);
-            border-color: rgba(255, 255, 255, 0.5);
+            background: var(--primary-color);
+            color: white;
+            border-color: var(--primary-color);
         }
 
         .filter-badge.active {
-            background: rgba(255, 255, 255, 0.9);
-            color: var(--primary-color);
-            border-color: white;
+            background: var(--primary-color);
+            color: white;
+            border-color: var(--primary-color);
         }
 
         .filter-badge.inactive {
             opacity: 0.6;
-            background: rgba(255, 255, 255, 0.05);
+            background: var(--surface-color);
         }
 
         /* Main Content */
@@ -392,14 +409,25 @@ export const htmlReportTemplate = `<!DOCTYPE html>
 <body>
     <header class="report-header">
         <nav class="report-nav">
-            <div class="logo">auditmysite</div>
-            <div class="filter-badges">
-                <span class="filter-badge active" data-section="summary">📊 Summary</span>
-                <span class="filter-badge active" data-section="accessibility">♿ Accessibility</span>
-                <span class="filter-badge" data-section="performance">⚡ Performance</span>
-                <span class="filter-badge" data-section="seo">🔍 SEO</span>
+            <div class="logo">
+                <svg class="logo-svg" viewBox="0 0 100 100" xmlns="http://www.w3.org/2000/svg">
+                    <circle cx="50" cy="50" r="40" fill="#ffffff" opacity="0.2"/>
+                    <path d="M30 45 L45 60 L70 35" stroke="#ffffff" stroke-width="6" fill="none" stroke-linecap="round" stroke-linejoin="round"/>
+                    <circle cx="50" cy="50" r="45" fill="none" stroke="#ffffff" stroke-width="3" opacity="0.3"/>
+                </svg>
+                <span>AuditMySite</span>
             </div>
         </nav>
+        <div class="filter-section">
+            <div class="filter-container">
+                <div class="filter-badges">
+                    <span class="filter-badge active" data-section="summary">Summary</span>
+                    <span class="filter-badge active" data-section="accessibility">Accessibility</span>
+                    <span class="filter-badge" data-section="performance">Performance</span>
+                    <span class="filter-badge" data-section="seo">SEO</span>
+                </div>
+            </div>
+        </div>
     </header>
 
     <main class="main-content">
@@ -432,21 +460,21 @@ export const htmlReportTemplate = `<!DOCTYPE html>
 
         <!-- Accessibility Section -->
         <section id="accessibility" class="issues-section">
-            <h2 class="section-title">♿ Accessibility Issues</h2>
+            <h2 class="section-title">Accessibility Issues</h2>
             <p class="section-description">Web accessibility compliance and WCAG violations analysis</p>
             {{accessibility}}
         </section>
 
         <!-- Performance Section -->
         <section id="performance" class="issues-section">
-            <h2 class="section-title">⚡ Performance Metrics</h2>
+            <h2 class="section-title">Performance Metrics</h2>
             <p class="section-description">Web page performance metrics and loading times</p>
             {{performance}}
         </section>
 
         <!-- SEO Section -->
         <section id="seo" class="issues-section">
-            <h2 class="section-title">🔍 SEO Analysis</h2>
+            <h2 class="section-title">SEO Analysis</h2>
             <p class="section-description">Search engine optimization analysis and content structure</p>
             {{seo}}
         </section>

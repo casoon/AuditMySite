@@ -1,22 +1,32 @@
 export class HtmlGenerator {
   generateAccessibilitySection(data: any): string {
-    return `<section id="accessibility">
-      <h2>Accessibility Report</h2>
-      <p class="section-description">Web accessibility compliance and WCAG violations analysis</p>
-      <table>
+    return `<div class="table-container">
+      <div class="table-header">
+        <div>
+          <p class="section-description">Web accessibility compliance and WCAG violations analysis</p>
+        </div>
+      </div>
+      <div class="table-wrapper">
+        <table class="data-table">
         <thead><tr><th>Page</th><th>Errors</th><th>Warnings</th><th>Pa11y Score</th></tr></thead>
         <tbody>
-          ${data.pages.map((page: any) =>
-            `<tr>
+          ${data.pages.map((page: any) => {
+            // Fix: Get Pa11y score from correct location in data structure
+            const pa11yScore = page.issues?.pa11yScore || page.pa11yScore || 'N/A';
+            const formattedScore = pa11yScore !== 'N/A' && typeof pa11yScore === 'number' ? 
+              `${Math.round(pa11yScore)}/100` : pa11yScore;
+            
+            return `<tr>
               <td>${page.url}</td>
               <td>${page.errors}</td>
               <td>${page.warnings}</td>
-              <td>${page.issues?.pa11yScore ?? 'N/A'}</td>
-            </tr>`
-          ).join('')}
+              <td>${formattedScore}</td>
+            </tr>`;
+          }).join('')}
         </tbody>
-      </table>
-    </section>`;
+        </table>
+      </div>
+    </div>`;
   }
 
   generatePerformanceSection(data: any): string {
@@ -27,10 +37,14 @@ export class HtmlGenerator {
       return isNaN(numValue) ? 'N/A' : `${Math.round(numValue)}ms`;
     };
 
-    return `<section id="performance">
-      <h2>Performance Report</h2>
-      <p class="section-description">Web page performance metrics and loading times</p>
-      <table>
+    return `<div class="table-container">
+      <div class="table-header">
+        <div>
+          <p class="section-description">Web page performance metrics and loading times</p>
+        </div>
+      </div>
+      <div class="table-wrapper">
+        <table class="data-table">
         <thead><tr><th>Page</th><th>Load Time</th><th>FCP</th><th>LCP</th><th>DOM Loaded</th><th>First Paint</th></tr></thead>
         <tbody>
           ${data.pages.map((page: any) => {
@@ -45,15 +59,20 @@ export class HtmlGenerator {
             </tr>`;
           }).join('')}
         </tbody>
-      </table>
-    </section>`;
+        </table>
+      </div>
+    </div>`;
   }
 
   generateSeoSection(data: any): string {
-    return `<section id="seo">
-      <h2>SEO Report</h2>
-      <p class="section-description">Search engine optimization analysis and content structure</p>
-      <table>
+    return `<div class="table-container">
+      <div class="table-header">
+        <div>
+          <p class="section-description">Search engine optimization analysis and content structure</p>
+        </div>
+      </div>
+      <div class="table-wrapper">
+        <table class="data-table">
         <thead><tr><th>Page & Title</th><th>Headings</th><th>Images w/o Alt</th><th>Buttons w/o Label</th></tr></thead>
         <tbody>
           ${data.pages.map((page: any) => {
@@ -73,8 +92,9 @@ export class HtmlGenerator {
             </tr>`;
           }).join('')}
         </tbody>
-      </table>
-    </section>`;
+        </table>
+      </div>
+    </div>`;
   }
 
   private getPageName(url: string): string {
