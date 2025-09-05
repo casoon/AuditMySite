@@ -184,6 +184,9 @@ export class StandardPipeline {
     // Generate output files
     const outputFiles: string[] = [];
     
+    // Fix: Always add detailed-issues.md to output files list first
+    outputFiles.push(detailedMdPath);
+    
     // Collect issues for reports
     const { PerformanceIssueCollector } = require('@core/performance');
     let allIssues: any[] = [];

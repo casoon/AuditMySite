@@ -408,6 +408,10 @@ export class EventDrivenQueue extends EventEmitter {
     
     const elapsed = this.startTime ? Math.round((Date.now() - this.startTime.getTime()) / 1000) : 0;
     
+    // Fix: Clear line before writing new status and force console output
+    console.log(`\r🚀 Testing pages... ${progressBar} ${progress}% (${stats.completed}/${stats.total})`);
+    console.log(`   ${eta}Speed: ${speed.toFixed(1)} pages/min | Elapsed: ${elapsed}s`);
+    
     return `🚀 Testing pages... ${progressBar} ${progress}% (${stats.completed}/${stats.total})\n   ${eta}Speed: ${speed.toFixed(1)} pages/min | Elapsed: ${elapsed}s`;
   }
   

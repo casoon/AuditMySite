@@ -429,11 +429,20 @@ program
         (summary.passedPages / summary.testedPages * 100).toFixed(1) : 0;
       console.log(`   🎯 Success Rate: ${successRate}%`);
       
-      // Show generated files
+      // Show generated files with proper icons and descriptions
       if (outputFiles.length > 0) {
         console.log(`\n📁 Generated reports:`);
         outputFiles.forEach(file => {
-          console.log(`   📄 ${path.basename(file)}`);
+          const filename = path.basename(file);
+          if (filename.includes('detailed-issues')) {
+            console.log(`   📄 ${filename}`);
+          } else if (filename.includes('performance-issues')) {
+            console.log(`   📄 ${filename}`);
+          } else if (filename.includes('accessibility-report')) {
+            console.log(`   📄 ${filename}`);
+          } else {
+            console.log(`   📄 ${filename}`);
+          }
         });
       }
       
@@ -491,7 +500,16 @@ program
           if (outputFiles.length > 0) {
             console.log(`\n📁 Generated reports:`);
             outputFiles.forEach(file => {
-              console.log(`   📄 ${path.basename(file)}`);
+              const filename = path.basename(file);
+              if (filename.includes('detailed-issues')) {
+                console.log(`   📄 ${filename}`);
+              } else if (filename.includes('performance-issues')) {
+                console.log(`   📄 ${filename}`);
+              } else if (filename.includes('accessibility-report')) {
+                console.log(`   📄 ${filename}`);
+              } else {
+                console.log(`   📄 ${filename}`);
+              }
             });
           }
           
