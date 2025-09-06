@@ -381,6 +381,9 @@ program
     // Declare variables in outer scope for error handling
     let pipelineOptions;
     let pipeline;
+    let summary;
+    let outputFiles;
+    let startTime;
     
     try {
       // Extract domain for report organization
@@ -486,18 +489,19 @@ program
         let successCount = 0;
         let errorCount = 0;
         let warningCount = 0;
-        const startTime = Date.now();
+        startTime = Date.now(); // Use outer scope variable
         
         // Process each URL
         for (let i = 0; i < limitedUrls.length; i++) {
-          const url = limitedUrls[i];
+          const urlObj = limitedUrls[i];
+          const url = typeof urlObj === 'string' ? urlObj : urlObj.loc;
           const spinner = ora(`[${i + 1}/${limitedUrls.length}] Analyzing ${url}`).start();
           
           try {
             const result = await checker.analyze('', url);
             
             results.push({
-              url,
+              url: url,
               title: result.title || 'N/A',
               errors: result.errors?.length || 0,
               warnings: result.warnings?.length || 0,
@@ -522,7 +526,7 @@ program
           } catch (error) {
             spinner.fail(`Failed: ${error.message}`);
             results.push({
-              url,
+              url: url,
               title: 'Error',
               errors: 1,
               warnings: 0,
@@ -563,7 +567,7 @@ program
         console.log(`✅ Enhanced analysis completed: ${results.length} pages in ${formatTime(totalTime)}`);
         
         // Show results (using same format as standard pipeline)
-        const summary = {
+        summary = {
           testedPages: results.length,
           passedPages: successCount,
           failedPages: results.length - successCount,
@@ -571,7 +575,8 @@ program
           totalErrors: errorCount,
           totalWarnings: warningCount
         };
-        const outputFiles = [reportPath];
+        outputFiles = [reportPath];
+        // startTime already set above, no need to recalculate
         
         // Continue to standard success output below...
         
@@ -586,9 +591,9 @@ program
       } else {
         // Use standard pipeline
         const standardResult = await runStandardPipeline();
-        var summary = standardResult.summary;
-        var outputFiles = standardResult.outputFiles;
-        var startTime = Date.now() - (standardResult.totalTime * 1000); // Reconstruct startTime
+        summary = standardResult.summary;
+        outputFiles = standardResult.outputFiles;
+        startTime = Date.now() - (standardResult.totalTime * 1000); // Reconstruct startTime
       }
       
       const totalTime = Math.round((Date.now() - startTime) / 1000);

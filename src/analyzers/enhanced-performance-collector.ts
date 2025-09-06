@@ -35,11 +35,20 @@ export class EnhancedPerformanceCollector {
     const startTime = Date.now();
 
     try {
-      // Navigate to the page with performance timing
-      await page.goto(url, { 
-        waitUntil: 'networkidle',
-        timeout: this.options.analysisTimeout || 30000 
-      });
+      // Navigate to the page with performance timing (only if page is not already loaded)
+      const currentUrl = page.url();
+      const isDataUri = currentUrl.startsWith('data:');
+      const isContentSet = currentUrl !== 'about:blank' && currentUrl !== '';
+      
+      // Only navigate if we don't already have content set
+      if (!isContentSet && !isDataUri) {
+        await page.goto(url, { 
+          waitUntil: 'networkidle',
+          timeout: this.options.analysisTimeout || 30000 
+        });
+      } else {
+        console.log(`📄 Using pre-set page content for performance analysis (${currentUrl})`);
+      }
 
       // Wait for potential lazy loading and interactions
       await page.waitForTimeout(3000);

@@ -269,11 +269,11 @@ export class EnhancedAccessibilityChecker {
                 seoScore: seoMetrics.overallSEOScore,
                 grade: seoMetrics.seoGrade,
                 metaData: {
-                    title: seoMetrics.metaTags.title.content || '',
-                    titleLength: seoMetrics.metaTags.title.length,
-                    description: seoMetrics.metaTags.description.content || '',
-                    descriptionLength: seoMetrics.metaTags.description.length,
-                    keywords: seoMetrics.metaTags.keywords?.content || ''
+                    title: seoMetrics.metaTags?.title?.content || '',
+                    titleLength: seoMetrics.metaTags?.title?.length || 0,
+                    description: seoMetrics.metaTags?.description?.content || '',
+                    descriptionLength: seoMetrics.metaTags?.description?.length || 0,
+                    keywords: seoMetrics.metaTags?.keywords?.content || ''
                 },
                 headingStructure: {
                     h1: seoMetrics.headingStructure.h1Count,
@@ -289,12 +289,12 @@ export class EnhancedAccessibilityChecker {
                     textToCodeRatio: 0 // Will be filled from content analysis
                 },
                 socialTags: {
-                    openGraph: Object.keys(seoMetrics.socialTags.openGraph).length,
-                    twitterCard: Object.keys(seoMetrics.socialTags.twitterCard).length
+                    openGraph: Object.keys(seoMetrics.socialTags?.openGraph || {}).length,
+                    twitterCard: Object.keys(seoMetrics.socialTags?.twitterCard || {}).length
                 },
                 technicalSEO: {
-                    internalLinks: seoMetrics.technicalSEO.linkAnalysis.internalLinks,
-                    externalLinks: seoMetrics.technicalSEO.linkAnalysis.externalLinks,
+                    internalLinks: seoMetrics.technicalSEO?.linkAnalysis?.internalLinks || 0,
+                    externalLinks: seoMetrics.technicalSEO?.linkAnalysis?.externalLinks || 0,
                     altTextCoverage: 0 // Calculate based on image analysis
                 }
             };

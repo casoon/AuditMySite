@@ -32,11 +32,20 @@ export class EnhancedSEOAnalyzer {
     const startTime = Date.now();
 
     try {
-      // Navigate to the page
-      await page.goto(url, { 
-        waitUntil: 'networkidle',
-        timeout: this.options.analysisTimeout || 30000 
-      });
+      // Navigate to the page (only if page is not already loaded)
+      const currentUrl = page.url();
+      const isDataUri = currentUrl.startsWith('data:');
+      const isContentSet = currentUrl !== 'about:blank' && currentUrl !== '';
+      
+      // Only navigate if we don't already have content set
+      if (!isContentSet && !isDataUri) {
+        await page.goto(url, { 
+          waitUntil: 'networkidle',
+          timeout: this.options.analysisTimeout || 30000 
+        });
+      } else {
+        console.log(`📄 Using pre-set page content for SEO analysis (${currentUrl})`);
+      }
 
       // Collect all SEO metrics in parallel
       const [
