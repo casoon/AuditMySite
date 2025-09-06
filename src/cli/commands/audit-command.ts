@@ -29,6 +29,11 @@ export interface AuditCommandArgs extends CommandArgs {
   inpBudget?: number;
   ttfbBudget?: number;
   unifiedQueue?: boolean;
+  // 🆕 Enhanced Analysis Options
+  enhanced?: boolean;               // Enable enhanced analysis with performance, SEO, and content weight
+  enhancedPerformance?: boolean;    // Enable enhanced performance metrics only
+  enhancedSeo?: boolean;           // Enable enhanced SEO analysis only
+  contentWeight?: boolean;         // Enable content weight analysis only
 }
 
 export class AuditCommand extends BaseCommand {
@@ -147,6 +152,14 @@ export class AuditCommand extends BaseCommand {
       (baseConfig as any).outputFormats = args.format;
     }
 
+    // Enhanced Analysis configuration from CLI args
+    if (args.enhanced || args.enhancedPerformance || args.enhancedSeo || args.contentWeight) {
+      (baseConfig as any).enhanced = true;
+      (baseConfig as any).enhancedPerformance = args.enhanced || args.enhancedPerformance;
+      (baseConfig as any).enhancedSeo = args.enhanced || args.enhancedSeo;
+      (baseConfig as any).contentWeight = args.enhanced || args.contentWeight;
+    }
+
     // Expert mode - interactive configuration
     if (args.expert && !args.nonInteractive) {
       return await this.runExpertMode(baseConfig);
@@ -205,6 +218,29 @@ export class AuditCommand extends BaseCommand {
       },
       {
         type: 'confirm',
+        name: 'enhanced',
+        message: '🚀 Enable Enhanced Analysis? (Performance, SEO, Content Weight)',
+        default: false
+      },
+      {
+        type: 'checkbox',
+        name: 'enhancedComponents',
+        message: '🔍 Which enhanced components? (select multiple)',
+        choices: [
+          { name: '⚡ Enhanced Performance - Core Web Vitals, advanced metrics', value: 'performance' },
+          { name: '🔍 Enhanced SEO - Meta tags, content quality, readability', value: 'seo' },
+          { name: '📏 Content Weight - Resource analysis, text-to-code ratio', value: 'contentWeight' }
+        ],
+        when: (answers) => answers.enhanced,
+        validate: (answer) => {
+          if (answer.length === 0) {
+            return 'Please select at least one enhanced component';
+          }
+          return true;
+        }
+      },
+      {
+        type: 'confirm',
         name: 'useUnifiedQueue',
         message: '🔧 Use the NEW Unified Queue System? (Recommended)',
         default: true
@@ -234,6 +270,14 @@ export class AuditCommand extends BaseCommand {
     
     // Store all formats for unified system (not in StandardPipelineOptions interface)
     (result as any).outputFormats = answers.formats;
+    
+    // Store enhanced analysis settings
+    if (answers.enhanced && answers.enhancedComponents) {
+      (result as any).enhanced = true;
+      (result as any).enhancedPerformance = answers.enhancedComponents.includes('performance');
+      (result as any).enhancedSeo = answers.enhancedComponents.includes('seo');
+      (result as any).contentWeight = answers.enhancedComponents.includes('contentWeight');
+    }
     
     return result;
   }
@@ -277,10 +321,25 @@ export class AuditCommand extends BaseCommand {
     console.log('\\n📋 Configuration:');
     console.log(`   📄 Pages: ${config.maxPages === 1000 ? 'All' : config.maxPages}`);
     console.log(`   📋 Standard: ${config.pa11yStandard}`);
-    console.log(`   📊 Performance: ${config.generatePerformanceReport ? 'Yes' : 'No'}`);
+    console.log(`   📈 Performance: ${config.generatePerformanceReport ? 'Yes' : 'No'}`);
     console.log(`   🔧 Queue System: ${config.useUnifiedQueue ? 'Unified (NEW)' : 'Legacy'}`);
     console.log(`   📄 Format: ${config.outputFormat?.toUpperCase()}`);
     console.log(`   📁 Output: ${config.outputDir}`);
+    
+    // Enhanced Analysis Summary
+    const enhancedConfig = config as any;
+    if (enhancedConfig.enhanced || args.enhanced) {
+      console.log('\\n🚀 Enhanced Analysis:');
+      if (enhancedConfig.enhancedPerformance || args.enhancedPerformance) {
+        console.log('   ⚡ Enhanced Performance: Yes - Core Web Vitals, advanced metrics');
+      }
+      if (enhancedConfig.enhancedSeo || args.enhancedSeo) {
+        console.log('   🔍 Enhanced SEO: Yes - Meta analysis, content quality, readability');
+      }
+      if (enhancedConfig.contentWeight || args.contentWeight) {
+        console.log('   📏 Content Weight: Yes - Resource analysis, text-to-code ratios');
+      }
+    }
   }
 
   private async discoverSitemap(sitemapUrl: string): Promise<string> {
@@ -317,10 +376,18 @@ export class AuditCommand extends BaseCommand {
   }
 
   private async runAudit(sitemapUrl: string, config: StandardPipelineOptions, outputInfo: any): Promise<any> {
-    this.logProgress('Starting accessibility test...');
-
-    const pipeline = new StandardPipeline();
+    const enhancedConfig = config as any;
     const startTime = Date.now();
+    
+    // Check if Enhanced Analysis is enabled
+    if (enhancedConfig.enhanced) {
+      this.logProgress('Starting enhanced accessibility analysis...');
+      return await this.runEnhancedAudit(sitemapUrl, config, outputInfo);
+    }
+    
+    // Standard audit pipeline
+    this.logProgress('Starting accessibility test...');
+    const pipeline = new StandardPipeline();
 
     const result = await pipeline.run({
       ...config,
@@ -340,6 +407,255 @@ export class AuditCommand extends BaseCommand {
     this.logProgress(`Average speed: ${avgSpeed.toFixed(1)} pages/minute`);
 
     return result;
+  }
+
+  private async runEnhancedAudit(sitemapUrl: string, config: StandardPipelineOptions, outputInfo: any): Promise<any> {
+    const { EnhancedAccessibilityChecker } = require('../../enhanced-accessibility-checker');
+    const { SitemapParser } = require('../../core/parsers/sitemap-parser');
+    
+    const enhancedConfig = config as any;
+    const startTime = Date.now();
+    
+    try {
+      // Parse sitemap to get URLs
+      this.logProgress('Parsing sitemap...');
+      const parser = new SitemapParser();
+      const urls = await parser.parseFromUrl(sitemapUrl);
+      const limitedUrls = urls.slice(0, config.maxPages || 5);
+      
+      this.logProgress(`Found ${urls.length} URLs, testing ${limitedUrls.length}`);
+      
+      // Initialize Enhanced Accessibility Checker
+      const checker = new EnhancedAccessibilityChecker({
+        includeResourceAnalysis: enhancedConfig.contentWeight,
+        includeSocialAnalysis: enhancedConfig.enhancedSeo,
+        includeReadabilityAnalysis: enhancedConfig.enhancedSeo,
+        includeTechnicalSEO: enhancedConfig.enhancedSeo,
+        analysisTimeout: 30000
+      });
+      
+      await checker.initialize();
+      this.logProgress('Enhanced accessibility checker initialized');
+      
+      const results = [];
+      let successCount = 0;
+      let errorCount = 0;
+      let warningCount = 0;
+      
+      // Process each URL
+      for (let i = 0; i < limitedUrls.length; i++) {
+        const url = limitedUrls[i];
+        this.logProgress(`[${i + 1}/${limitedUrls.length}] Analyzing ${url}`);
+        
+        try {
+          // For enhanced analysis, we'll use the URL directly
+          // Note: This is a simplified approach - in production you'd want to fetch HTML first
+          const result = await checker.analyze('', url); // Empty HTML means it will fetch the page
+          
+          results.push({
+            url,
+            title: result.title || 'N/A',
+            errors: result.errors?.length || 0,
+            warnings: result.warnings?.length || 0,
+            passed: result.passed,
+            enhancedPerformance: result.enhancedPerformance,
+            enhancedSEO: result.enhancedSEO,
+            contentWeight: result.contentWeight,
+            qualityScore: result.qualityScore
+          });
+          
+          if (result.passed) successCount++;
+          errorCount += result.errors?.length || 0;
+          warningCount += result.warnings?.length || 0;
+          
+          // Show enhanced metrics for this page
+          if (result.qualityScore) {
+            this.logProgress(`   Quality Score: ${result.qualityScore.score}/100 (${result.qualityScore.grade})`);
+          }
+          if (result.enhancedSEO) {
+            this.logProgress(`   SEO Score: ${result.enhancedSEO.seoScore}/100`);
+          }
+          if (result.contentWeight) {
+            this.logProgress(`   Content Score: ${result.contentWeight.contentScore}/100`);
+          }
+          
+        } catch (error) {
+          this.logError(`Failed to analyze ${url}: ${error}`);
+          results.push({
+            url,
+            title: 'Error',
+            errors: 1,
+            warnings: 0,
+            passed: false,
+            crashed: true
+          });
+          errorCount++;
+        }
+      }
+      
+      // Cleanup
+      await checker.cleanup();
+      
+      const totalTime = Date.now() - startTime;
+      const avgSpeed = results.length / (totalTime / 60000);
+      
+      // Build result summary
+      const summary = {
+        totalPages: urls.length,
+        testedPages: results.length,
+        passedPages: successCount,
+        failedPages: results.length - successCount,
+        crashedPages: results.filter(r => r.crashed).length,
+        totalErrors: errorCount,
+        totalWarnings: warningCount,
+        totalDuration: totalTime,
+        results
+      };
+      
+      const finalResult = {
+        summary,
+        issues: [],
+        sitemapUrl,
+        outputFiles: [],
+        enhancedResults: results // Store enhanced results
+      };
+      
+      // Generate enhanced reports if needed
+      if (config.outputFormat) {
+        await this.generateEnhancedReports(finalResult, config, outputInfo);
+      }
+      
+      this.logSuccess(`Enhanced analysis completed: ${results.length} pages in ${this.formatDuration(totalTime)}`);
+      this.logProgress(`Average speed: ${avgSpeed.toFixed(1)} pages/minute`);
+      
+      return finalResult;
+      
+    } catch (error) {
+      this.logError(`Enhanced audit failed: ${error}`);
+      throw error;
+    }
+  }
+
+  private async generateEnhancedReports(result: any, config: StandardPipelineOptions, outputInfo: any): Promise<void> {
+    try {
+      this.logProgress('Generating enhanced analysis reports...');
+      
+      // For now, create a simple enhanced report
+      // In the future, this should use an enhanced report generator
+      const reportPath = path.join(outputInfo.dir, 'enhanced-audit-report.html');
+      
+      const htmlContent = this.generateSimpleEnhancedReport(result, config);
+      fs.writeFileSync(reportPath, htmlContent);
+      
+      const sizeKB = Math.round(fs.statSync(reportPath).size / 1024);
+      this.logSuccess(`Generated enhanced HTML report: enhanced-audit-report.html (${sizeKB}KB)`);
+      
+      result.outputFiles = [reportPath];
+      
+    } catch (error) {
+      this.logWarning(`Enhanced report generation failed: ${error}`);
+      this.logProgress('Enhanced analysis results are still available, only report generation failed');
+    }
+  }
+
+  private generateSimpleEnhancedReport(result: any, config: StandardPipelineOptions): string {
+    const { summary, enhancedResults } = result;
+    
+    return `<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Enhanced Accessibility Analysis Report</title>
+    <style>
+        body { font-family: Arial, sans-serif; margin: 0; padding: 20px; background: #f5f5f5; }
+        .container { max-width: 1200px; margin: 0 auto; background: white; padding: 30px; border-radius: 8px; box-shadow: 0 2px 10px rgba(0,0,0,0.1); }
+        h1 { color: #2563eb; border-bottom: 2px solid #2563eb; padding-bottom: 10px; }
+        .summary { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 20px; margin: 20px 0; }
+        .metric { background: #f8fafc; padding: 15px; border-radius: 8px; text-align: center; }
+        .metric-value { font-size: 2em; font-weight: bold; color: #2563eb; }
+        .metric-label { font-size: 0.9em; color: #64748b; margin-top: 5px; }
+        .results-table { width: 100%; border-collapse: collapse; margin: 20px 0; }
+        .results-table th, .results-table td { padding: 12px; text-align: left; border-bottom: 1px solid #e2e8f0; }
+        .results-table th { background: #f1f5f9; font-weight: 600; }
+        .grade { padding: 4px 8px; border-radius: 4px; color: white; font-weight: bold; }
+        .grade-A { background: #10b981; }
+        .grade-B { background: #3b82f6; }
+        .grade-C { background: #f59e0b; }
+        .grade-D { background: #ef4444; }
+        .grade-F { background: #991b1b; }
+        .enhanced-metrics { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 10px; font-size: 0.9em; }
+        .enhanced-metric { background: #f8fafc; padding: 8px; border-radius: 4px; text-align: center; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🚀 Enhanced Accessibility Analysis Report</h1>
+        
+        <div class="summary">
+            <div class="metric">
+                <div class="metric-value">${summary.testedPages}</div>
+                <div class="metric-label">Pages Tested</div>
+            </div>
+            <div class="metric">
+                <div class="metric-value">${summary.passedPages}</div>
+                <div class="metric-label">Passed</div>
+            </div>
+            <div class="metric">
+                <div class="metric-value">${summary.failedPages}</div>
+                <div class="metric-label">Failed</div>
+            </div>
+            <div class="metric">
+                <div class="metric-value">${Math.round((summary.passedPages / summary.testedPages) * 100)}%</div>
+                <div class="metric-label">Success Rate</div>
+            </div>
+        </div>
+        
+        <h2>Detailed Results</h2>
+        <table class="results-table">
+            <thead>
+                <tr>
+                    <th>Page</th>
+                    <th>Status</th>
+                    <th>Enhanced Metrics</th>
+                    <th>Quality Score</th>
+                </tr>
+            </thead>
+            <tbody>
+                ${enhancedResults.map((page: any) => `
+                    <tr>
+                        <td>
+                            <strong>${page.title}</strong><br>
+                            <small style="color: #64748b;">${page.url}</small>
+                        </td>
+                        <td>
+                            ${page.passed ? '✅ Passed' : '❌ Failed'}
+                            ${page.errors ? `<br><small>${page.errors} errors</small>` : ''}
+                            ${page.warnings ? `<br><small>${page.warnings} warnings</small>` : ''}
+                        </td>
+                        <td>
+                            <div class="enhanced-metrics">
+                                ${page.enhancedSEO ? `<div class="enhanced-metric">SEO: ${page.enhancedSEO.seoScore}/100</div>` : ''}
+                                ${page.contentWeight ? `<div class="enhanced-metric">Content: ${page.contentWeight.contentScore}/100</div>` : ''}
+                                ${page.enhancedPerformance ? `<div class="enhanced-metric">Performance: ${page.enhancedPerformance.performanceScore || 'N/A'}</div>` : ''}
+                            </div>
+                        </td>
+                        <td>
+                            ${page.qualityScore ? 
+                                `<span class="grade grade-${page.qualityScore.grade}">${page.qualityScore.score}/100 (${page.qualityScore.grade})</span>` : 'N/A'
+                            }
+                        </td>
+                    </tr>
+                `).join('')}
+            </tbody>
+        </table>
+        
+        <footer style="margin-top: 40px; padding-top: 20px; border-top: 1px solid #e2e8f0; text-align: center; color: #64748b;">
+            <p>Generated by AuditMySite Enhanced Analysis - ${new Date().toLocaleString()}</p>
+        </footer>
+    </div>
+</body>
+</html>`;
   }
 
   private async generateUnifiedReports(result: any, config: StandardPipelineOptions, outputInfo: any): Promise<void> {

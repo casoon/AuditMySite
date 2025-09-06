@@ -360,13 +360,26 @@ class FluentAuditBuilder implements AuditBuilder {
   private mergeWithDefaults(): Required<AuditOptions> {
     const config = this.sdk.getConfig();
     return {
+      // Basic options
       maxPages: this.options.maxPages || 10,
       standard: this.options.standard || 'WCAG2AA',
       formats: this.options.formats || ['html'],
       outputDir: this.options.outputDir || config.defaultOutputDir || './audit-results',
-      includePerformance: this.options.includePerformance ?? true,
-      includeSeo: this.options.includeSeo ?? false,
+      
+      // Legacy compatibility flags (backward compatibility)
+      includePerformance: this.options.includePerformance ?? (this.options.performance ?? true),
+      includeSeo: this.options.includeSeo ?? (this.options.seo ?? true),
       includeSecurity: this.options.includeSecurity ?? false,
+      
+      // New unified feature flags (enhanced methods are default in Standard)
+      accessibility: this.options.accessibility ?? true,
+      performance: this.options.performance ?? true,
+      seo: this.options.seo ?? true,
+      contentWeight: this.options.contentWeight ?? true,
+      reduced: this.options.reduced ?? false,
+      includeRecommendations: this.options.includeRecommendations ?? true,
+      
+      // Technical options
       usePa11y: this.options.usePa11y ?? true,
       pa11yOptions: this.options.pa11yOptions || {},
       performanceBudget: this.options.performanceBudget || {},

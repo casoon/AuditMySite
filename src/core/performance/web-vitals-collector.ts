@@ -78,98 +78,23 @@ export const BUDGET_TEMPLATES: Record<string, PerformanceBudget> = {
 
 export class WebVitalsCollector {
   private budget: PerformanceBudget;
+  private maxRetries: number;
+  private retryDelay: number;
   
-  constructor(budget?: PerformanceBudget) {
+  constructor(budget?: PerformanceBudget, options?: { maxRetries?: number; retryDelay?: number }) {
     this.budget = budget || BUDGET_TEMPLATES.default;
+    this.maxRetries = options?.maxRetries || 3;
+    this.retryDelay = options?.retryDelay || 1000;
   }
   
   /**
-   * Collect Core Web Vitals using Google's official web-vitals library
-   * This ensures 100% accuracy vs. Lighthouse methodology
+   * Collect Core Web Vitals using robust browser synchronization
+   * Prevents timing issues and execution context destruction
    */
   async collectMetrics(page: Page): Promise<CoreWebVitals> {
     try {
-      // Inject Google's official web-vitals library
-      await page.addScriptTag({
-        url: 'https://unpkg.com/web-vitals@3/dist/web-vitals.iife.js'
-      });
-      
-      // Collect metrics using the official implementation
-      const metrics = await page.evaluate(() => {
-        return new Promise<any>((resolve) => {
-          const results: any = {
-            lcp: 0, cls: 0, fcp: 0, inp: 0, ttfb: 0,
-            loadTime: 0, domContentLoaded: 0, renderTime: 0
-          };
-          
-          let resolved = false;
-          
-          const addNavigationTiming = () => {
-            // Add navigation timing metrics
-            const navigation = performance.getEntriesByType('navigation')[0] as PerformanceNavigationTiming;
-            if (navigation) {
-              results.loadTime = navigation.loadEventEnd;
-              results.domContentLoaded = navigation.domContentLoadedEventEnd;
-              results.renderTime = navigation.domContentLoadedEventEnd - navigation.responseEnd;
-            }
-          };
-          
-          const finishCollection = () => {
-            if (!resolved) {
-              resolved = true;
-              addNavigationTiming();
-              resolve(results);
-            }
-          };
-          
-          // Use Google's official web-vitals implementations
-          // Each metric is collected independently
-          (window as any).webVitals.onLCP((metric: any) => {
-            results.lcp = metric.value;
-            console.log('LCP collected:', metric.value);
-          });
-          
-          (window as any).webVitals.onCLS((metric: any) => {
-            results.cls = metric.value;
-            console.log('CLS collected:', metric.value);
-          });
-          
-          (window as any).webVitals.onFCP((metric: any) => {
-            results.fcp = metric.value;
-            console.log('FCP collected:', metric.value);
-          });
-          
-          (window as any).webVitals.onINP((metric: any) => {
-            results.inp = metric.value || 0;
-            console.log('INP collected:', metric.value);
-          });
-          
-          (window as any).webVitals.onTTFB((metric: any) => {
-            results.ttfb = metric.value;
-            console.log('TTFB collected:', metric.value);
-          });
-          
-          // Start collection with progressive timeouts
-          let metricsCollected = 0;
-          let timeoutId: NodeJS.Timeout;
-          
-          const checkAndFinish = () => {
-            // Give metrics more time to stabilize, especially LCP and CLS
-            if (document.readyState === 'complete') {
-              // Allow more time for LCP to stabilize (it can change up to 10s)
-              timeoutId = setTimeout(finishCollection, 5000);
-            } else {
-              // Wait for load event first
-              window.addEventListener('load', () => {
-                // After load, give extra time for CLS to stabilize
-                timeoutId = setTimeout(finishCollection, 6000);
-              });
-            }
-          };
-          
-          checkAndFinish();
-        });
-      });
+      // Use isolated context collection for maximum stability
+      const metrics = await this.collectWithIsolatedContext(page);
       
       // Apply fallback strategies for missing metrics
       const enhancedMetrics = this.applyFallbackStrategies(metrics);
@@ -192,6 +117,442 @@ export class WebVitalsCollector {
       console.warn('Web Vitals collection failed, using fallback:', error);
       return this.getFallbackMetrics();
     }
+  }
+  
+  /**
+   * Collect metrics using isolated browser context for maximum stability
+   * Each measurement runs in its own clean environment
+   */
+  async collectWithIsolatedContext(page: Page): Promise<any> {
+    const browser = page.context().browser();
+    if (!browser) {
+      console.warn('No browser available for isolated context, using existing page');
+      return this.collectWithRetry(page, this.maxRetries);
+    }
+    
+    // Create isolated context for performance measurement
+    const isolatedContext = await browser.newContext({
+      // Inherit viewport and user agent from original context
+      viewport: page.viewportSize(),
+      userAgent: await page.evaluate(() => navigator.userAgent),
+      // Disable unnecessary features for cleaner measurement
+      javaScriptEnabled: true,
+      // Keep similar conditions but isolated
+      ignoreHTTPSErrors: true,
+      bypassCSP: false
+    });
+    
+    try {
+      const isolatedPage = await isolatedContext.newPage();
+      
+      // Navigate to the same URL as the original page
+      const currentUrl = page.url();
+      console.log(`🔄 Creating isolated context for: ${currentUrl}`);
+      
+      await isolatedPage.goto(currentUrl, { 
+        waitUntil: 'networkidle',
+        timeout: 30000
+      });
+      
+      // Collect metrics with enhanced retry mechanism
+      const metrics = await this.collectWithAdvancedRetry(isolatedPage);
+      
+      return metrics;
+      
+    } finally {
+      // Always clean up the isolated context
+      await isolatedContext.close();
+    }
+  }
+  
+  /**
+   * Advanced retry mechanism with exponential backoff and different strategies
+   */
+  async collectWithAdvancedRetry(page: Page): Promise<any> {
+    const strategies = [
+      { name: 'web-vitals-library', method: this.collectWithWebVitalsLibrary.bind(this) },
+      { name: 'performance-observer', method: this.collectWithPerformanceObserver.bind(this) },
+      { name: 'navigation-timing', method: this.getNavigationTimingFallback.bind(this) }
+    ];
+    
+    let lastError: Error | null = null;
+    
+    for (let attempt = 1; attempt <= this.maxRetries; attempt++) {
+      for (const strategy of strategies) {
+        try {
+          console.log(`🔍 Attempt ${attempt}/${this.maxRetries} using ${strategy.name}`);
+          
+          // Ensure page stability before each attempt
+          await page.waitForLoadState('networkidle');
+          await page.waitForTimeout(Math.min(attempt * 200, 1000));
+          
+          const metrics = await strategy.method(page);
+          
+          // Validate metrics quality
+          if (this.hasValidMetrics(metrics)) {
+            console.log(`✅ Success with ${strategy.name} on attempt ${attempt}`);
+            return metrics;
+          } else {
+            console.log(`⚠️ ${strategy.name} returned incomplete metrics`);
+          }
+          
+        } catch (error) {
+          lastError = error as Error;
+          console.warn(`❌ ${strategy.name} failed on attempt ${attempt}:`, error);
+        }
+      }
+      
+      // Wait before next attempt with exponential backoff
+      if (attempt < this.maxRetries) {
+        const delay = this.retryDelay * Math.pow(2, attempt - 1);
+        console.log(`⏱️ Waiting ${delay}ms before next attempt...`);
+        await page.waitForTimeout(delay);
+      }
+    }
+    
+    console.warn('All collection strategies exhausted, using basic navigation timing');
+    return this.getNavigationTimingFallback(page);
+  }
+  
+  /**
+   * Collect metrics with retry mechanism and robust error handling
+   */
+  private async collectWithRetry(page: Page, maxRetries: number): Promise<any> {
+    let lastError: Error | null = null;
+    
+    for (let attempt = 1; attempt <= maxRetries; attempt++) {
+      try {
+        const metrics = await this.collectMetricsOnce(page);
+        
+        // Validate metrics - if we get some valid data, use it
+        if (this.hasValidMetrics(metrics)) {
+          return metrics;
+        }
+        
+        console.log(`Attempt ${attempt} got incomplete metrics, retrying...`);
+        
+        if (attempt < maxRetries) {
+          // Wait before retry, with exponential backoff
+          await page.waitForTimeout(attempt * 500);
+        }
+        
+      } catch (error) {
+        lastError = error as Error;
+        console.warn(`Performance collection attempt ${attempt} failed:`, error);
+        
+        if (attempt < maxRetries) {
+          // Wait before retry
+          await page.waitForTimeout(attempt * 1000);
+        }
+      }
+    }
+    
+    // All retries failed, return fallback metrics
+    console.warn('All performance collection attempts failed, using navigation timing fallback');
+    return this.getNavigationTimingFallback(page);
+  }
+  
+  /**
+   * Single attempt at collecting metrics with better synchronization
+   */
+  private async collectMetricsOnce(page: Page): Promise<any> {
+    // First try the modern web-vitals library approach
+    try {
+      return await this.collectWithWebVitalsLibrary(page);
+    } catch (error) {
+      console.warn('Web-vitals library failed, trying PerformanceObserver approach:', error);
+      return await this.collectWithPerformanceObserver(page);
+    }
+  }
+  
+  /**
+   * Collect using Google's web-vitals library with better error handling
+   */
+  private async collectWithWebVitalsLibrary(page: Page): Promise<any> {
+    // Check if we can inject the library safely
+    const canInject = await page.evaluate(() => {
+      return !!(window && document && document.readyState);
+    });
+    
+    if (!canInject) {
+      throw new Error('Page context not ready for script injection');
+    }
+    
+    // Inject library with timeout
+    await Promise.race([
+      page.addScriptTag({
+        url: 'https://unpkg.com/web-vitals@3/dist/web-vitals.iife.js'
+      }),
+      new Promise((_, reject) => 
+        setTimeout(() => reject(new Error('Script injection timeout')), 10000)
+      )
+    ]);
+    
+    // Collect metrics with timeout and better state management
+    return await page.evaluate(() => {
+      return new Promise<any>((resolve, reject) => {
+        const results: any = {
+          lcp: 0, cls: 0, fcp: 0, inp: 0, ttfb: 0,
+          loadTime: 0, domContentLoaded: 0, renderTime: 0
+        };
+        
+        let resolved = false;
+        let collectedMetrics = 0;
+        const expectedMetrics = 5; // LCP, CLS, FCP, INP, TTFB
+        
+        const finishCollection = (reason: string) => {
+          if (!resolved) {
+            resolved = true;
+            
+            // Add navigation timing metrics
+            const navigation = performance.getEntriesByType('navigation')[0] as PerformanceNavigationTiming;
+            if (navigation) {
+              results.loadTime = navigation.loadEventEnd;
+              results.domContentLoaded = navigation.domContentLoadedEventEnd;
+              results.renderTime = navigation.domContentLoadedEventEnd - navigation.responseEnd;
+            }
+            
+            console.log(`Web Vitals collection finished (${reason}):`, results);
+            resolve(results);
+          }
+        };
+        
+        // Set up metric collectors with error handling
+        try {
+          if (!(window as any).webVitals) {
+            throw new Error('web-vitals library not available');
+          }
+          
+          const webVitals = (window as any).webVitals;
+          
+          // Collect each metric with individual error handling
+          try {
+            webVitals.onLCP((metric: any) => {
+              results.lcp = metric.value;
+              collectedMetrics++;
+              console.log(`LCP: ${metric.value}ms`);
+            });
+          } catch (e) { console.warn('LCP collection failed:', e); }
+          
+          try {
+            webVitals.onCLS((metric: any) => {
+              results.cls = metric.value;
+              collectedMetrics++;
+              console.log(`CLS: ${metric.value}`);
+            });
+          } catch (e) { console.warn('CLS collection failed:', e); }
+          
+          try {
+            webVitals.onFCP((metric: any) => {
+              results.fcp = metric.value;
+              collectedMetrics++;
+              console.log(`FCP: ${metric.value}ms`);
+            });
+          } catch (e) { console.warn('FCP collection failed:', e); }
+          
+          try {
+            webVitals.onINP((metric: any) => {
+              results.inp = metric.value || 0;
+              collectedMetrics++;
+              console.log(`INP: ${metric.value}ms`);
+            });
+          } catch (e) { console.warn('INP collection failed:', e); }
+          
+          try {
+            webVitals.onTTFB((metric: any) => {
+              results.ttfb = metric.value;
+              collectedMetrics++;
+              console.log(`TTFB: ${metric.value}ms`);
+            });
+          } catch (e) { console.warn('TTFB collection failed:', e); }
+          
+          // Set timeout based on page state
+          const timeout = document.readyState === 'complete' ? 3000 : 8000;
+          
+          setTimeout(() => {
+            finishCollection(`timeout after ${timeout}ms`);
+          }, timeout);
+          
+          // If page is already loaded, give it less time
+          if (document.readyState === 'complete') {
+            setTimeout(() => {
+              if (collectedMetrics >= expectedMetrics * 0.6) { // If we have 60% of metrics
+                finishCollection('sufficient metrics collected');
+              }
+            }, 2000);
+          }
+          
+        } catch (error) {
+          reject(error);
+        }
+      });
+    });
+  }
+  
+  /**
+   * Fallback collection using PerformanceObserver API directly
+   */
+  private async collectWithPerformanceObserver(page: Page): Promise<any> {
+    return await page.evaluate(() => {
+      return new Promise<any>((resolve) => {
+        const results: any = {
+          lcp: 0, cls: 0, fcp: 0, inp: 0, ttfb: 0,
+          loadTime: 0, domContentLoaded: 0, renderTime: 0
+        };
+        
+        let resolved = false;
+        
+        const finishCollection = () => {
+          if (!resolved) {
+            resolved = true;
+            
+            // Add navigation timing
+            const navigation = performance.getEntriesByType('navigation')[0] as PerformanceNavigationTiming;
+            if (navigation) {
+              results.loadTime = navigation.loadEventEnd;
+              results.domContentLoaded = navigation.domContentLoadedEventEnd;
+              results.renderTime = navigation.domContentLoadedEventEnd - navigation.responseEnd;
+              results.ttfb = navigation.responseStart - navigation.requestStart;
+            }
+            
+            // Add paint metrics
+            const paintEntries = performance.getEntriesByType('paint');
+            const fcpEntry = paintEntries.find(entry => entry.name === 'first-contentful-paint');
+            if (fcpEntry) {
+              results.fcp = fcpEntry.startTime;
+            }
+            
+            resolve(results);
+          }
+        };
+        
+        try {
+          // Try to collect LCP
+          const lcpObserver = new PerformanceObserver((list) => {
+            const entries = list.getEntries();
+            const lastEntry = entries[entries.length - 1];
+            if (lastEntry) {
+              results.lcp = lastEntry.startTime;
+            }
+          });
+          
+          lcpObserver.observe({ entryTypes: ['largest-contentful-paint'] });
+          
+          // Try to collect CLS
+          let clsValue = 0;
+          const clsObserver = new PerformanceObserver((list) => {
+            const entries = list.getEntries();
+            entries.forEach((entry: any) => {
+              if (!entry.hadRecentInput) {
+                clsValue += entry.value;
+              }
+            });
+            results.cls = clsValue;
+          });
+          
+          clsObserver.observe({ entryTypes: ['layout-shift'] });
+          
+          // Set timeout
+          setTimeout(finishCollection, 5000);
+          
+        } catch (error) {
+          console.warn('PerformanceObserver setup failed:', error);
+          setTimeout(finishCollection, 1000);
+        }
+      });
+    });
+  }
+  
+  /**
+   * Get navigation timing as fallback when all else fails
+   */
+  private async getNavigationTimingFallback(page: Page): Promise<any> {
+    return await page.evaluate(() => {
+      const navigation = performance.getEntriesByType('navigation')[0] as PerformanceNavigationTiming;
+      const paintEntries = performance.getEntriesByType('paint');
+      
+      const fcp = paintEntries.find(entry => entry.name === 'first-contentful-paint')?.startTime || 0;
+      
+      return {
+        lcp: fcp || navigation?.loadEventEnd || 0,
+        cls: 0, // Can't measure without PerformanceObserver
+        fcp: fcp,
+        inp: 0, // Can't measure without interaction
+        ttfb: navigation ? navigation.responseStart - navigation.requestStart : 0,
+        loadTime: navigation?.loadEventEnd || 0,
+        domContentLoaded: navigation?.domContentLoadedEventEnd || 0,
+        renderTime: navigation ? navigation.domContentLoadedEventEnd - navigation.responseEnd : 0
+      };
+    });
+  }
+  
+  /**
+   * Enhanced metrics validation with quality scoring
+   */
+  private hasValidMetrics(metrics: any): boolean {
+    const quality = this.assessMetricsQuality(metrics);
+    return quality.score >= 0.4; // At least 40% quality required
+  }
+  
+  /**
+   * Assess the quality of collected metrics
+   */
+  private assessMetricsQuality(metrics: any): { score: number; issues: string[]; strengths: string[] } {
+    let score = 0;
+    const issues: string[] = [];
+    const strengths: string[] = [];
+    const maxScore = 10;
+    
+    // Core metrics availability (4 points)
+    if (metrics.lcp > 0) { score += 1.5; strengths.push('LCP available'); } else issues.push('LCP missing');
+    if (metrics.fcp > 0) { score += 1; strengths.push('FCP available'); } else issues.push('FCP missing');
+    if (metrics.cls >= 0) { score += 0.5; strengths.push('CLS available'); } else issues.push('CLS missing');
+    if (metrics.ttfb > 0) { score += 1; strengths.push('TTFB available'); } else issues.push('TTFB missing');
+    
+    // Navigation timing availability (2 points)
+    if (metrics.loadTime > 0) { score += 1; strengths.push('Load time available'); } else issues.push('Load time missing');
+    if (metrics.domContentLoaded > 0) { score += 1; strengths.push('DOM timing available'); } else issues.push('DOM timing missing');
+    
+    // Reasonableness checks (4 points)
+    if (metrics.loadTime > 0 && metrics.loadTime < 60000) { score += 1; strengths.push('Reasonable load time'); }
+    else if (metrics.loadTime >= 60000) issues.push('Unreasonable load time (>60s)');
+    
+    if (metrics.lcp > 0 && metrics.lcp < 30000) { score += 1; strengths.push('Reasonable LCP'); }
+    else if (metrics.lcp >= 30000) issues.push('Unreasonable LCP (>30s)');
+    
+    if (metrics.fcp > 0 && metrics.fcp < 20000) { score += 1; strengths.push('Reasonable FCP'); }
+    else if (metrics.fcp >= 20000) issues.push('Unreasonable FCP (>20s)');
+    
+    if (metrics.cls >= 0 && metrics.cls < 5) { score += 1; strengths.push('Reasonable CLS'); }
+    else if (metrics.cls >= 5) issues.push('Unreasonable CLS (>5)');
+    
+    const normalizedScore = Math.max(0, Math.min(1, score / maxScore));
+    
+    return {
+      score: normalizedScore,
+      issues,
+      strengths
+    };
+  }
+  
+  /**
+   * Get metrics quality report for debugging
+   */
+  getMetricsQualityReport(metrics: any): string {
+    const quality = this.assessMetricsQuality(metrics);
+    const percentage = Math.round(quality.score * 100);
+    
+    let report = `Performance Metrics Quality: ${percentage}%\n`;
+    
+    if (quality.strengths.length > 0) {
+      report += `✅ Strengths: ${quality.strengths.join(', ')}\n`;
+    }
+    
+    if (quality.issues.length > 0) {
+      report += `❌ Issues: ${quality.issues.join(', ')}\n`;
+    }
+    
+    return report;
   }
   
   /**
@@ -401,13 +762,52 @@ export class WebVitalsCollector {
     };
   }
   
-  private getFallbackMetrics(): CoreWebVitals {
+  private getFallbackMetrics(error?: Error): CoreWebVitals {
+    const recommendations = [
+      'Performance metrics collection failed.',
+      'This may be due to network issues, blocked resources, or browser restrictions.',
+      'Consider running the audit again or check your network connection.'
+    ];
+    
+    if (error) {
+      recommendations.push(`Error details: ${error.message}`);
+    }
+    
     return {
       lcp: 0, cls: 0, fcp: 0, inp: 0, ttfb: 0,
       loadTime: 0, domContentLoaded: 0, renderTime: 0,
       score: 0,
       grade: 'F',
-      recommendations: ['Performance metrics collection failed. Please check network connection.']
+      recommendations,
+      budgetStatus: {
+        passed: false,
+        violations: [{
+          metric: 'lcp',
+          actual: 0,
+          threshold: this.budget.lcp.good,
+          severity: 'error',
+          message: 'Unable to measure performance metrics'
+        }],
+        summary: '❌ Performance measurement failed'
+      }
+    };
+  }
+  
+  /**
+   * Update retry configuration
+   */
+  updateRetryConfig(maxRetries: number, retryDelay: number): void {
+    this.maxRetries = Math.max(1, Math.min(10, maxRetries)); // Limit between 1-10
+    this.retryDelay = Math.max(100, Math.min(10000, retryDelay)); // Limit between 100ms-10s
+  }
+  
+  /**
+   * Get current retry configuration
+   */
+  getRetryConfig(): { maxRetries: number; retryDelay: number } {
+    return {
+      maxRetries: this.maxRetries,
+      retryDelay: this.retryDelay
     };
   }
 }

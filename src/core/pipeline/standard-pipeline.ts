@@ -44,6 +44,11 @@ export interface StandardPipelineOptions {
   outputFormat?: 'markdown' | 'html';
   // 🔧 NEW: Use unified queue system
   useUnifiedQueue?: boolean;
+  // 🆕 NEW: Enhanced analysis options
+  useEnhancedAnalysis?: boolean;
+  contentWeightAnalysis?: boolean;
+  enhancedPerformanceAnalysis?: boolean;
+  enhancedSeoAnalysis?: boolean;
 }
 
 export class StandardPipeline {
@@ -79,16 +84,41 @@ export class StandardPipeline {
     const limitedUrls = localUrls.slice(0, maxPages);
     console.log(`📋 URLs limited to ${maxPages}: ${limitedUrls.length} URLs will be tested`);
     
-    // Initialize Accessibility Checker
-    const checker = new AccessibilityChecker();
-    await checker.initialize();
+    // Initialize Accessibility Checker (with enhanced analysis if requested)
+    let checker: AccessibilityChecker;
+    let enhancedChecker: any = null;
     
-    console.log('🦪 Running accessibility tests...');
+    if (options.useEnhancedAnalysis) {
+      console.log('🆕 Initializing Enhanced Accessibility Checker...');
+      const { EnhancedAccessibilityChecker } = require('../accessibility/enhanced-accessibility-checker');
+      const { BrowserManager } = require('../browser');
+      
+      enhancedChecker = new EnhancedAccessibilityChecker();
+      const browserManager = new BrowserManager({ headless: true, port: 9222 });
+      await browserManager.initialize();
+      await enhancedChecker.initialize(browserManager);
+      checker = enhancedChecker; // Use enhanced checker as the main checker
+    } else {
+      checker = new AccessibilityChecker();
+      await checker.initialize();
+    }
+    
+    console.log('🤪 Running accessibility tests...');
     console.log('⚙️  Configuration:');
-    console.log('   Default mode:');
-    console.log('     📊 Collect performance metrics');
-    console.log('     🧪 Run accessibility tests (pa11y)');
-    console.log('     🚀 Parallel processing');
+    
+    if (options.useEnhancedAnalysis) {
+      console.log('   🆕 Enhanced Analysis Mode:');
+      console.log(`     📦 Content Weight Analysis: ${options.contentWeightAnalysis !== false ? 'Yes' : 'No'}`);
+      console.log(`     ⚡ Enhanced Performance: ${options.enhancedPerformanceAnalysis !== false ? 'Yes' : 'No'}`);
+      console.log(`     🔍 Enhanced SEO: ${options.enhancedSeoAnalysis !== false ? 'Yes' : 'No'}`);
+      console.log(`     🧠 Semantic Analysis: Yes`);
+    } else {
+      console.log('   Default mode:');
+      console.log('     📊 Collect performance metrics');
+      console.log('     🧪 Run accessibility tests (pa11y)');
+      console.log('     🚀 Parallel processing');
+    }
+    
     console.log('   Expert mode (use --expert):');
     console.log(`     📸 Capture screenshots: ${options.captureScreenshots ? 'Yes' : 'No'} (--screenshots)`);
     console.log(`     ⌨️  Test keyboard navigation: ${options.testKeyboardNavigation ? 'Yes' : 'No'} (--keyboard)`);
@@ -133,26 +163,45 @@ export class StandardPipeline {
       maxCpuUsage: options.maxCpuUsage
     };
     
-    // Choose between queue systems: unified (new), legacy event-driven, or sequential
+    // Choose between enhanced analysis and regular analysis
     let results: AccessibilityResult[];
-    if (options.useUnifiedQueue) {
-      console.log('🔧 Use NEW Unified Queue System (Recommended)...');
-      results = await checker.testMultiplePagesUnified(
+    
+    if (options.useEnhancedAnalysis && enhancedChecker) {
+      console.log('🆕 Running Enhanced Analysis Tests...');
+      const enhancedTestOptions = {
+        ...testOptions,
+        enhancedAnalysis: true,
+        contentWeightAnalysis: options.contentWeightAnalysis !== false,
+        enhancedPerformanceAnalysis: options.enhancedPerformanceAnalysis !== false,
+        enhancedSeoAnalysis: options.enhancedSeoAnalysis !== false,
+        semanticAnalysis: true
+      };
+      
+      results = await enhancedChecker.testMultiplePagesWithEnhancedAnalysis(
         limitedUrls.map((url: any) => url.loc),
-        testOptions
-      );
-    } else if (options.useSequentialTesting) {
-      console.log('📋 Use sequential tests (Legacy mode)...');
-      results = await checker.testMultiplePages(
-        limitedUrls.map((url: any) => url.loc),
-        testOptions
+        enhancedTestOptions
       );
     } else {
-      console.log('🚀 Use integrated queue processing with short status updates (Legacy Event-driven)...');
-      results = await checker.testMultiplePagesWithQueue(
-        limitedUrls.map((url: any) => url.loc),
-        testOptions
-      );
+      // Regular accessibility tests with queue systems
+      if (options.useUnifiedQueue) {
+        console.log('🔧 Use NEW Unified Queue System (Recommended)...');
+        results = await checker.testMultiplePagesUnified(
+          limitedUrls.map((url: any) => url.loc),
+          testOptions
+        );
+      } else if (options.useSequentialTesting) {
+        console.log('📋 Use sequential tests (Legacy mode)...');
+        results = await checker.testMultiplePages(
+          limitedUrls.map((url: any) => url.loc),
+          testOptions
+        );
+      } else {
+        console.log('🚀 Use integrated queue processing with short status updates (Legacy Event-driven)...');
+        results = await checker.testMultiplePagesWithQueue(
+          limitedUrls.map((url: any) => url.loc),
+          testOptions
+        );
+      }
     }
     
     console.log('\n📋 Creating test summary...');
@@ -178,6 +227,10 @@ export class StandardPipeline {
     const detailedMdPath = path.join(outputDir, `detailed-issues-${dateOnly}.md`);
     fs.writeFileSync(detailedMdPath, detailedMd, 'utf8');
     
+    // Cleanup checkers
+    if (enhancedChecker) {
+      await enhancedChecker.cleanup();
+    }
     await checker.cleanup();
     
     console.log('📄 Generating output files...');

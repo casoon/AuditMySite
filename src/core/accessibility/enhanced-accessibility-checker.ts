@@ -4,6 +4,11 @@ import { Chrome135Optimizer, PerformanceOptimizationResults } from '../performan
 import { Html5ElementsChecker, Html5ElementsAnalysis } from './html5-elements-checker';
 import { AriaRulesAnalyzer, AriaAnalysisResults } from './aria-rules-analyzer';
 import { WebVitalsCollector } from '@core/performance';
+import { ContentWeightAnalyzer } from '../../analyzers/content-weight-analyzer';
+import { EnhancedPerformanceCollector } from '../../analyzers/enhanced-performance-collector';
+import { EnhancedSEOAnalyzer } from '../../analyzers/enhanced-seo-analyzer';
+import { ContentWeight, ContentAnalysis, EnhancedPerformanceMetrics, EnhancedSEOMetrics } from '../../types/enhanced-metrics';
+import { BrowserManager } from '../browser';
 
 /**
  * Enhanced Test Options for v1.3
@@ -19,6 +24,12 @@ export interface EnhancedTestOptions extends TestOptions {
   enableChrome135Optimizations?: boolean;
   optimizeAccessibilityTree?: boolean;
   enhancedDialogSupport?: boolean;
+  
+  // NEW: Content weight and enhanced analysis options
+  contentWeightAnalysis?: boolean;
+  enhancedPerformanceAnalysis?: boolean;
+  enhancedSeoAnalysis?: boolean;
+  enhancedAnalysis?: boolean; // Enable all enhanced features
 }
 
 /**
@@ -34,6 +45,12 @@ export interface EnhancedAccessibilityResult extends AccessibilityResult {
   chrome135Optimizations?: PerformanceOptimizationResults;
   performanceResults?: any; // Add performanceResults property
   
+  // NEW: Enhanced analyzer results
+  contentWeight?: ContentWeight;
+  contentAnalysis?: ContentAnalysis;
+  enhancedPerformance?: EnhancedPerformanceMetrics;
+  enhancedSeo?: EnhancedSEOMetrics;
+  
   // Enhanced recommendations
   enhancedRecommendations?: string[];
   modernFeaturesDetected?: string[];
@@ -45,19 +62,48 @@ export interface EnhancedAccessibilityResult extends AccessibilityResult {
 
 /**
  * Enhanced Accessibility Checker with v1.3 Features
- * Integrates HTML5, ARIA, Chrome 135 optimizations, and semantic analysis
+ * Integrates HTML5, ARIA, Chrome 135 optimizations, content weight, performance, and SEO analysis
  */
 export class EnhancedAccessibilityChecker {
   private chrome135Optimizer: Chrome135Optimizer;
   private html5Checker: Html5ElementsChecker;
   private ariaAnalyzer: AriaRulesAnalyzer;
   private webVitalsCollector: WebVitalsCollector;
+  
+  // NEW: Enhanced analyzers
+  private contentWeightAnalyzer: ContentWeightAnalyzer;
+  private enhancedPerformanceCollector: EnhancedPerformanceCollector;
+  private enhancedSeoAnalyzer: EnhancedSEOAnalyzer;
+  private browserManager?: BrowserManager;
 
   constructor() {
     this.chrome135Optimizer = new Chrome135Optimizer();
     this.html5Checker = new Html5ElementsChecker();
     this.ariaAnalyzer = new AriaRulesAnalyzer();
     this.webVitalsCollector = new WebVitalsCollector();
+    
+    // Initialize new analyzers
+    this.contentWeightAnalyzer = new ContentWeightAnalyzer();
+    this.enhancedPerformanceCollector = new EnhancedPerformanceCollector();
+    this.enhancedSeoAnalyzer = new EnhancedSEOAnalyzer();
+  }
+
+  /**
+   * Initialize enhanced analyzers with browser manager
+   */
+  async initialize(browserManager: BrowserManager): Promise<void> {
+    this.browserManager = browserManager;
+    
+    // Store browser manager reference for analyzers
+    // Note: These analyzers don't have initialize methods, they work directly with pages
+  }
+
+  /**
+   * Cleanup enhanced analyzers
+   */
+  async cleanup(): Promise<void> {
+    // These analyzers don't require cleanup
+    // They work directly with pages provided to them
   }
 
   /**
@@ -180,6 +226,78 @@ export class EnhancedAccessibilityChecker {
         }
       }
 
+      // NEW: Content Weight Analysis
+      if (options.contentWeightAnalysis || options.enhancedAnalysis) {
+        try {
+          const contentWeightResult = await this.contentWeightAnalyzer.analyzeContentWeight(page, url);
+          result.contentWeight = contentWeightResult.contentWeight;
+          result.contentAnalysis = contentWeightResult.contentAnalysis;
+          
+          // Add content quality warnings
+          if (result.contentAnalysis.textToCodeRatio < 0.1) {
+            result.warnings.push('Low content-to-code ratio detected');
+          }
+          if (result.contentWeight.total > 1024 * 1024) { // > 1MB
+            result.warnings.push('Large page size may impact accessibility');
+          }
+        } catch (error) {
+          result.warnings.push('Content weight analysis failed: ' + String(error));
+        }
+      }
+
+      // NEW: Enhanced Performance Analysis
+      if (options.enhancedPerformanceAnalysis || options.enhancedAnalysis) {
+        try {
+          const enhancedPerformanceData = await this.enhancedPerformanceCollector.collectEnhancedMetrics(page, url);
+          result.enhancedPerformance = enhancedPerformanceData;
+          
+          // Add performance-based warnings
+          if (enhancedPerformanceData.performanceScore < 75) {
+            result.warnings.push(`Performance score (${enhancedPerformanceData.performanceScore}) below recommended threshold`);
+          }
+          if (enhancedPerformanceData.lcp > 2500) {
+            result.warnings.push('Large Contentful Paint exceeds recommended time');
+          }
+          if (enhancedPerformanceData.cls > 0.1) {
+            result.warnings.push('Cumulative Layout Shift exceeds recommended threshold');
+          }
+        } catch (error) {
+          result.warnings.push('Enhanced performance analysis failed: ' + String(error));
+        }
+      }
+
+      // NEW: Enhanced SEO Analysis
+      if (options.enhancedSeoAnalysis || options.enhancedAnalysis) {
+        try {
+          const enhancedSeoData = await this.enhancedSeoAnalyzer.analyzeSEO(page, url);
+          result.enhancedSeo = enhancedSeoData;
+          
+          // Add SEO-based warnings based on scores
+          if (enhancedSeoData.overallSEOScore < 50) {
+            result.warnings.push(`SEO score (${enhancedSeoData.overallSEOScore}) is below recommended threshold`);
+          }
+          
+          // Add specific SEO issues
+          if (!enhancedSeoData.metaTags.title.present) {
+            result.errors.push('SEO: Missing page title');
+          }
+          if (!enhancedSeoData.metaTags.description.present) {
+            result.warnings.push('SEO: Missing meta description');
+          }
+          
+          // Check for accessibility-related SEO issues
+          if (!enhancedSeoData.metaTags.title.present || !enhancedSeoData.metaTags.title.content) {
+            result.errors.push('Missing page title affects both SEO and accessibility');
+          }
+          if (!enhancedSeoData.metaTags.description.present || !enhancedSeoData.metaTags.description.content) {
+            result.warnings.push('Missing meta description affects discoverability');
+          }
+          
+        } catch (error) {
+          result.warnings.push('Enhanced SEO analysis failed: ' + String(error));
+        }
+      }
+
       // Generate Enhanced Recommendations
       result.enhancedRecommendations = this.generateEnhancedRecommendations(result, options);
 
@@ -237,6 +355,30 @@ export class EnhancedAccessibilityChecker {
     if (result.performanceResults) {
       maxScore += 10;
       score += (result.performanceResults.score / 100) * 10;
+    }
+
+    // NEW: Enhanced performance contribution
+    if (result.enhancedPerformance) {
+      maxScore += 15;
+      score += (result.enhancedPerformance.performanceScore / 100) * 15;
+    }
+
+    // NEW: Content quality contribution
+    if (result.contentAnalysis) {
+      maxScore += 10;
+      // Good content-to-code ratio indicates semantic quality
+      score += Math.min(result.contentAnalysis.textToCodeRatio * 100, 10);
+    }
+
+    // NEW: SEO semantic contribution
+    if (result.enhancedSeo) {
+      maxScore += 15;
+      score += (result.enhancedSeo.overallSEOScore / 100) * 15;
+      // Bonus for good content structure
+      if (result.enhancedSeo.readabilityScore > 70) {
+        maxScore += 5;
+        score += 5;
+      }
     }
 
     return maxScore > 0 ? Math.round((score / maxScore) * 100) : 0;
@@ -322,6 +464,27 @@ export class EnhancedAccessibilityChecker {
       recommendations.push(...result.chrome135Optimizations.recommendations);
     }
 
+    // NEW: Content weight recommendations (Note: ContentWeight doesn't have recommendations directly)
+    if (result.contentWeight && result.contentWeight.total > 2048 * 1024) { // > 2MB
+      recommendations.push('Content: Consider optimizing page size for better performance');
+    }
+
+    // NEW: Enhanced performance recommendations
+    if (result.enhancedPerformance) {
+      result.enhancedPerformance.recommendations.slice(0, 3).forEach((rec: any) => {
+        if (rec.priority === 'high' || rec.priority === 'medium') {
+          recommendations.push(`Performance: ${rec.description}`);
+        }
+      });
+    }
+
+    // NEW: SEO recommendations
+    if (result.enhancedSeo) {
+      result.enhancedSeo.recommendations.slice(0, 3).forEach((rec: any) => {
+        recommendations.push(`SEO: ${rec.description}`);
+      });
+    }
+
     // Future readiness recommendations
     if ((result.futureReadiness || 0) < 70) {
       recommendations.push('Consider upgrading to modern HTML5 and ARIA patterns for better future compatibility');
@@ -401,6 +564,92 @@ export class EnhancedAccessibilityChecker {
     }
     
     return sections.join('\n');
+  }
+
+  /**
+   * Test multiple pages with enhanced analysis enabled
+   */
+  async testMultiplePagesWithEnhancedAnalysis(
+    urls: string[],
+    options: EnhancedTestOptions = {}
+  ): Promise<EnhancedAccessibilityResult[]> {
+    if (!this.browserManager) {
+      throw new Error('Enhanced accessibility checker not initialized with browser manager');
+    }
+
+    const results: EnhancedAccessibilityResult[] = [];
+    const enhancedOptions: EnhancedTestOptions = {
+      ...options,
+      enhancedAnalysis: true, // Enable all enhanced features by default
+      contentWeightAnalysis: options.contentWeightAnalysis !== false,
+      enhancedPerformanceAnalysis: options.enhancedPerformanceAnalysis !== false,
+      enhancedSeoAnalysis: options.enhancedSeoAnalysis !== false,
+      semanticAnalysis: true
+    };
+
+    console.log(`🚀 Enhanced accessibility testing for ${urls.length} pages`);
+    console.log('📊 Enhanced features enabled:');
+    console.log(`   📦 Content Weight Analysis: ${enhancedOptions.contentWeightAnalysis ? 'Yes' : 'No'}`);
+    console.log(`   ⚡ Enhanced Performance: ${enhancedOptions.enhancedPerformanceAnalysis ? 'Yes' : 'No'}`);
+    console.log(`   🔍 Enhanced SEO: ${enhancedOptions.enhancedSeoAnalysis ? 'Yes' : 'No'}`);
+    console.log(`   🧠 Semantic Analysis: ${enhancedOptions.semanticAnalysis ? 'Yes' : 'No'}`);
+
+    for (let i = 0; i < urls.length; i++) {
+      const url = urls[i];
+      console.log(`\n📄 Testing ${i + 1}/${urls.length}: ${url}`);
+      
+      try {
+        const page = await this.browserManager.getPage();
+        const result = await this.testPageEnhanced(page, url, enhancedOptions);
+        results.push(result);
+        
+        console.log(`   ${result.passed ? '✅ PASSED' : '❌ FAILED'} - Semantic: ${result.semanticScore || 0}% | Compliance: ${result.complianceLevel?.toUpperCase()}`);
+        
+      } catch (error) {
+        console.error(`   💥 Error testing ${url}: ${error}`);
+        // Add error result
+        const errorResult: EnhancedAccessibilityResult = {
+          url,
+          title: '',
+          imagesWithoutAlt: 0,
+          buttonsWithoutLabel: 0,
+          headingsCount: 0,
+          errors: [`Enhanced test failed: ${error}`],
+          warnings: [],
+          passed: false,
+          duration: 0,
+          crashed: true,
+          enhancedRecommendations: [],
+          modernFeaturesDetected: [],
+          complianceLevel: 'basic',
+          futureReadiness: 0
+        };
+        results.push(errorResult);
+      }
+    }
+
+    // Generate summary
+    const passedCount = results.filter(r => r.passed).length;
+    const avgSemanticScore = results.reduce((sum, r) => sum + (r.semanticScore || 0), 0) / results.length;
+    const avgFutureReadiness = results.reduce((sum, r) => sum + (r.futureReadiness || 0), 0) / results.length;
+    
+    console.log('\n📊 Enhanced Analysis Summary:');
+    console.log('==============================');
+    console.log(`✅ Passed: ${passedCount}/${results.length} (${((passedCount / results.length) * 100).toFixed(1)}%)`);
+    console.log(`🧠 Average Semantic Score: ${avgSemanticScore.toFixed(1)}%`);
+    console.log(`🚀 Average Future Readiness: ${avgFutureReadiness.toFixed(1)}%`);
+    
+    const complianceLevels = results.reduce((acc, r) => {
+      acc[r.complianceLevel || 'basic'] = (acc[r.complianceLevel || 'basic'] || 0) + 1;
+      return acc;
+    }, {} as Record<string, number>);
+    
+    console.log('📋 Compliance Distribution:');
+    Object.entries(complianceLevels).forEach(([level, count]) => {
+      console.log(`   ${level.toUpperCase()}: ${count} pages`);
+    });
+
+    return results;
   }
 
   /**

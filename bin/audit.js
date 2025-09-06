@@ -34,13 +34,20 @@ program
   .option('--inp-budget <ms>', 'Custom INP budget in milliseconds (good threshold)')
   .option('--ttfb-budget <ms>', 'Custom TTFB budget in milliseconds (good threshold)')
   
-  // 🚀 Tauri Integration Options
+// 🚀 Tauri Integration Options
   .option('--stream', 'Enable streaming output for desktop integration')
   .option('--session-id <id>', 'Session ID for tracking (required with --stream)')
   .option('--chunk-size <size>', 'Chunk size for large reports', '1000')
   
   // 🔧 NEW: Unified Queue System Options
   .option('--unified-queue', 'Use the new unified queue system (EXPERIMENTAL)')
+  
+  // 🚀 NEW: Enhanced Analysis Options (Enhanced is now DEFAULT!)
+  .option('--no-enhanced', 'Disable enhanced analysis (use basic accessibility only)')
+  .option('--enhanced', 'Force enable enhanced analysis (already default)')
+  .option('--enhanced-performance', 'Enable only enhanced performance metrics')
+  .option('--enhanced-seo', 'Enable only enhanced SEO analysis')
+  .option('--content-weight', 'Enable only content weight analysis')
   
   .action(async (sitemapUrl, options) => {
     // 🚀 Tauri Integration: Streaming Mode
@@ -56,7 +63,7 @@ program
     console.log(`🚀 AuditMySite v${packageJson.version} - Enhanced Accessibility Testing`);
     console.log(`📄 Sitemap: ${sitemapUrl}`);
     
-    // 🎯 SMART DEFAULTS
+    // 🎯 SMART DEFAULTS - Enhanced Analysis is now DEFAULT!
     const QUICK_DEFAULTS = {
       maxPages: options.maxPages || (options.full ? 1000 : 5),
       standard: 'WCAG2AA',
@@ -71,10 +78,31 @@ program
       usePa11y: true,
       lighthouse: false,               // ❌ Removed Lighthouse
       captureScreenshots: false,      // ❌ Removed
-      verbose: options.verbose || false
+      verbose: options.verbose || false,
+      // 🚀 NEW: Enhanced Analysis is now DEFAULT (can be disabled with --no-enhanced)
+      enhanced: true,                  // ✅ Enhanced Analysis enabled by default
+      enhancedPerformance: true,       // ✅ Performance metrics by default
+      enhancedSeo: true,               // ✅ SEO analysis by default  
+      contentWeight: true              // ✅ Content weight by default
     };
     
     let config = { ...QUICK_DEFAULTS };
+    
+    // 🚀 Override Enhanced Analysis settings from CLI arguments
+    if (options.enhanced === false) {
+      // Explicitly disable enhanced analysis via --no-enhanced
+      config.enhanced = false;
+      config.enhancedPerformance = false;
+      config.enhancedSeo = false;
+      config.contentWeight = false;
+    } else if (options.enhancedPerformance || options.enhancedSeo || options.contentWeight) {
+      // Enable only specific enhanced components
+      config.enhanced = true;
+      config.enhancedPerformance = options.enhancedPerformance || false;
+      config.enhancedSeo = options.enhancedSeo || false;
+      config.contentWeight = options.contentWeight || false;
+    }
+    // Note: --enhanced flag or default keeps all defaults (already true)
     
     // 🔧 EXPERT MODE - Interactive wizard
     if (options.expert && !options.nonInteractive) {
@@ -185,6 +213,29 @@ program
           name: 'testFocusManagement',
           message: '🎯 Test focus management and indicators?',
           default: false
+        },
+        {
+          type: 'confirm',
+          name: 'enhanced',
+          message: '🚀 Keep Enhanced Analysis enabled? (Performance, SEO, Content Weight)',
+          default: true
+        },
+        {
+          type: 'checkbox',
+          name: 'enhancedComponents',
+          message: '🔍 Which enhanced components? (select multiple)',
+          choices: [
+            { name: '⚡ Enhanced Performance - Core Web Vitals, advanced metrics', value: 'performance' },
+            { name: '🔍 Enhanced SEO - Meta tags, content quality, readability', value: 'seo' },
+            { name: '📏 Content Weight - Resource analysis, text-to-code ratio', value: 'contentWeight' }
+          ],
+          when: (answers) => answers.enhanced,
+          validate: (answer) => {
+            if (answer.length === 0) {
+              return 'Please select at least one enhanced component';
+            }
+            return true;
+          }
         },
         {
           type: 'list',
@@ -303,13 +354,29 @@ program
     }
     
     // 📈 Show configuration
-    console.log(`\n📋 Configuration:`);
+    console.log(`\\n📋 Configuration:`);
     console.log(`   📄 Pages: ${config.maxPages === 1000 ? 'All' : config.maxPages}`);
     console.log(`   📋 Standard: ${config.standard}`);
-    console.log(`   📊 Performance: ${config.generatePerformanceReport ? 'Yes' : 'No'}`);
-    console.log(`   📊 Budget: ${config.budgetTemplate || options.budget || 'default'} (LCP: ${performanceBudget.lcp.good}ms, CLS: ${performanceBudget.cls.good})`);
+    console.log(`   📈 Basic Performance: ${config.generatePerformanceReport ? 'Yes' : 'No'}`);
+    console.log(`   📈 Budget: ${config.budgetTemplate || options.budget || 'default'} (LCP: ${performanceBudget.lcp.good}ms, CLS: ${performanceBudget.cls.good})`);
     console.log(`   📄 Format: ${config.format.toUpperCase()}`);
     console.log(`   📁 Output: ${config.outputDir}`);
+    
+    // Enhanced Analysis Summary (now default, unless explicitly disabled!)
+    if (config.enhanced) {
+      console.log('\\n🚀 Enhanced Analysis (DEFAULT):');
+      if (config.enhancedPerformance) {
+        console.log('   ⚡ Enhanced Performance: ✅ Core Web Vitals, advanced metrics');
+      }
+      if (config.enhancedSeo) {
+        console.log('   🔍 Enhanced SEO: ✅ Meta analysis, content quality, readability');
+      }
+      if (config.contentWeight) {
+        console.log('   📏 Content Weight: ✅ Resource analysis, text-to-code ratios');
+      }
+    } else {
+      console.log('\\n⚠️  Enhanced Analysis: DISABLED (remove --no-enhanced for better insights)');
+    }
     
     // Declare variables in outer scope for error handling
     let pipelineOptions;
@@ -385,28 +452,144 @@ program
         }
       }
       
-      console.log('\n🎯 Starting accessibility test...');
+      // Check if Enhanced Analysis is enabled (after CLI overrides)
+      const isEnhancedAnalysis = config.enhanced;
       
-      // Get actual page count from sitemap
-      let actualPageCount = config.maxPages;
-      try {
-        const { SitemapParser } = require('../dist/parsers/sitemap-parser');
+      if (isEnhancedAnalysis) {
+        console.log('\\n🚀 Starting enhanced accessibility analysis...');
+        
+        try {
+          // Use Enhanced Analysis pipeline
+          const { EnhancedAccessibilityChecker } = require('../dist/enhanced-accessibility-checker');
+          const { SitemapParser } = require('../dist/parsers/sitemap-parser');
+        
+        // Parse sitemap
         const parser = new SitemapParser();
         const urls = await parser.parseSitemap(finalSitemapUrl);
-        actualPageCount = config.maxPages === 1000 ? urls.length : Math.min(urls.length, config.maxPages);
-        console.log(`📊 Found ${urls.length} URLs in sitemap, testing ${actualPageCount}`);
-      } catch (error) {
-        console.log('⚠️  Could not parse sitemap, using default page count');
+        const limitedUrls = urls.slice(0, config.maxPages || 5);
+        
+        console.log(`📈 Found ${urls.length} URLs in sitemap, testing ${limitedUrls.length}`);
+        
+        // Initialize Enhanced Accessibility Checker
+        const checker = new EnhancedAccessibilityChecker({
+          includeResourceAnalysis: (config.enhancedComponents && config.enhancedComponents.includes('contentWeight')) || options.enhanced || options.contentWeight,
+          includeSocialAnalysis: (config.enhancedComponents && config.enhancedComponents.includes('seo')) || options.enhanced || options.enhancedSeo,
+          includeReadabilityAnalysis: (config.enhancedComponents && config.enhancedComponents.includes('seo')) || options.enhanced || options.enhancedSeo,
+          includeTechnicalSEO: (config.enhancedComponents && config.enhancedComponents.includes('seo')) || options.enhanced || options.enhancedSeo,
+          analysisTimeout: 30000
+        });
+        
+        await checker.initialize();
+        console.log('✨ Enhanced accessibility checker initialized');
+        
+        const results = [];
+        let successCount = 0;
+        let errorCount = 0;
+        let warningCount = 0;
+        const startTime = Date.now();
+        
+        // Process each URL
+        for (let i = 0; i < limitedUrls.length; i++) {
+          const url = limitedUrls[i];
+          const spinner = ora(`[${i + 1}/${limitedUrls.length}] Analyzing ${url}`).start();
+          
+          try {
+            const result = await checker.analyze('', url);
+            
+            results.push({
+              url,
+              title: result.title || 'N/A',
+              errors: result.errors?.length || 0,
+              warnings: result.warnings?.length || 0,
+              passed: result.passed,
+              enhancedPerformance: result.enhancedPerformance,
+              enhancedSEO: result.enhancedSEO,
+              contentWeight: result.contentWeight,
+              qualityScore: result.qualityScore
+            });
+            
+            if (result.passed) successCount++;
+            errorCount += result.errors?.length || 0;
+            warningCount += result.warnings?.length || 0;
+            
+            // Show enhanced metrics for this page
+            let statusText = result.passed ? '✅ Passed' : '❌ Failed';
+            if (result.qualityScore) {
+              statusText += ` (Quality: ${result.qualityScore.score}/100 ${result.qualityScore.grade})`;
+            }
+            spinner.succeed(statusText);
+            
+          } catch (error) {
+            spinner.fail(`Failed: ${error.message}`);
+            results.push({
+              url,
+              title: 'Error',
+              errors: 1,
+              warnings: 0,
+              passed: false,
+              crashed: true
+            });
+            errorCount++;
+          }
+        }
+        
+        // Cleanup
+        await checker.cleanup();
+        
+        // Generate enhanced report using professional HtmlGenerator
+        const { HtmlGenerator } = require('../dist/generators/html-generator');
+        const generator = new HtmlGenerator();
+        
+        const reportData = {
+          summary: {
+            totalPages: urls.length,
+            testedPages: results.length,
+            passedPages: successCount,
+            failedPages: results.length - successCount,
+            crashedPages: results.filter(r => r.crashed).length,
+            totalErrors: errorCount,
+            totalWarnings: warningCount,
+            totalDuration: Date.now() - startTime
+          },
+          enhancedResults: results
+        };
+        
+        const htmlContent = generator.generateEnhancedReport(reportData, finalSitemapUrl);
+        
+        const reportPath = path.join(subDir, 'enhanced-accessibility-report.html');
+        require('fs').writeFileSync(reportPath, htmlContent);
+        
+        const totalTime = Math.round((Date.now() - startTime) / 1000);
+        console.log(`✅ Enhanced analysis completed: ${results.length} pages in ${formatTime(totalTime)}`);
+        
+        // Show results (using same format as standard pipeline)
+        const summary = {
+          testedPages: results.length,
+          passedPages: successCount,
+          failedPages: results.length - successCount,
+          crashedPages: results.filter(r => r.crashed).length,
+          totalErrors: errorCount,
+          totalWarnings: warningCount
+        };
+        const outputFiles = [reportPath];
+        
+        // Continue to standard success output below...
+        
+        } catch (enhancedError) {
+          console.error(`\\n⚠️  Enhanced Analysis failed: ${enhancedError.message}`);
+          console.log('🔄 Falling back to standard accessibility analysis...');
+          
+          // Fallback to standard pipeline
+          return await runStandardPipeline();
+        }
+        
+      } else {
+        // Use standard pipeline
+        const standardResult = await runStandardPipeline();
+        var summary = standardResult.summary;
+        var outputFiles = standardResult.outputFiles;
+        var startTime = Date.now() - (standardResult.totalTime * 1000); // Reconstruct startTime
       }
-      
-      const startTime = Date.now();
-      
-      // Update pipeline options with discovered sitemap URL
-      pipelineOptions.sitemapUrl = finalSitemapUrl;
-      
-      console.log(`✨ ${actualPageCount === 1 ? '1 page' : actualPageCount + ' pages'} will be tested...`);
-      
-      const { summary, outputFiles } = await pipeline.run(pipelineOptions);
       
       const totalTime = Math.round((Date.now() - startTime) / 1000);
       console.log(`✅ Completed ${summary.testedPages} pages in ${formatTime(totalTime)}`);
@@ -748,6 +931,138 @@ async function runStreamingAudit(sitemapUrl, options) {
   } finally {
     streamingReporter.cleanup();
   }
+}
+
+// Helper function to run standard pipeline (used as fallback)
+async function runStandardPipeline() {
+  console.log('\\n🎯 Starting standard accessibility test...');
+  
+  // Get actual page count from sitemap
+  let actualPageCount = config.maxPages;
+  try {
+    const { SitemapParser } = require('../dist/parsers/sitemap-parser');
+    const parser = new SitemapParser();
+    const urls = await parser.parseSitemap(finalSitemapUrl);
+    actualPageCount = config.maxPages === 1000 ? urls.length : Math.min(urls.length, config.maxPages);
+    console.log(`📈 Found ${urls.length} URLs in sitemap, testing ${actualPageCount}`);
+  } catch (error) {
+    console.log('⚙️  Could not parse sitemap, using default page count');
+  }
+  
+  const startTime = Date.now();
+  
+  // Update pipeline options with discovered sitemap URL
+  pipelineOptions.sitemapUrl = finalSitemapUrl;
+  
+  console.log(`✨ ${actualPageCount === 1 ? '1 page' : actualPageCount + ' pages'} will be tested...`);
+  
+  const { summary, outputFiles } = await pipeline.run(pipelineOptions);
+  
+  const totalTime = Math.round((Date.now() - startTime) / 1000);
+  console.log(`✅ Completed ${summary.testedPages} pages in ${formatTime(totalTime)}`);
+  
+  return { summary, outputFiles, totalTime };
+}
+
+// Helper function for Enhanced Report Generation
+function generateEnhancedReport(result) {
+  const { summary, enhancedResults } = result;
+  
+  return `<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Enhanced Accessibility Analysis Report</title>
+    <style>
+        body { font-family: Arial, sans-serif; margin: 0; padding: 20px; background: #f5f5f5; }
+        .container { max-width: 1200px; margin: 0 auto; background: white; padding: 30px; border-radius: 8px; box-shadow: 0 2px 10px rgba(0,0,0,0.1); }
+        h1 { color: #2563eb; border-bottom: 2px solid #2563eb; padding-bottom: 10px; }
+        .summary { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 20px; margin: 20px 0; }
+        .metric { background: #f8fafc; padding: 15px; border-radius: 8px; text-align: center; }
+        .metric-value { font-size: 2em; font-weight: bold; color: #2563eb; }
+        .metric-label { font-size: 0.9em; color: #64748b; margin-top: 5px; }
+        .results-table { width: 100%; border-collapse: collapse; margin: 20px 0; }
+        .results-table th, .results-table td { padding: 12px; text-align: left; border-bottom: 1px solid #e2e8f0; }
+        .results-table th { background: #f1f5f9; font-weight: 600; }
+        .grade { padding: 4px 8px; border-radius: 4px; color: white; font-weight: bold; }
+        .grade-A { background: #10b981; }
+        .grade-B { background: #3b82f6; }
+        .grade-C { background: #f59e0b; }
+        .grade-D { background: #ef4444; }
+        .grade-F { background: #991b1b; }
+        .enhanced-metrics { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 10px; font-size: 0.9em; }
+        .enhanced-metric { background: #f8fafc; padding: 8px; border-radius: 4px; text-align: center; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🚀 Enhanced Accessibility Analysis Report</h1>
+        
+        <div class="summary">
+            <div class="metric">
+                <div class="metric-value">${summary.testedPages}</div>
+                <div class="metric-label">Pages Tested</div>
+            </div>
+            <div class="metric">
+                <div class="metric-value">${summary.passedPages}</div>
+                <div class="metric-label">Passed</div>
+            </div>
+            <div class="metric">
+                <div class="metric-value">${summary.failedPages}</div>
+                <div class="metric-label">Failed</div>
+            </div>
+            <div class="metric">
+                <div class="metric-value">${Math.round((summary.passedPages / summary.testedPages) * 100)}%</div>
+                <div class="metric-label">Success Rate</div>
+            </div>
+        </div>
+        
+        <h2>Detailed Results</h2>
+        <table class="results-table">
+            <thead>
+                <tr>
+                    <th>Page</th>
+                    <th>Status</th>
+                    <th>Enhanced Metrics</th>
+                    <th>Quality Score</th>
+                </tr>
+            </thead>
+            <tbody>
+                ${enhancedResults.map((page) => `
+                    <tr>
+                        <td>
+                            <strong>${page.title}</strong><br>
+                            <small style="color: #64748b;">${page.url}</small>
+                        </td>
+                        <td>
+                            ${page.passed ? '✅ Passed' : '❌ Failed'}
+                            ${page.errors ? `<br><small>${page.errors} errors</small>` : ''}
+                            ${page.warnings ? `<br><small>${page.warnings} warnings</small>` : ''}
+                        </td>
+                        <td>
+                            <div class="enhanced-metrics">
+                                ${page.enhancedSEO ? `<div class="enhanced-metric">SEO: ${page.enhancedSEO.seoScore}/100</div>` : ''}
+                                ${page.contentWeight ? `<div class="enhanced-metric">Content: ${page.contentWeight.contentScore}/100</div>` : ''}
+                                ${page.enhancedPerformance ? `<div class="enhanced-metric">Performance: ${page.enhancedPerformance.performanceScore || 'N/A'}</div>` : ''}
+                            </div>
+                        </td>
+                        <td>
+                            ${page.qualityScore ? 
+                                `<span class="grade grade-${page.qualityScore.grade}">${page.qualityScore.score}/100 (${page.qualityScore.grade})</span>` : 'N/A'
+                            }
+                        </td>
+                    </tr>
+                `).join('')}
+            </tbody>
+        </table>
+        
+        <footer style="margin-top: 40px; padding-top: 20px; border-top: 1px solid #e2e8f0; text-align: center; color: #64748b;">
+            <p>Generated by AuditMySite Enhanced Analysis - ${new Date().toLocaleString()}</p>
+        </footer>
+    </div>
+</body>
+</html>`;
 }
 
 program.parse();

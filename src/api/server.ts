@@ -180,9 +180,32 @@ export class AuditAPIServer {
         success: true,
         data: {
           name: 'AuditMySite API',
-          version: '1.8.0',
-          description: 'REST API for accessibility testing',
-          endpoints: ['/health', '/api/v1/audit', '/api/v1/audit/quick'],
+          version: '1.8.8',
+          description: 'REST API for comprehensive website analysis with enhanced accessibility, performance, SEO, and content weight testing',
+          features: [
+            'Enhanced Accessibility Analysis (ARIA, Focus, Color Contrast)',
+            'Core Web Vitals Performance Metrics',
+            'Advanced SEO Analysis',
+            'Content Weight Assessment',
+            'Multiple Report Formats (HTML, JSON, CSV)'
+          ],
+          endpoints: [
+            '/health', 
+            '/api/v1/audit', 
+            '/api/v1/audit/quick',
+            '/api/v1/audit/performance',
+            '/api/v1/audit/seo',
+            '/api/v1/audit/content-weight'
+          ],
+          options: {
+            'accessibility': 'Enable enhanced accessibility analysis (default: true)',
+            'performance': 'Enable Core Web Vitals collection (default: true)',
+            'seo': 'Enable SEO analysis (default: true)',
+            'contentWeight': 'Enable content weight assessment (default: true)',
+            'reduced': 'Use reduced analysis mode (default: false)',
+            'includeRecommendations': 'Include actionable recommendations (default: true)',
+            'outputFormat': 'Output format: json, html, csv (default: json)'
+          },
           maxConcurrentJobs: this.config.maxConcurrentJobs
         }
       });
@@ -196,6 +219,12 @@ export class AuditAPIServer {
     
     // Quick audit endpoint
     this.app.post('/api/v1/audit/quick', this.handleQuickAudit.bind(this));
+    
+    // Specialized analysis endpoints
+    this.app.post('/api/v1/audit/performance', this.handlePerformanceAudit.bind(this));
+    this.app.post('/api/v1/audit/seo', this.handleSeoAudit.bind(this));
+    this.app.post('/api/v1/audit/content-weight', this.handleContentWeightAudit.bind(this));
+    this.app.post('/api/v1/audit/accessibility', this.handleAccessibilityAudit.bind(this));
     
     // Test connection endpoint
     this.app.post('/api/v1/test-connection', this.handleTestConnection.bind(this));
@@ -262,12 +291,22 @@ export class AuditAPIServer {
         return;
       }
       
-      // Create job
+      // Create job with enhanced defaults
+      const enhancedOptions: AuditOptions = {
+        accessibility: true,
+        performance: true,
+        seo: true,
+        contentWeight: true,
+        includeRecommendations: true,
+        reduced: false,
+        ...(jobRequest.options || {})
+      };
+      
       const job: AuditJob = {
         id: jobId,
         status: 'pending',
         sitemapUrl: jobRequest.sitemapUrl,
-        options: jobRequest.options || {},
+        options: enhancedOptions,
         createdAt: new Date(),
         progress: { current: 0, total: 100, percentage: 0 }
       };
@@ -368,7 +407,18 @@ export class AuditAPIServer {
         return;
       }
       
-      const result = await this.sdk.quickAudit(sitemapUrl, options || {});
+      // Merge options with new defaults: enhanced features are on by default
+      const mergedOptions: AuditOptions = {
+        accessibility: true,
+        performance: true,
+        seo: true,
+        contentWeight: true,
+        includeRecommendations: true,
+        reduced: false,
+        ...(options || {})
+      };
+      
+      const result = await this.sdk.quickAudit(sitemapUrl, mergedOptions);
       
       res.json({
         success: true,
@@ -380,6 +430,154 @@ export class AuditAPIServer {
     }
   }
 
+  private async handlePerformanceAudit(req: Request, res: Response): Promise<void> {
+    try {
+      const { sitemapUrl, options } = req.body;
+      
+      if (!sitemapUrl) {
+        res.status(400).json(
+          this.createErrorResponse('INVALID_INPUT', 'sitemapUrl is required')
+        );
+        return;
+      }
+      
+      const performanceOptions: AuditOptions = {
+        accessibility: false,
+        performance: true,
+        seo: false,
+        contentWeight: false,
+        includeRecommendations: true,
+        reduced: false,
+        ...(options || {})
+      };
+      
+      const result = await this.sdk.quickAudit(sitemapUrl, performanceOptions);
+      
+      res.json({
+        success: true,
+        data: {
+          ...result,
+          analysisType: 'performance',
+          focus: 'Core Web Vitals and performance metrics'
+        }
+      });
+      
+    } catch (error) {
+      res.status(500).json(this.createErrorResponse('PERFORMANCE_AUDIT_ERROR', 'Performance audit failed'));
+    }
+  }
+  
+  private async handleSeoAudit(req: Request, res: Response): Promise<void> {
+    try {
+      const { sitemapUrl, options } = req.body;
+      
+      if (!sitemapUrl) {
+        res.status(400).json(
+          this.createErrorResponse('INVALID_INPUT', 'sitemapUrl is required')
+        );
+        return;
+      }
+      
+      const seoOptions: AuditOptions = {
+        accessibility: false,
+        performance: false,
+        seo: true,
+        contentWeight: false,
+        includeRecommendations: true,
+        reduced: false,
+        ...(options || {})
+      };
+      
+      const result = await this.sdk.quickAudit(sitemapUrl, seoOptions);
+      
+      res.json({
+        success: true,
+        data: {
+          ...result,
+          analysisType: 'seo',
+          focus: 'Search engine optimization analysis'
+        }
+      });
+      
+    } catch (error) {
+      res.status(500).json(this.createErrorResponse('SEO_AUDIT_ERROR', 'SEO audit failed'));
+    }
+  }
+  
+  private async handleContentWeightAudit(req: Request, res: Response): Promise<void> {
+    try {
+      const { sitemapUrl, options } = req.body;
+      
+      if (!sitemapUrl) {
+        res.status(400).json(
+          this.createErrorResponse('INVALID_INPUT', 'sitemapUrl is required')
+        );
+        return;
+      }
+      
+      const contentOptions: AuditOptions = {
+        accessibility: false,
+        performance: false,
+        seo: false,
+        contentWeight: true,
+        includeRecommendations: true,
+        reduced: false,
+        ...(options || {})
+      };
+      
+      const result = await this.sdk.quickAudit(sitemapUrl, contentOptions);
+      
+      res.json({
+        success: true,
+        data: {
+          ...result,
+          analysisType: 'content-weight',
+          focus: 'Content weight and optimization analysis'
+        }
+      });
+      
+    } catch (error) {
+      res.status(500).json(this.createErrorResponse('CONTENT_WEIGHT_AUDIT_ERROR', 'Content weight audit failed'));
+    }
+  }
+  
+  private async handleAccessibilityAudit(req: Request, res: Response): Promise<void> {
+    try {
+      const { sitemapUrl, options } = req.body;
+      
+      if (!sitemapUrl) {
+        res.status(400).json(
+          this.createErrorResponse('INVALID_INPUT', 'sitemapUrl is required')
+        );
+        return;
+      }
+      
+      const accessibilityOptions: AuditOptions = {
+        accessibility: true,
+        performance: false,
+        seo: false,
+        contentWeight: false,
+        includeRecommendations: true,
+        reduced: false,
+        ...(options || {})
+      };
+      
+      const result = await this.sdk.quickAudit(sitemapUrl, accessibilityOptions);
+      
+      res.json({
+        success: true,
+        data: {
+          ...result,
+          analysisType: 'accessibility',
+          focus: 'Enhanced accessibility and WCAG compliance analysis'
+        }
+      });
+      
+    } catch (error) {
+      res.status(500).json(this.createErrorResponse('ACCESSIBILITY_AUDIT_ERROR', 'Accessibility audit failed'));
+    }
+  }
+  
   private async handleTestConnection(req: Request, res: Response): Promise<void> {
     try {
       const { sitemapUrl } = req.body;

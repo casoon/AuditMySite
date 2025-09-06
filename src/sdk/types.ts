@@ -52,12 +52,29 @@ export interface AuditOptions {
   formats?: ReportFormat[];
   /** Output directory for reports */
   outputDir?: string;
+
+  // Legacy include flags (kept for backward compatibility)
   /** Include performance metrics */
   includePerformance?: boolean;
   /** Include SEO analysis */
   includeSeo?: boolean;
   /** Include security checks */
   includeSecurity?: boolean;
+
+  // New unified feature flags (enhanced methods are default in Standard)
+  /** Enable Accessibility analysis (enhanced methods included by default) */
+  accessibility?: boolean;
+  /** Enable Performance analysis (Core Web Vitals, timing) */
+  performance?: boolean;
+  /** Enable SEO analysis */
+  seo?: boolean;
+  /** Enable Content Weight analysis */
+  contentWeight?: boolean;
+  /** Use reduced mode to limit checks and speed up audits */
+  reduced?: boolean;
+  /** Include actionable recommendations in results */
+  includeRecommendations?: boolean;
+
   /** Use Pa11y for accessibility testing */
   usePa11y?: boolean;
   /** Custom Pa11y options */

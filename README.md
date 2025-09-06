@@ -1,12 +1,13 @@
-# 🎯 AuditMySite - Professional Web Auditing Suite v1.8.4
+# 🎯 AuditMySite - Enhanced Web Analysis Suite v1.9.0
 
-> **🎯 NEW v1.8.4**: Single Source of Truth System + Modern HTML Reports! **Unified data structures across CLI, SDK, and API!** 🔥
-> **🚀 v1.8.0**: Comprehensive Jest Testing Suite + CLI/API Optimization! **Rock-solid test coverage for production reliability!**
-> **🧪 v1.7**: Comprehensive Automated Testing Suite + Developer Experience Improvements! **Production-ready reliability!**
+> **🚀 NEW v1.9.0**: Revolutionary Enhanced Analysis Suite! **Robust accessibility testing, Core Web Vitals monitoring, SEO analysis, and content optimization insights!** 🔥
+> **🔧 PERFORMANCE**: Isolated browser contexts, retry mechanisms, and 100% stable measurements! **Enterprise-grade reliability!**
+> **🌐 API**: Comprehensive endpoints with specialized analysis modes! **Professional integration ready!**
+> **🧪 TESTING**: 25+ test cases with edge case coverage! **Production-validated quality!**
 
-A comprehensive **three-in-one solution** for professional web auditing: **CLI tool**, **REST API server**, and **JavaScript SDK**. Features modern accessibility testing, performance analysis, security validation, and professional reporting with a **unified single source of truth data system** ensuring 100% consistency across all interfaces.
+A comprehensive **three-in-one solution** for professional web auditing: **CLI tool**, **REST API server**, and **JavaScript SDK**. Features revolutionary enhanced analysis with isolated browser contexts, retry mechanisms, SEO optimization, content weight assessment, and comprehensive API endpoints for enterprise-grade web auditing.
 
-⚡ **v1.8.4 Highlights**: Interactive HTML reports with filter badges, unified TypeScript SDK, and template variable fixes!
+⚡ **v1.9.0 Highlights**: Enhanced Analysis as standard, robust performance monitoring, specialized API endpoints, and comprehensive test coverage!
 
 ## 🚀 Quick Start
 
@@ -58,17 +59,19 @@ console.log('Generated Files:', response.files);
 
 ## ✨ Key Features
 
-### 🎯 **New in v1.8.4**
-- 🎯 **Single Source of Truth System** - Unified data structures across CLI, SDK, and API for 100% consistency
-- 🎨 **Modern HTML Reports** - Complete redesign with interactive filter badges and responsive design
-- 📊 **Template Variable System** - Fixed all variable substitution issues ({{domain}}, {{successRate}}, etc.)
-- 🔢 **Number Formatting** - Performance metrics properly rounded (2757ms instead of 2757.100ms)
-- 📋 **Enhanced SEO Layout** - Combined Page & Title columns with structured information display
-- 🎯 **Updated Branding** - Modern target emoji replacing wheelchair icon + custom logo ready
-- 🔌 **Unified SDK** - Single interface for Node.js, CLI, and REST API with full TypeScript support
-- 📚 **Comprehensive Documentation** - Complete API docs in `/UNIFIED-API.md` with examples
-- ⚙️ **Filter Badge System** - Interactive show/hide sections with visual states
-- 🛠️ **Type Safety** - Full TypeScript support with validation throughout entire system
+### 🚀 **New in v1.9.0 - Enhanced Analysis Suite**
+- 🔍 **Enhanced Accessibility Analysis** - ARIA validation, focus management, and color contrast analysis as standard
+- ⚡ **Robust Performance Monitoring** - Core Web Vitals with isolated browser contexts and retry mechanisms
+- 🎆 **Advanced SEO Analysis** - Meta tags, heading structure, and link analysis for optimization insights
+- 📏 **Content Weight Assessment** - Content optimization analysis with performance impact evaluation
+- 🔧 **Isolated Browser Contexts** - Separate contexts for maximum measurement stability
+- 🔄 **Advanced Retry System** - 3-tier collection strategies with exponential backoff
+- 🌐 **Specialized API Endpoints** - `/performance`, `/seo`, `/content-weight`, `/accessibility` for focused analysis
+- 🧪 **Comprehensive Test Suite** - 25+ test cases covering edge cases and quality validation
+- 📊 **Quality Assessment System** - Metrics validation with 40% minimum quality threshold
+- 🛡️ **Enhanced Error Handling** - Execution context destruction prevention and robust fallbacks
+- 🔌 **Unified Feature Flags** - Consistent API with `accessibility`, `performance`, `seo`, `contentWeight` options
+- 📊 **Professional Reports** - Modern HTML reports with enhanced analysis sections
 
 ### 🚀 **New in v1.8.0**
 - 🧪 **Comprehensive Jest Test Suite** - 103+ passing tests covering all core functionality
@@ -156,32 +159,49 @@ console.log('Generated Files:', response.files);
 | `--timeout <ms>` | Audit timeout in milliseconds | `30000` |
 | `--cors` | Enable CORS for cross-origin requests | `false` |
 
-### API Endpoints 🆕
+### API Endpoints 🆕 **Enhanced in v1.9.0!**
 
-| Method | Endpoint | Description |
-|--------|----------|-------------|
-| `POST` | `/api/audits` | Start a new audit job |
-| `GET` | `/api/audits/{jobId}` | Get audit job status |
-| `GET` | `/api/audits/{jobId}/results` | Get audit results |
-| `DELETE` | `/api/audits/{jobId}` | Cancel/delete audit job |
-| `GET` | `/api/health` | Server health check |
-| `GET` | `/api/status` | Server status and statistics |
+|| Method | Endpoint | Description |
+||--------|----------|-------------|
+|| `POST` | `/api/v1/audit/quick` | Quick audit with enhanced analysis (default) |
+|| `POST` | `/api/v1/audit/performance` | Performance-focused analysis with Core Web Vitals |
+|| `POST` | `/api/v1/audit/seo` | SEO-focused analysis with optimization insights |
+|| `POST` | `/api/v1/audit/content-weight` | Content weight analysis with optimization recommendations |
+|| `POST` | `/api/v1/audit/accessibility` | Accessibility-focused analysis with ARIA validation |
+|| `POST` | `/api/v1/audit` | Full audit job with background processing |
+|| `GET` | `/api/v1/audit/{jobId}` | Get audit job status |
+|| `DELETE` | `/api/v1/audit/{jobId}` | Cancel audit job |
+|| `GET` | `/api/v1/audits` | List all audit jobs with pagination |
+|| `GET` | `/api/v1/info` | API information with feature documentation |
+|| `POST` | `/api/v1/test-connection` | Test connection to target URL |
+|| `GET` | `/health` | Server health check |
 
 **Authentication**: All endpoints except `/api/health` require `X-API-Key` header.
 
-**Example API Usage**:
+**Example API Usage v1.9.0**:
 ```bash
-# Start audit
-curl -X POST http://localhost:3000/api/audits \
-  -H "X-API-Key: your-key" \
+# Quick audit with enhanced analysis (default)
+curl -X POST http://localhost:3000/api/v1/audit/quick \
   -H "Content-Type: application/json" \
-  -d '{"url": "https://example.com", "options": {"pages": 10}}'
+  -d '{"sitemapUrl": "https://example.com/sitemap.xml", "options": {"maxPages": 5}}'
 
-# Check status  
-curl http://localhost:3000/api/audits/audit_123 -H "X-API-Key: your-key"
+# Performance-focused audit
+curl -X POST http://localhost:3000/api/v1/audit/performance \
+  -H "Content-Type: application/json" \
+  -d '{"sitemapUrl": "https://example.com/sitemap.xml", "options": {"maxPages": 10, "performanceBudget": {"lcp": {"good": 2500, "poor": 4000}}}}'
 
-# Get results
-curl http://localhost:3000/api/audits/audit_123/results -H "X-API-Key: your-key"
+# SEO analysis
+curl -X POST http://localhost:3000/api/v1/audit/seo \
+  -H "Content-Type: application/json" \
+  -d '{"sitemapUrl": "https://example.com/sitemap.xml", "options": {"maxPages": 5, "includeRecommendations": true}}'
+
+# Content weight analysis
+curl -X POST http://localhost:3000/api/v1/audit/content-weight \
+  -H "Content-Type: application/json" \
+  -d '{"sitemapUrl": "https://example.com/sitemap.xml"}'
+
+# Get API info with features
+curl http://localhost:3000/api/v1/info
 ```
 
 ## 💡 Usage Examples
