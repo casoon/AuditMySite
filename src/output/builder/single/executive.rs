@@ -255,7 +255,10 @@ fn score_area_for_key_point(finding: &crate::audit::normalized::NormalizedFindin
         title_de.to_ascii_lowercase(),
         finding.description.to_ascii_lowercase()
     );
-    if key.contains("form") || key.contains("label") || key.contains("input") {
+    if (key.contains("form") && !key.contains("format"))
+        || key.contains("label")
+        || key.contains("input")
+    {
         "Forms"
     } else if key.contains("keyboard") || key.contains("tastatur") {
         "Keyboard"
@@ -271,5 +274,78 @@ fn score_area_for_key_point(finding: &crate::audit::normalized::NormalizedFindin
         "Landmarks / page structure"
     } else {
         "Semantics"
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::audit::normalized::{
+        ComplexityKind, ExpectedImpactKind, NormalizedFinding, ReportVisibilityData, ScoreEffect,
+        ScoreImpactData,
+    };
+    use crate::taxonomy::Severity;
+
+    fn make_finding(rule_id: &str) -> NormalizedFinding {
+        NormalizedFinding {
+            category: "wcag".into(),
+            rule_id: rule_id.into(),
+            wcag_criterion: "1.3.4".into(),
+            axe_id: None,
+            wcag_level: "AA".into(),
+            dimension: "Accessibility".into(),
+            subcategory: "Structure & Semantics".into(),
+            issue_class: "Weak".into(),
+            dimension_kind: crate::taxonomy::Dimension::Accessibility,
+            subcategory_kind: crate::taxonomy::Subcategory::StructureSemantics,
+            issue_class_kind: crate::taxonomy::IssueClass::Weak,
+            severity: Severity::High,
+            user_impact: String::new(),
+            technical_impact: String::new(),
+            score_impact: ScoreImpactData {
+                base_penalty: 3.0,
+                max_penalty: 6.0,
+                scaling: "Fixed".into(),
+            },
+            report_visibility: ReportVisibilityData::default(),
+            aggregation_key: rule_id.into(),
+            title: String::new(),
+            description:
+                "Die Seite erzwingt eine bestimmte Bildschirmausrichtung (Hoch- oder Querformat)."
+                    .into(),
+            help_url: None,
+            occurrence_count: 1,
+            priority_score: 1.0,
+            confidence: "very_high".into(),
+            false_positive_risk: "very_low".into(),
+            verification: "automatically_confirmed".into(),
+            complexity: "low".into(),
+            complexity_reason: "Test fixture".into(),
+            complexity_kind: ComplexityKind::LowScope,
+            expected_impact: "Test fixture".into(),
+            expected_impact_kind: ExpectedImpactKind::Wcag {
+                occurrence_count: 1,
+                score_effect: ScoreEffect::Low,
+                wcag_level: "AA".into(),
+            },
+            bfsg_relevance: "medium".into(),
+            remediation_priority: "normal".into(),
+            occurrences: vec![],
+        }
+    }
+
+    #[test]
+    fn score_area_for_key_point_does_not_classify_orientation_lock_as_forms() {
+        // Regression: the real "a11y.orientation.restricted" rule's German
+        // title/description contains "Querformat", which must not trip the
+        // "form" substring match and get bucketed into "Forms".
+        let finding = make_finding("a11y.orientation.restricted");
+        assert_ne!(score_area_for_key_point(&finding), "Forms");
+    }
+
+    #[test]
+    fn score_area_for_key_point_still_classifies_real_forms_findings() {
+        let finding = make_finding("a11y.form_labels.missing");
+        assert_eq!(score_area_for_key_point(&finding), "Forms");
     }
 }

@@ -95,7 +95,9 @@ impl BrowserInstaller {
         fs::remove_file(&archive_path).ok();
 
         // Write version file
-        fs::write(target_dir.join("version.txt"), &resolved_version).ok();
+        if let Err(e) = fs::write(target_dir.join("version.txt"), &resolved_version) {
+            warn!("Failed to write version.txt for {}: {}", target_name, e);
+        }
 
         // Make executable
         let binary_path = Self::binary_path(&target_dir, target);
@@ -144,8 +146,10 @@ impl BrowserInstaller {
         // Also clean up legacy location
         if let Ok(legacy_dir) = Self::legacy_chromium_dir() {
             if legacy_dir.exists() {
-                fs::remove_dir_all(&legacy_dir).ok();
-                println!("Removed legacy chromium install");
+                match fs::remove_dir_all(&legacy_dir) {
+                    Ok(()) => println!("Removed legacy chromium install"),
+                    Err(e) => warn!("Failed to remove legacy chromium install: {}", e),
+                }
             }
         }
 
@@ -394,9 +398,26 @@ impl BrowserInstaller {
     fn remove_quarantine(dir: &Path) {
         use std::process::Command;
         // Remove macOS quarantine attribute recursively
-        let _ = Command::new("xattr")
+        match Command::new("xattr")
             .args(["-rd", "com.apple.quarantine"])
             .arg(dir)
-            .output();
+            .output()
+        {
+            Ok(output) if !output.status.success() => {
+                warn!(
+                    "xattr failed to remove quarantine attribute from {}: {}",
+                    dir.display(),
+                    String::from_utf8_lossy(&output.stderr)
+                );
+            }
+            Err(e) => {
+                warn!(
+                    "Failed to run xattr to remove quarantine attribute from {}: {}",
+                    dir.display(),
+                    e
+                );
+            }
+            Ok(_) => {}
+        }
     }
 }

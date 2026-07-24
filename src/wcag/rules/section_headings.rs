@@ -152,7 +152,7 @@ fn count_paragraphs(tree: &AXTree) -> usize {
 fn get_heading_levels(tree: &AXTree) -> Vec<u32> {
     tree.iter()
         .filter(|node| node.role.as_deref() == Some("heading"))
-        .filter_map(|node| node.get_property_int("level").map(|l| l as u32))
+        .filter_map(|node| node.get_property_int("level").map(|l| l.clamp(1, 6) as u32))
         .collect()
 }
 
@@ -248,5 +248,24 @@ mod tests {
         assert!(has_heading_gaps(&[1, 3])); // Gap from h1 to h3
         assert!(has_heading_gaps(&[1, 2, 4])); // Gap from h2 to h4
         assert!(!has_heading_gaps(&[1, 1, 2, 2])); // Multiple same levels OK
+    }
+
+    #[test]
+    fn test_get_heading_levels_clamps_malformed_aria_level() {
+        // Regression: a negative aria-level must not wrap around to a huge
+        // u32 via an unclamped cast, which would silently disable gap
+        // detection for every heading after it.
+        let tree = AXTree::from_nodes(vec![
+            create_heading("1", -1),
+            create_heading("2", 0),
+            create_heading("3", 9),
+            create_heading("4", 2),
+        ]);
+
+        // AXTree stores nodes in a HashMap, so iteration order isn't
+        // insertion order — sort before comparing.
+        let mut levels = get_heading_levels(&tree);
+        levels.sort_unstable();
+        assert_eq!(levels, vec![1, 1, 2, 6]);
     }
 }

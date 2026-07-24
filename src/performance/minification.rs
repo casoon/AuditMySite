@@ -231,7 +231,7 @@ fn classify_kind(url: &str, initiator_type: &str) -> String {
 
 fn legacy_javascript_signature(url: &str) -> Option<&'static str> {
     let lower = url.to_ascii_lowercase();
-    if lower.contains("core-js") || lower.contains("core.min.js") {
+    if lower.contains("core-js") {
         Some("core-js")
     } else if lower.contains("regenerator-runtime") || lower.contains("regeneratorruntime") {
         Some("regenerator-runtime")
@@ -327,6 +327,12 @@ mod tests {
         );
         assert_eq!(
             legacy_javascript_signature("https://cdn.example.com/app.modern.js"),
+            None
+        );
+        // Regression: a generic bundler-produced chunk literally named
+        // "core.min.js" is not a signature of the core-js polyfill package.
+        assert_eq!(
+            legacy_javascript_signature("https://cdn.example.com/assets/core.min.js"),
             None
         );
     }

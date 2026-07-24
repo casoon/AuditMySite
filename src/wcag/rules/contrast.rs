@@ -603,6 +603,9 @@ impl Color {
         let Some(end) = css.rfind(')') else {
             return false;
         };
+        if start + 1 > end {
+            return false;
+        }
         css[start + 1..end]
             .split(',')
             .nth(3)
@@ -994,6 +997,13 @@ mod tests {
         assert!(!Color::is_transparent("rgba(0, 0, 0, 1)"));
         assert!(!Color::is_transparent("rgb(255, 255, 255)"));
         assert!(!Color::is_transparent("#FFFFFF"));
+    }
+
+    #[test]
+    fn test_is_transparent_malformed_parens_does_not_panic() {
+        // Regression: last `)` occurring before the first `(` must not panic
+        // on the `start + 1..end` slice.
+        assert!(!Color::is_transparent("rgba)("));
     }
 
     #[test]

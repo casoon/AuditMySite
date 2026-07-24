@@ -69,7 +69,6 @@ pub fn status_color(status: &str) -> &'static str {
     }
 }
 
-#[allow(dead_code)]
 /// Map a WCAG severity to its hue. Critical/High are problems (red), Medium is
 /// a watch state (orange), Low/everything else is informational (blue).
 pub fn severity_color(severity: crate::wcag::Severity) -> &'static str {
@@ -78,5 +77,27 @@ pub fn severity_color(severity: crate::wcag::Severity) -> &'static str {
         Critical | High => tokens::DANGER,
         Medium => tokens::WARN_DEEP,
         _ => tokens::INFO,
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::wcag::Severity;
+
+    #[test]
+    fn severity_color_low_is_info_blue_not_gray() {
+        // Regression: findings.rs used to re-derive this mapping independently
+        // and rendered Low as NEUTRAL (gray) instead of the documented blue
+        // "informational" hue.
+        assert_eq!(severity_color(Severity::Low), tokens::INFO);
+    }
+
+    #[test]
+    fn severity_color_matches_documented_four_color_law() {
+        assert_eq!(severity_color(Severity::Critical), tokens::DANGER);
+        assert_eq!(severity_color(Severity::High), tokens::DANGER);
+        assert_eq!(severity_color(Severity::Medium), tokens::WARN_DEEP);
+        assert_eq!(severity_color(Severity::Low), tokens::INFO);
     }
 }

@@ -2943,7 +2943,7 @@ fn derive_confidence(rule_id: &str, subcategory: &str, issue_class: &str) -> Str
     if key.contains("alt_text.weak")
         || key.contains("understand")
         || key.contains("readability")
-        || key.contains("content")
+        || subcategory.eq_ignore_ascii_case("content")
     {
         "medium".to_string()
     } else if key.contains("aria")
@@ -2967,7 +2967,7 @@ fn derive_false_positive_risk(rule_id: &str, subcategory: &str, issue_class: &st
     if key.contains("weak")
         || key.contains("alt_text.weak")
         || key.contains("understand")
-        || key.contains("content")
+        || subcategory.eq_ignore_ascii_case("content")
     {
         "medium".to_string()
     } else if key.contains("aria") || key.contains("heading") || key.contains("landmark") {
@@ -4223,6 +4223,49 @@ mod tests {
             names_contributing.contains(&"Accessibility"),
             "Accessibility must contribute in viewport_weighted mode, got: {:?}",
             names_contributing
+        );
+    }
+
+    // Regression: the taxonomy rule id "a11y.hover.content_visibility" (the
+    // content-on-hover/focus check, WCAG 1.4.13) merely contains the
+    // substring "content" — a deterministic, DOM-observable interaction check
+    // must not be downgraded to the subjective "content quality" confidence
+    // bucket just because of that substring collision. Subcategory/issue_class
+    // are passed as the German labels actually used at the call site
+    // (`subcategory_de`/`issue_class_de`), not their English names.
+    #[test]
+    fn derive_confidence_does_not_downgrade_content_on_hover_rule() {
+        assert_eq!(
+            derive_confidence(
+                "a11y.hover.content_visibility",
+                "Visuelle Darstellung",
+                "Schwach"
+            ),
+            "very_high"
+        );
+    }
+
+    #[test]
+    fn derive_false_positive_risk_does_not_flag_content_on_hover_rule() {
+        assert_eq!(
+            derive_false_positive_risk(
+                "a11y.hover.content_visibility",
+                "Visuelle Darstellung",
+                "Schwach"
+            ),
+            "very_low"
+        );
+    }
+
+    #[test]
+    fn derive_confidence_still_downgrades_seo_content_subcategory() {
+        assert_eq!(
+            derive_confidence("seo.headings.missing_h1", "Content", "issue"),
+            "medium"
+        );
+        assert_eq!(
+            derive_false_positive_risk("seo.headings.missing_h1", "Content", "issue"),
+            "medium"
         );
     }
 }

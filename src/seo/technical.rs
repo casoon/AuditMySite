@@ -1780,7 +1780,7 @@ fn format_tracking_signal(
 
 fn classify_tracking_url(url: &str) -> Option<&'static str> {
     let lower = url.to_ascii_lowercase();
-    if lower.contains("/cdn-cgi/zaraz/") || lower.contains("zaraz") {
+    if lower.contains("/cdn-cgi/zaraz/") {
         Some("Cloudflare Zaraz")
     } else if lower.contains("googletagmanager.com")
         || lower.contains("google-analytics.com")
@@ -1811,9 +1811,7 @@ fn detect_zaraz(
         signals.insert("window.zaraz".to_string());
     }
     for url in script_urls.iter().chain(resource_urls.iter()) {
-        if url.to_ascii_lowercase().contains("/cdn-cgi/zaraz/")
-            || url.to_ascii_lowercase().contains("zaraz")
-        {
+        if url.to_ascii_lowercase().contains("/cdn-cgi/zaraz/") {
             signals.insert(url.clone());
         }
     }
@@ -1914,6 +1912,33 @@ mod tests {
         );
         assert!(zaraz.detected);
         assert_eq!(zaraz.signals.len(), 1);
+    }
+
+    #[test]
+    fn test_zaraz_detection_does_not_false_positive_on_polish_word() {
+        // Regression: "zaraz" ("right away" in Polish) must not be treated as
+        // a Cloudflare Zaraz signal unless it appears on the actual
+        // /cdn-cgi/zaraz/ path.
+        let zaraz = detect_zaraz(
+            &["https://example.pl/blog/zaraz-wracam-do-pracy".to_string()],
+            &[],
+            &[],
+            false,
+        );
+        assert!(!zaraz.detected);
+        assert!(zaraz.signals.is_empty());
+    }
+
+    #[test]
+    fn test_classify_tracking_url_does_not_false_positive_on_polish_word() {
+        assert_eq!(
+            classify_tracking_url("https://example.pl/blog/zaraz-wracam-do-pracy"),
+            None
+        );
+        assert_eq!(
+            classify_tracking_url("https://example.com/cdn-cgi/zaraz/s.js"),
+            Some("Cloudflare Zaraz")
+        );
     }
 
     #[test]

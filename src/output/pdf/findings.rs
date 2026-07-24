@@ -233,24 +233,37 @@ pub(super) fn render_finding_technical(
     acronyms_expanded: &mut bool,
 ) -> renderreport::engine::ReportBuilder {
     let en = i18n.locale() == "en";
-    let (severity_prefix, color) = match group.severity {
-        crate::wcag::Severity::Critical => (
-            if en { "[Critical] " } else { "[Kritisch] " },
-            super::design::tokens::DANGER,
-        ),
-        crate::wcag::Severity::High => (
-            if en { "[High] " } else { "[Hoch] " },
-            super::design::tokens::DANGER,
-        ),
-        crate::wcag::Severity::Medium => (
-            if en { "[Medium] " } else { "[Mittel] " },
-            super::design::tokens::WARN_DEEP,
-        ),
-        crate::wcag::Severity::Low => (
-            if en { "[Low] " } else { "[Gering] " },
-            super::design::tokens::NEUTRAL,
-        ),
+    let severity_prefix = match group.severity {
+        crate::wcag::Severity::Critical => {
+            if en {
+                "[Critical] "
+            } else {
+                "[Kritisch] "
+            }
+        }
+        crate::wcag::Severity::High => {
+            if en {
+                "[High] "
+            } else {
+                "[Hoch] "
+            }
+        }
+        crate::wcag::Severity::Medium => {
+            if en {
+                "[Medium] "
+            } else {
+                "[Mittel] "
+            }
+        }
+        crate::wcag::Severity::Low => {
+            if en {
+                "[Low] "
+            } else {
+                "[Gering] "
+            }
+        }
     };
+    let color = super::design::severity_color(group.severity);
 
     let header = if !group.wcag_criterion.is_empty() {
         format!(
