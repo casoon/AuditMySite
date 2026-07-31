@@ -357,6 +357,8 @@ pub struct ModuleDetailsBlock {
     pub ux: Option<UxPresentation>,
     pub journey: Option<JourneyPresentation>,
     pub dark_mode: Option<DarkModePresentation>,
+    pub design_quality: Option<DesignQualityPresentation>,
+    pub ai_transparency: Option<AiTransparencyPresentation>,
     pub source_quality: Option<crate::source_quality::SourceQualityAnalysis>,
     pub ai_visibility: Option<crate::ai_visibility::AiVisibilityAnalysis>,
     pub tech_stack: Option<crate::tech_stack::TechStackAnalysis>,
@@ -411,6 +413,39 @@ pub struct VisionDeficiencyModePresentation {
     pub contrast_violations: u32,
     pub new_contrast_violations: u32,
     pub use_of_color_violations: u32,
+}
+
+/// Design-quality analysis presentation block (#528). Opt-in, score-neutral —
+/// never contributes to accessibility/overall score, grade, or certificate.
+pub struct DesignQualityPresentation {
+    pub warning_count: usize,
+    pub advisory_count: usize,
+    pub findings: Vec<DesignQualityFindingPresentation>,
+}
+
+pub struct DesignQualityFindingPresentation {
+    pub rule_id: String,
+    pub level_label: String,
+    pub confidence_label: String,
+    pub selector: String,
+    pub evidence: String,
+    pub message: String,
+}
+
+/// AI-transparency (EU AI Act Art. 50) presentation block. Opt-in,
+/// score-neutral — never contributes to accessibility/overall score, grade,
+/// or certificate. Single-report only (see `PipelineConfig.check_ai_transparency`).
+pub struct AiTransparencyPresentation {
+    pub images_checked: usize,
+    pub findings: Vec<ImageProvenanceFindingPresentation>,
+}
+
+pub struct ImageProvenanceFindingPresentation {
+    pub image_url: String,
+    pub provenance_label: String,
+    pub validation_label: String,
+    pub generator: Option<String>,
+    pub message: String,
 }
 
 /// Action plan as pre-mapped roadmap columns

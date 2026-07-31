@@ -15,7 +15,9 @@ use crate::output::report_model::*;
 use super::helpers::{map_severity, score_quality_color, score_quality_label};
 
 mod accessibility;
+mod ai_transparency;
 mod dark_mode;
+mod design_quality;
 mod experience;
 mod indicators;
 mod overview;
@@ -24,7 +26,9 @@ mod platform;
 mod seo;
 
 pub(super) use accessibility::{render_a11y_journey_findings, render_screen_reader_section};
+pub(super) use ai_transparency::render_ai_transparency;
 pub(super) use dark_mode::render_dark_mode;
+pub(super) use design_quality::render_design_quality;
 pub(super) use experience::{render_journey, render_ux};
 pub(super) use indicators::{
     render_ai_visibility, render_best_practices, render_content_visibility, render_source_quality,

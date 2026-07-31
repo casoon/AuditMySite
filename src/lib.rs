@@ -35,6 +35,7 @@
 //!         check_security: false,
 //!         check_mobile: false,
 //!         check_dark_mode: false,
+//!         check_design_quality: false,
 //!         check_stack: false,
 //!         persist_artifacts: true,
 //!         capture_screenshots: false,
@@ -84,6 +85,7 @@
 
 pub mod a11y_journey;
 pub mod accessibility;
+pub mod ai_transparency;
 pub mod ai_visibility;
 pub mod assessment;
 pub mod audit;
@@ -93,6 +95,7 @@ pub mod cli;
 pub mod commerce;
 pub mod content_visibility;
 pub mod dark_mode;
+pub mod design_quality;
 pub mod error;
 pub mod i18n;
 pub mod interaction;
@@ -138,7 +141,7 @@ pub use dark_mode::{analyze_dark_mode, DarkModeAnalysis, DarkModeIssue, DarkMode
 pub use error::{AuditError, Result};
 pub use journey::{analyze_journey, analyze_journey_with_dom_check, JourneyAnalysis, PageIntent};
 pub use mobile::{analyze_mobile_friendliness, MobileFriendliness};
-pub use output::{format_json_normalized, print_report};
+pub use output::format_json_normalized;
 pub use performance::{
     calculate_performance_score, extract_web_vitals, PerformanceScore, WebVitals,
 };

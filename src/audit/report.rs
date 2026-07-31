@@ -300,6 +300,15 @@ pub struct ExperienceSection {
     /// Dark mode support and quality analysis (optional)
     #[serde(skip_serializing_if = "Option::is_none")]
     pub dark_mode: Option<DarkModeAnalysis>,
+    /// Opt-in design-quality heuristics (#528, optional). Never affects
+    /// accessibility/overall score, grade, or certificate.
+    #[serde(skip_serializing_if = "Option::is_none", default)]
+    pub design_quality: Option<crate::design_quality::DesignQualityAnalysis>,
+    /// Opt-in C2PA image-provenance check (EU AI Act Art. 50, optional,
+    /// single-URL mode only). Never affects accessibility/overall score,
+    /// grade, or certificate.
+    #[serde(skip_serializing_if = "Option::is_none", default)]
+    pub ai_transparency: Option<crate::ai_transparency::AiTransparencyAnalysis>,
     /// Budget violations detected for this page
     #[serde(skip_serializing_if = "Vec::is_empty", default)]
     pub budget_violations: Vec<crate::audit::budget::BudgetViolation>,
@@ -570,6 +579,24 @@ impl AuditReport {
     /// Set dark mode analysis results
     pub fn with_dark_mode(mut self, dark_mode: DarkModeAnalysis) -> Self {
         self.experience.dark_mode = Some(dark_mode);
+        self
+    }
+
+    /// Set design-quality analysis results (#528)
+    pub fn with_design_quality(
+        mut self,
+        design_quality: crate::design_quality::DesignQualityAnalysis,
+    ) -> Self {
+        self.experience.design_quality = Some(design_quality);
+        self
+    }
+
+    /// Set ai-transparency analysis results (EU AI Act Art. 50)
+    pub fn with_ai_transparency(
+        mut self,
+        ai_transparency: crate::ai_transparency::AiTransparencyAnalysis,
+    ) -> Self {
+        self.experience.ai_transparency = Some(ai_transparency);
         self
     }
 

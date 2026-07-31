@@ -3,6 +3,8 @@
 //! Bootstrap, logging setup, and top-level command dispatch.
 //! Orchestration logic lives in the sibling modules declared below.
 
+#[path = "cli/batch_lifecycle.rs"]
+mod batch_lifecycle;
 #[path = "cli/commands.rs"]
 mod commands;
 #[path = "cli/output_paths.rs"]
@@ -95,12 +97,26 @@ fn setup_logging(args: &Args) {
         "warn,chromiumoxide=off,tungstenite=off,auditmysite=warn".to_string()
     };
 
+    let ansi = match args.color {
+        auditmysite::cli::ColorPolicy::Always => true,
+        auditmysite::cli::ColorPolicy::Never => false,
+        auditmysite::cli::ColorPolicy::Auto => io::stderr().is_terminal(),
+    };
+
     let subscriber = tracing_subscriber::fmt()
         .with_env_filter(EnvFilter::new(filter))
         .with_target(false)
         .with_thread_ids(false)
         .with_file(false)
         .with_line_number(false)
+        // `tracing_subscriber::fmt()` defaults to stdout; a warn/error-level
+        // log line (e.g. a batch page timeout) would otherwise interleave
+        // with JSON/AI/SARIF/table payloads on stdout (#529/#530's
+        // stdout-must-stay-machine-readable mandate). ANSI follows the same
+        // `--color` policy as the table/progress renderers instead of
+        // tracing-subscriber's own default-on behavior.
+        .with_writer(std::io::stderr)
+        .with_ansi(ansi)
         .compact()
         .finish();
 

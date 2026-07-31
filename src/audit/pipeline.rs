@@ -34,6 +34,7 @@ use crate::browser::{
 };
 use crate::cli::{Args, WcagLevel};
 use crate::dark_mode::DarkModeAnalysis;
+use crate::design_quality::DesignQualityAnalysis;
 use crate::error::Result;
 use crate::interaction::stability::{settle, wait_for_page_stability};
 use crate::journey::JourneyAnalysis;
@@ -177,6 +178,8 @@ pub struct SnapshotData {
     ux: Option<UxAnalysis>,
     journey: Option<JourneyAnalysis>,
     dark_mode: Option<DarkModeAnalysis>,
+    design_quality: Option<DesignQualityAnalysis>,
+    ai_transparency: Option<crate::ai_transparency::AiTransparencyAnalysis>,
     tech_stack: Option<crate::tech_stack::TechStackAnalysis>,
     best_practices: Option<BestPracticesAnalysis>,
     module_runs: Vec<crate::audit::ModuleRun>,
@@ -228,6 +231,8 @@ impl SnapshotData {
             ModuleData::Ux(u) => self.ux = Some(*u),
             ModuleData::Journey(j) => self.journey = Some(*j),
             ModuleData::DarkMode(d) => self.dark_mode = Some(*d),
+            ModuleData::DesignQuality(d) => self.design_quality = Some(*d),
+            ModuleData::AiTransparency(a) => self.ai_transparency = Some(*a),
             ModuleData::TechStack(t) => self.tech_stack = Some(*t),
             ModuleData::BestPractices(b) => self.best_practices = Some(*b),
             ModuleData::SourceQuality(_)
@@ -263,6 +268,14 @@ pub struct PipelineConfig {
     pub check_mobile: bool,
     /// Run dark-mode analysis
     pub check_dark_mode: bool,
+    /// Run the opt-in design-quality module (#528). Not part of `--full` yet.
+    pub check_design_quality: bool,
+    /// Run the opt-in C2PA image-provenance check (EU AI Act Art. 50
+    /// transparency duties). Not part of `--full`; single-URL mode only (see
+    /// `from_args_and_config`) and requires the `ai-transparency` Cargo
+    /// feature to do anything (see `src/cli/runners.rs`'s early feature
+    /// check).
+    pub check_ai_transparency: bool,
     /// Run tech stack detection and stack-specific audits
     pub check_stack: bool,
     /// Persist audit artifacts under ~/.auditmysite/cache
@@ -314,10 +327,11 @@ impl PipelineConfig {
         // 6 for the commerce trust-pages restructure, 7 for commerce page_kind,
         // 8 for commerce conversion signals, 9 for structured-data rule and
         // page-fit assessments, 10 for the report quality model, 11 for
-        // page-stability provenance.
-        const CACHE_FMT: u8 = 11;
+        // page-stability provenance, 12 for the design_quality module field,
+        // 13 for the ai_transparency module field.
+        const CACHE_FMT: u8 = 13;
         format!(
-            "v={};fmt={};level={};perf={};seo={};sec={};mobile={};dark={};stack={};consent={};interactive={:?};journey_budget_ms={};lang={}",
+            "v={};fmt={};level={};perf={};seo={};sec={};mobile={};dark={};design_quality={};ai_transparency={};stack={};consent={};interactive={:?};journey_budget_ms={};lang={}",
             env!("CARGO_PKG_VERSION"),
             CACHE_FMT,
             self.wcag_level,
@@ -326,6 +340,8 @@ impl PipelineConfig {
             self.check_security as u8,
             self.check_mobile as u8,
             self.check_dark_mode as u8,
+            self.check_design_quality as u8,
+            self.check_ai_transparency as u8,
             self.check_stack as u8,
             self.dismiss_consent as u8,
             self.interactive,
@@ -354,6 +370,8 @@ impl PipelineConfig {
                 check_seo: false,
                 check_security: false,
                 check_mobile: false,
+                check_design_quality: false,
+                check_ai_transparency: false,
                 check_stack: false,
                 ..self.clone()
             },
@@ -384,6 +402,13 @@ impl PipelineConfig {
             check_security: full_audit || args.security,
             check_mobile: (full_audit || args.mobile) && !args.skip_mobile,
             check_dark_mode: true,
+            check_design_quality: args.design_quality,
+            // Single-URL mode only (`args.url.is_some()`, same condition as
+            // `capture_element_evidence`) — a batch run would fetch+parse
+            // every image on every page only to have `build_batch_detail()`
+            // discard the whole module blob per page (#256's per-page
+            // detail is only ever `fix_guidance`/`en301549_annex`).
+            check_ai_transparency: args.ai_transparency && args.url.is_some(),
             check_stack: full_audit || args.stack,
             persist_artifacts: true,
             capture_screenshots: args.url.is_some()
@@ -735,6 +760,8 @@ pub async fn audit_page(
         ux: mobile_snap.ux.clone(),
         journey: mobile_snap.journey.clone(),
         dark_mode: desktop_snap.dark_mode.clone(), // taken from desktop pass
+        design_quality: mobile_snap.design_quality.clone(),
+        ai_transparency: mobile_snap.ai_transparency.clone(),
         tech_stack: mobile_snap.tech_stack.clone(),
         best_practices: mobile_snap.best_practices.clone(),
         module_runs: desktop_snap
@@ -1061,6 +1088,27 @@ fn merge_wcag_violations(desktop: &WcagResults, mobile: &WcagResults) -> WcagRes
     let positives = merge_aux(&desktop.positives, &mobile.positives);
     let not_testables = merge_aux(&desktop.not_testables, &mobile.not_testables);
 
+    // #527: pixel sampling can classify the same element differently across
+    // viewport passes (e.g. rendering/DPR differences on an actual <img>
+    // behind text), which would otherwise double-report one real problem as
+    // both a confirmed violation (from one viewport) and a manual-review
+    // warning (from the other) for the same rule+selector. A confirmed
+    // violation supersedes a "needs review" warning, so drop the warning.
+    let violation_keys: std::collections::HashSet<(String, String)> = merged
+        .iter()
+        .map(|v| {
+            let (rule, id) = dedup_key(v);
+            (rule.to_owned(), id)
+        })
+        .collect();
+    let warnings: Vec<Violation> = warnings
+        .into_iter()
+        .filter(|w| {
+            let (rule, id) = dedup_key(w);
+            !violation_keys.contains(&(rule.to_owned(), id))
+        })
+        .collect();
+
     WcagResults {
         violations: merged,
         warnings,
@@ -1186,6 +1234,8 @@ async fn extract_snapshot(
         ux: None,
         journey: None,
         dark_mode: None,
+        design_quality: None,
+        ai_transparency: None,
         tech_stack: None,
         best_practices: None,
         module_runs: Vec::new(),
@@ -1473,6 +1523,12 @@ fn aggregate_report(
     }
     if let Some(dark_mode) = snapshot.dark_mode.clone() {
         report = report.with_dark_mode(dark_mode);
+    }
+    if let Some(design_quality) = snapshot.design_quality.clone() {
+        report = report.with_design_quality(design_quality);
+    }
+    if let Some(ai_transparency) = snapshot.ai_transparency.clone() {
+        report = report.with_ai_transparency(ai_transparency);
     }
 
     if let Some(tech_stack) = snapshot.tech_stack.clone() {
@@ -2032,6 +2088,8 @@ mod tests {
             disable_images: false,
             verbose: true,
             quiet: false,
+            color: crate::cli::ColorPolicy::Auto,
+            progress: crate::cli::ProgressPolicy::Auto,
             detect_chrome: false,
             full: false,
             performance: false,
@@ -2040,6 +2098,8 @@ mod tests {
             security: false,
             mobile: false,
             skip_mobile: false,
+            design_quality: false,
+            ai_transparency: false,
             stack: false,
             reuse_cache: false,
             force_refresh: false,
@@ -2124,6 +2184,8 @@ mod tests {
             check_security: false,
             check_mobile: true,
             check_dark_mode: true,
+            check_design_quality: false,
+            check_ai_transparency: false,
             check_stack: false,
             persist_artifacts: true,
             capture_screenshots: false,
@@ -2221,6 +2283,19 @@ journey_budget_ms = 1234
         let desktop = config.for_viewport(Viewport::Desktop);
 
         assert!(!desktop.check_dark_mode);
+    }
+
+    #[test]
+    fn for_viewport_desktop_disables_design_quality_like_mobile() {
+        let args = Args::parse_from(["auditmysite", "https://example.com", "--design-quality"]);
+        let config = PipelineConfig::from_args_and_config(&args, None);
+        assert!(config.check_design_quality);
+
+        let desktop = config.for_viewport(Viewport::Desktop);
+        let mobile = config.for_viewport(Viewport::Mobile);
+
+        assert!(!desktop.check_design_quality);
+        assert!(mobile.check_design_quality);
     }
 
     #[test]

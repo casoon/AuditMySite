@@ -113,6 +113,8 @@ fn default_config() -> PipelineConfig {
         check_security: false,
         check_mobile: false,
         check_dark_mode: false,
+        check_design_quality: false,
+        check_ai_transparency: false,
         check_stack: false,
         persist_artifacts: true,
         capture_screenshots: false,
@@ -599,6 +601,88 @@ async fn test_image_contrast_pixel_sampling() {
     );
 }
 
+#[tokio::test]
+#[ignore]
+async fn test_opacity_overlay_contrast_pixel_sampling() {
+    // Regression for #527: an uncertain-background element (opacity stack,
+    // translucent overlay sibling, or an actual <img> behind text) whose
+    // CSS-derived colors look fine in isolation must still be pixel-sampled
+    // and surfaced, instead of silently producing zero findings.
+    let (url, shutdown) = serve_fixture("opacity_overlay_contrast.html");
+
+    let manager = ci_browser().await;
+    let page = manager.new_page().await.expect("New page failed");
+    manager
+        .navigate(&page, &url)
+        .await
+        .expect("Navigation failed");
+
+    let (report, _snapshot) = audit_page(&page, &url, &default_config(), &manager)
+        .await
+        .expect("Audit failed");
+
+    shutdown.store(true, std::sync::atomic::Ordering::Relaxed);
+
+    let contrast_violations: Vec<_> = report
+        .accessibility
+        .wcag_results
+        .violations
+        .iter()
+        .filter(|v| v.rule == "1.4.3")
+        .collect();
+    let contrast_warnings: Vec<_> = report
+        .accessibility
+        .wcag_results
+        .warnings
+        .iter()
+        .filter(|v| v.rule == "1.4.3")
+        .collect();
+
+    for v in &contrast_violations {
+        println!(
+            "Confirmed Violation: selector={:?}, message={}",
+            v.selector, v.message
+        );
+    }
+    for w in &contrast_warnings {
+        println!(
+            "NeedsReview Warning: selector={:?}, message={}",
+            w.selector, w.message
+        );
+    }
+
+    let is_flagged = |needle: &str| -> bool {
+        let in_violations = contrast_violations
+            .iter()
+            .filter(|v| v.selector.as_deref().is_some_and(|s| s.contains(needle)))
+            .count();
+        let in_warnings = contrast_warnings
+            .iter()
+            .filter(|w| w.selector.as_deref().is_some_and(|s| s.contains(needle)))
+            .count();
+        assert!(
+            in_violations + in_warnings <= 1,
+            "{needle} must be flagged at most once across violations+warnings, got {} violations and {} warnings",
+            in_violations,
+            in_warnings
+        );
+        in_violations + in_warnings == 1
+    };
+
+    assert!(
+        is_flagged("opacity-text") || is_flagged("opacity-box"),
+        "opacity-stacked text must now be flagged (previously missed entirely)"
+    );
+    assert!(
+        is_flagged("overlay-text") || is_flagged("overlay-box"),
+        "text under a translucent overlay sibling must now be flagged"
+    );
+    assert!(
+        is_flagged("img-text") || is_flagged("img-box"),
+        "text layered over an actual <img> must now be flagged"
+    );
+}
+
 /// #343 — catalog-driven audit produces a complete report structure.
 #[tokio::test]
 #[ignore]
@@ -794,5 +878,171 @@ async fn test_label_in_name_false_positives() {
         genuine_mismatch.kind,
         auditmysite::wcag::types::FindingKind::Violation,
         "genuine mismatch should stay a confirmed violation; got {genuine_mismatch:?}"
+    );
+}
+
+#[tokio::test]
+#[ignore]
+async fn test_design_quality_module_findings_and_score_isolation() {
+    // #528: the opt-in design_quality module must (a) actually detect each of
+    // its rules against a real rendered page and (b) never change the
+    // accessibility score/grade/certificate, whether enabled or not.
+    let (url, shutdown) = serve_fixture("design_quality.html");
+
+    let manager = ci_browser().await;
+
+    let page_off = manager.new_page().await.expect("New page failed");
+    manager
+        .navigate(&page_off, &url)
+        .await
+        .expect("Navigation failed");
+    let config_off = PipelineConfig {
+        check_performance: true,
+        ..default_config()
+    };
+    let (report_off, _snapshot_off) = audit_page(&page_off, &url, &config_off, &manager)
+        .await
+        .expect("Audit failed (design_quality off)");
+
+    let page_on = manager.new_page().await.expect("New page failed");
+    manager
+        .navigate(&page_on, &url)
+        .await
+        .expect("Navigation failed");
+    let config_on = PipelineConfig {
+        check_performance: true,
+        check_design_quality: true,
+        ..default_config()
+    };
+    let (report_on, _snapshot_on) = audit_page(&page_on, &url, &config_on, &manager)
+        .await
+        .expect("Audit failed (design_quality on)");
+
+    shutdown.store(true, std::sync::atomic::Ordering::Relaxed);
+
+    assert!(
+        report_off.experience.design_quality.is_none(),
+        "design_quality must stay unpopulated when the module is off"
+    );
+    let dq = report_on
+        .experience
+        .design_quality
+        .as_ref()
+        .expect("design_quality must be populated when the module is on");
+
+    for rule_id in [
+        "design.overflow_clip",
+        "design.line_length",
+        "design.line_height",
+        "design.all_caps",
+        "design.layout_transition",
+    ] {
+        assert!(
+            dq.findings.iter().any(|f| f.rule_id == rule_id),
+            "expected a {rule_id} finding; got {:?}",
+            dq.findings.iter().map(|f| &f.rule_id).collect::<Vec<_>>()
+        );
+    }
+
+    for safe_selector in [
+        "clip-button-safe",
+        "short-line-text",
+        "normal-line-height-text",
+        "mixed-case-text",
+        "transition-safe",
+    ] {
+        assert!(
+            !dq.findings
+                .iter()
+                .any(|f| f.selector.contains(safe_selector)),
+            "negative control '{safe_selector}' must not produce a design_quality finding"
+        );
+    }
+
+    assert_eq!(
+        report_off.accessibility.score, report_on.accessibility.score,
+        "accessibility score must be byte-identical whether design_quality is on or off"
+    );
+    assert_eq!(
+        report_off.accessibility.grade, report_on.accessibility.grade,
+        "accessibility grade must be identical whether design_quality is on or off"
+    );
+    assert_eq!(
+        report_off.accessibility.certificate, report_on.accessibility.certificate,
+        "certificate must be identical whether design_quality is on or off"
+    );
+}
+
+#[tokio::test]
+#[ignore]
+#[cfg(feature = "ai-transparency")]
+async fn test_ai_transparency_module_ssrf_guard_and_score_isolation() {
+    // The opt-in ai_transparency module must (a) never change the
+    // accessibility score/grade/certificate, whether enabled or not, and (b)
+    // never fetch the loopback fixture server the test harness itself runs
+    // on — `serve_fixture` binds 127.0.0.1, which the module's SSRF guard
+    // must reject just like it would any other private/loopback address.
+    // (An end-to-end "real AI-generated image" path is covered by the
+    // synthetic-fixture unit tests in `src/ai_transparency/image_provenance.rs`
+    // — this harness has no way to serve real image bytes at a public IP.)
+    let (url, shutdown) = serve_fixture("ai_transparency.html");
+
+    let manager = ci_browser().await;
+
+    let page_off = manager.new_page().await.expect("New page failed");
+    manager
+        .navigate(&page_off, &url)
+        .await
+        .expect("Navigation failed");
+    let config_off = PipelineConfig {
+        check_performance: true,
+        ..default_config()
+    };
+    let (report_off, _snapshot_off) = audit_page(&page_off, &url, &config_off, &manager)
+        .await
+        .expect("Audit failed (ai_transparency off)");
+
+    let page_on = manager.new_page().await.expect("New page failed");
+    manager
+        .navigate(&page_on, &url)
+        .await
+        .expect("Navigation failed");
+    let config_on = PipelineConfig {
+        check_performance: true,
+        check_ai_transparency: true,
+        ..default_config()
+    };
+    let (report_on, _snapshot_on) = audit_page(&page_on, &url, &config_on, &manager)
+        .await
+        .expect("Audit failed (ai_transparency on)");
+
+    shutdown.store(true, std::sync::atomic::Ordering::Relaxed);
+
+    assert!(
+        report_off.experience.ai_transparency.is_none(),
+        "ai_transparency must stay unpopulated when the module is off"
+    );
+    let at = report_on
+        .experience
+        .ai_transparency
+        .as_ref()
+        .expect("ai_transparency must be populated when the module is on");
+    assert_eq!(
+        at.images_checked, 0,
+        "the loopback fixture server must be rejected by the SSRF guard, not fetched"
+    );
+    assert!(at.findings.is_empty());
+
+    assert_eq!(
+        report_off.accessibility.score, report_on.accessibility.score,
+        "accessibility score must be byte-identical whether ai_transparency is on or off"
+    );
+    assert_eq!(
+        report_off.accessibility.grade, report_on.accessibility.grade,
+        "accessibility grade must be identical whether ai_transparency is on or off"
+    );
+    assert_eq!(
+        report_off.accessibility.certificate, report_on.accessibility.certificate,
+        "certificate must be identical whether ai_transparency is on or off"
     );
 }

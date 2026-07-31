@@ -55,6 +55,8 @@ mod tests {
             check_security: false,
             check_mobile: false,
             check_dark_mode: false,
+            check_design_quality: false,
+            check_ai_transparency: false,
             check_stack,
             persist_artifacts: false,
             capture_screenshots: false,

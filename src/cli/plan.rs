@@ -17,7 +17,7 @@ use crate::output_paths::{
 // ─── Banner ──────────────────────────────────────────────────────────────────
 
 pub fn print_banner() {
-    println!(
+    eprintln!(
         "{}",
         r#"
     _             _ _ _   __  __       ____  _ _
@@ -29,7 +29,7 @@ pub fn print_banner() {
 "#
         .cyan()
     );
-    println!(
+    eprintln!(
         "  {} v{} - WCAG 2.1 Accessibility Checker\n",
         "AuditMySite".bold(),
         env!("CARGO_PKG_VERSION")
@@ -42,24 +42,24 @@ pub fn print_single_audit_plan(args: &Args, url: &str) {
     if args.quiet {
         return;
     }
-    println!("{}", "Audit plan".cyan().bold());
-    println!("  {} Single URL", "Mode:".dimmed());
-    println!("  {} {}", "Format:".dimmed(), args.effective_format());
-    println!("  {} {}", "Report level:".dimmed(), args.report_level);
-    println!("  {} {}", "Modules:".dimmed(), active_modules_label(args));
+    eprintln!("{}", "Audit plan".cyan().bold());
+    eprintln!("  {} Single URL", "Mode:".dimmed());
+    eprintln!("  {} {}", "Format:".dimmed(), args.effective_format());
+    eprintln!("  {} {}", "Report level:".dimmed(), args.report_level);
+    eprintln!("  {} {}", "Modules:".dimmed(), active_modules_label(args));
     let outputs = planned_single_outputs(args, url);
     if !outputs.is_empty() {
-        println!("  {} {}", "Output:".dimmed(), outputs.join(", "));
+        eprintln!("  {} {}", "Output:".dimmed(), outputs.join(", "));
     }
-    println!();
+    eprintln!();
 }
 
 pub fn print_batch_audit_plan(args: &Args, total_urls: usize) {
     if args.quiet {
         return;
     }
-    println!("{}", "Audit plan".cyan().bold());
-    println!(
+    eprintln!("{}", "Audit plan".cyan().bold());
+    eprintln!(
         "  {} {}",
         "Mode:".dimmed(),
         if args.per_page_reports {
@@ -72,15 +72,15 @@ pub fn print_batch_audit_plan(args: &Args, total_urls: usize) {
             "URL file"
         }
     );
-    println!("  {} {} URLs", "Scope:".dimmed(), total_urls);
-    println!("  {} {}", "Format:".dimmed(), args.effective_format());
-    println!("  {} {}", "Report level:".dimmed(), args.report_level);
-    println!("  {} {}", "Modules:".dimmed(), active_modules_label(args));
+    eprintln!("  {} {} URLs", "Scope:".dimmed(), total_urls);
+    eprintln!("  {} {}", "Format:".dimmed(), args.effective_format());
+    eprintln!("  {} {}", "Report level:".dimmed(), args.report_level);
+    eprintln!("  {} {}", "Modules:".dimmed(), active_modules_label(args));
     let outputs = planned_batch_outputs(args);
     if !outputs.is_empty() {
-        println!("  {} {}", "Output:".dimmed(), outputs.join(", "));
+        eprintln!("  {} {}", "Output:".dimmed(), outputs.join(", "));
     }
-    println!();
+    eprintln!();
 }
 
 // ─── Planned output path lists ────────────────────────────────────────────────

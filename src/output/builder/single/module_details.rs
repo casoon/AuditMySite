@@ -5,13 +5,15 @@ use crate::audit::performance_interpretation::{
 use crate::dark_mode::dark_mode_issue_text;
 use crate::i18n::I18n;
 use crate::output::report_model::{
-    AnimationPresentation, CoveragePresentation, CriticalChainPresentation, DarkModePresentation,
-    FrictionPointPresentation, ImageEfficiencyPresentation, JourneyDimensionPresentation,
-    JourneyPresentation, MinificationPresentation, MobilePresentation, ModuleDetailsBlock,
-    OversizedImageRow, PerformancePresentation, PerformanceViewport, RobotsPresentation,
-    SecurityPresentation, SeoPresentation, SeoProfilePresentation, SignalDetails,
-    ThirdPartyOriginRow, ThirdPartyPresentation, ThrottledPerfEntry, UxDimensionPresentation,
-    UxIssuePresentation, UxPresentation, VisionDeficiencyModePresentation,
+    AiTransparencyPresentation, AnimationPresentation, CoveragePresentation,
+    CriticalChainPresentation, DarkModePresentation, DesignQualityFindingPresentation,
+    DesignQualityPresentation, FrictionPointPresentation, ImageEfficiencyPresentation,
+    ImageProvenanceFindingPresentation, JourneyDimensionPresentation, JourneyPresentation,
+    MinificationPresentation, MobilePresentation, ModuleDetailsBlock, OversizedImageRow,
+    PerformancePresentation, PerformanceViewport, RobotsPresentation, SecurityPresentation,
+    SeoPresentation, SeoProfilePresentation, SignalDetails, ThirdPartyOriginRow,
+    ThirdPartyPresentation, ThrottledPerfEntry, UxDimensionPresentation, UxIssuePresentation,
+    UxPresentation, VisionDeficiencyModePresentation,
 };
 use crate::output::search_experience::build_search_experience;
 
@@ -1771,6 +1773,151 @@ fn build_dark_mode_details(
     })
 }
 
+fn build_design_quality_details(
+    normalized: &AuditContext<'_>,
+    i18n: &I18n,
+) -> Option<DesignQualityPresentation> {
+    let en = i18n.locale() == "en";
+    normalized.raw_design_quality.map(|dq| {
+        let warning_count = dq.warnings().count();
+        let advisory_count = dq.advisories().count();
+        DesignQualityPresentation {
+            warning_count,
+            advisory_count,
+            findings: dq
+                .findings
+                .iter()
+                .map(|f| {
+                    let level_label = match f.level {
+                        crate::design_quality::FindingLevel::Warning => {
+                            if en {
+                                "Warning"
+                            } else {
+                                "Warnung"
+                            }
+                        }
+                        crate::design_quality::FindingLevel::Advisory => {
+                            if en {
+                                "Advisory"
+                            } else {
+                                "Hinweis"
+                            }
+                        }
+                    };
+                    let confidence_label = match f.confidence {
+                        crate::design_quality::Confidence::High => {
+                            if en {
+                                "High"
+                            } else {
+                                "Hoch"
+                            }
+                        }
+                        crate::design_quality::Confidence::Medium => {
+                            if en {
+                                "Medium"
+                            } else {
+                                "Mittel"
+                            }
+                        }
+                        crate::design_quality::Confidence::Low => {
+                            if en {
+                                "Low"
+                            } else {
+                                "Niedrig"
+                            }
+                        }
+                    };
+                    DesignQualityFindingPresentation {
+                        rule_id: f.rule_id.clone(),
+                        level_label: level_label.to_string(),
+                        confidence_label: confidence_label.to_string(),
+                        selector: f.selector.clone(),
+                        evidence: f.evidence.clone(),
+                        message: crate::design_quality::finding_message_text(
+                            &f.rule_id, f.level, en,
+                        ),
+                    }
+                })
+                .collect(),
+        }
+    })
+}
+
+fn build_ai_transparency_details(
+    normalized: &AuditContext<'_>,
+    i18n: &I18n,
+) -> Option<AiTransparencyPresentation> {
+    let en = i18n.locale() == "en";
+    normalized.raw_ai_transparency.map(|a| AiTransparencyPresentation {
+        images_checked: a.images_checked,
+        findings: a
+            .findings
+            .iter()
+            .map(|f| {
+                let provenance_label = if en {
+                    match f.provenance {
+                        crate::ai_transparency::AiProvenanceKind::TrainedAlgorithmicMedia => {
+                            "AI-trained model (trainedAlgorithmicMedia)"
+                        }
+                        crate::ai_transparency::AiProvenanceKind::CompositeWithTrainedAlgorithmicMedia => {
+                            "AI-assisted composite (compositeWithTrainedAlgorithmicMedia)"
+                        }
+                        crate::ai_transparency::AiProvenanceKind::CompositeSynthetic => {
+                            "Composite with AI content (compositeSynthetic)"
+                        }
+                        crate::ai_transparency::AiProvenanceKind::VirtualRecording => {
+                            "Virtual recording with AI content (virtualRecording)"
+                        }
+                        crate::ai_transparency::AiProvenanceKind::TrainedAlgorithmicData => {
+                            "Algorithmically generated data (trainedAlgorithmicData)"
+                        }
+                    }
+                } else {
+                    match f.provenance {
+                        crate::ai_transparency::AiProvenanceKind::TrainedAlgorithmicMedia => {
+                            "KI-trainiertes Modell (trainedAlgorithmicMedia)"
+                        }
+                        crate::ai_transparency::AiProvenanceKind::CompositeWithTrainedAlgorithmicMedia => {
+                            "KI-gestützte Komposition (compositeWithTrainedAlgorithmicMedia)"
+                        }
+                        crate::ai_transparency::AiProvenanceKind::CompositeSynthetic => {
+                            "Komposition mit KI-Anteil (compositeSynthetic)"
+                        }
+                        crate::ai_transparency::AiProvenanceKind::VirtualRecording => {
+                            "Virtuelle Aufzeichnung mit KI-Anteil (virtualRecording)"
+                        }
+                        crate::ai_transparency::AiProvenanceKind::TrainedAlgorithmicData => {
+                            "Algorithmisch erzeugte Daten (trainedAlgorithmicData)"
+                        }
+                    }
+                }
+                .to_string();
+                let validation_label = if en {
+                    match f.validation {
+                        crate::ai_transparency::ManifestValidation::Invalid => "not validated",
+                        crate::ai_transparency::ManifestValidation::Valid => "valid",
+                        crate::ai_transparency::ManifestValidation::Trusted => "trusted",
+                    }
+                } else {
+                    match f.validation {
+                        crate::ai_transparency::ManifestValidation::Invalid => "nicht validiert",
+                        crate::ai_transparency::ManifestValidation::Valid => "gültig",
+                        crate::ai_transparency::ManifestValidation::Trusted => "vertrauenswürdig",
+                    }
+                }
+                .to_string();
+                ImageProvenanceFindingPresentation {
+                    image_url: f.image_url.clone(),
+                    provenance_label,
+                    validation_label,
+                    generator: f.generator.clone(),
+                    message: crate::ai_transparency::finding_message_text(&f.rule_id, en),
+                }
+            })
+            .collect(),
+    })
+}
+
 fn build_ux_details(normalized: &AuditContext<'_>, i18n: &I18n) -> Option<UxPresentation> {
     let locale = i18n.locale();
     normalized.raw_ux.map(|u| {
@@ -1936,6 +2083,8 @@ pub(super) fn build_module_details_from_normalized(
     let security = build_security_details(normalized, i18n);
     let mobile = build_mobile_details(normalized, i18n);
     let dark_mode = build_dark_mode_details(normalized, i18n);
+    let design_quality = build_design_quality_details(normalized, i18n);
+    let ai_transparency = build_ai_transparency_details(normalized, i18n);
     let ux = build_ux_details(normalized, i18n);
     let journey = build_journey_details(normalized, i18n);
 
@@ -1954,6 +2103,8 @@ pub(super) fn build_module_details_from_normalized(
         || ux.is_some()
         || journey.is_some()
         || dark_mode.is_some()
+        || design_quality.is_some()
+        || ai_transparency.is_some()
         || source_quality.is_some()
         || ai_visibility.is_some()
         || tech_stack.is_some()
@@ -1970,6 +2121,8 @@ pub(super) fn build_module_details_from_normalized(
         ux,
         journey,
         dark_mode,
+        design_quality,
+        ai_transparency,
         source_quality,
         ai_visibility,
         tech_stack,
@@ -1995,6 +2148,8 @@ pub(super) fn pdf_rendered_modules() -> std::collections::BTreeSet<&'static str>
         "ux",
         "journey",
         "dark_mode",
+        "design_quality",
+        "ai_transparency",
         "source_quality",
         "ai_visibility",
         "tech_stack",

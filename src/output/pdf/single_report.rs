@@ -16,10 +16,11 @@ use super::design;
 
 use super::appendix::build_cli_snapshot_table;
 use super::detail_modules::{
-    render_a11y_journey_findings, render_ai_visibility, render_best_practices,
-    render_budget_violations, render_content_visibility, render_dark_mode, render_journey,
-    render_mobile, render_performance, render_screen_reader_section, render_search_experience,
-    render_security, render_seo, render_source_quality, render_tech_stack, render_ux,
+    render_a11y_journey_findings, render_ai_transparency, render_ai_visibility,
+    render_best_practices, render_budget_violations, render_content_visibility, render_dark_mode,
+    render_design_quality, render_journey, render_mobile, render_performance,
+    render_screen_reader_section, render_search_experience, render_security, render_seo,
+    render_source_quality, render_tech_stack, render_ux,
 };
 use super::diagnosis::render_diagnosis_section;
 use super::en301549::render_en301549_annex;
@@ -1400,6 +1401,16 @@ fn render_active_module_section(
         "dark_mode" => {
             if let Some(ref dm) = vm.module_details.dark_mode {
                 return (render_dark_mode(builder, dm, is_first, i18n), true);
+            }
+        }
+        "design_quality" => {
+            if let Some(ref dq) = vm.module_details.design_quality {
+                return (render_design_quality(builder, dq, is_first, i18n), true);
+            }
+        }
+        "ai_transparency" => {
+            if let Some(ref at) = vm.module_details.ai_transparency {
+                return (render_ai_transparency(builder, at, is_first, i18n), true);
             }
         }
         "source_quality" => {

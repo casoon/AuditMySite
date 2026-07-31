@@ -31,6 +31,30 @@ mod tests {
 
     use super::export_sr_audit;
 
+    /// Recursively sorts object keys so this snapshot assertion is stable
+    /// regardless of `serde_json`'s `preserve_order` feature — which the
+    /// optional `ai-transparency` feature's `c2pa` dependency unconditionally
+    /// enables (hardcoded in its own `Cargo.toml`, not one of its own
+    /// optional features), changing `serde_json::Value::Object`'s backing map
+    /// from a sorted `BTreeMap` to an insertion-order `IndexMap` for the
+    /// *whole* binary via Cargo feature unification — not just this module.
+    fn sort_json_keys(value: serde_json::Value) -> serde_json::Value {
+        match value {
+            serde_json::Value::Object(map) => {
+                let mut entries: Vec<(String, serde_json::Value)> = map
+                    .into_iter()
+                    .map(|(k, v)| (k, sort_json_keys(v)))
+                    .collect();
+                entries.sort_by(|a, b| a.0.cmp(&b.0));
+                serde_json::Value::Object(entries.into_iter().collect())
+            }
+            serde_json::Value::Array(arr) => {
+                serde_json::Value::Array(arr.into_iter().map(sort_json_keys).collect())
+            }
+            other => other,
+        }
+    }
+
     fn node(id: &str, role: &str, name: Option<&str>, child_ids: Vec<&str>) -> AXNode {
         AXNode {
             node_id: id.to_string(),
@@ -71,6 +95,7 @@ mod tests {
         let mut json: serde_json::Value = serde_json::from_str(&raw).expect("valid json");
         json["timestamp"] = serde_json::Value::String("[timestamp]".into());
         json["tool_version"] = serde_json::Value::String("[version]".into());
+        let json = sort_json_keys(json);
         insta::assert_json_snapshot!(json, @r###"
         {
           "bfsg_compliance": {

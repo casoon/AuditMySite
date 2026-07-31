@@ -33,11 +33,13 @@ impl AuditCatalog {
     /// the four post-processing modules registered in A4 (Journey via
     /// `collect`, source/AI/content visibility via `derive`).
     pub fn standard() -> Self {
+        use crate::ai_transparency::AiTransparencyModule;
         use crate::ai_visibility::AiVisibilityModule;
         use crate::best_practices::BestPracticesModule;
         use crate::commerce::CommerceModule;
         use crate::content_visibility::ContentVisibilityModule;
         use crate::dark_mode::DarkModeModule;
+        use crate::design_quality::DesignQualityModule;
         use crate::journey::JourneyModule;
         use crate::mobile::MobileModule;
         use crate::performance::PerformanceModule;
@@ -53,6 +55,8 @@ impl AuditCatalog {
             .with_module(Box::new(SecurityModule))
             .with_module(Box::new(MobileModule))
             .with_module(Box::new(DarkModeModule))
+            .with_module(Box::new(DesignQualityModule))
+            .with_module(Box::new(AiTransparencyModule))
             .with_module(Box::new(TechStackModule))
             .with_module(Box::new(UxModule))
             .with_module(Box::new(BestPracticesModule))
@@ -354,6 +358,8 @@ mod tests {
             "security",
             "mobile",
             "dark_mode",
+            "design_quality",
+            "ai_transparency",
             "tech_stack",
             "ux",
             "best_practices",

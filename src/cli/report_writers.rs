@@ -12,8 +12,8 @@ use auditmysite::error::{AuditError, Result};
 #[cfg(feature = "pdf")]
 use auditmysite::output::report_model::ReportConfig;
 use auditmysite::output::{
-    export_snapshot_yaml, export_sr_audit, format_ai_json, format_batch_table, format_sarif,
-    format_summary, print_batch_table, print_report, UnifiedReport,
+    export_snapshot_yaml, export_sr_audit, format_ai_json, format_sarif, format_summary,
+    UnifiedReport,
 };
 #[cfg(feature = "pdf")]
 use auditmysite::output::{generate_batch_pdf, generate_batch_typ, generate_pdf, generate_typ};
@@ -51,13 +51,19 @@ pub fn output_single_report(
             }
         }
         OutputFormat::Table => {
-            print_report(report, args.level);
+            let output = auditmysite::output::terminal::render_single_report(report, args);
+            output_text(&output, &args.output, "Table", args.quiet)?;
         }
         OutputFormat::Pdf => {
             #[cfg(feature = "pdf")]
             {
                 if !args.quiet {
-                    print_report(report, args.level);
+                    println!(
+                        "{}",
+                        auditmysite::output::terminal::render_single_report_for(
+                            report, args, false
+                        )
+                    );
                 }
                 let normalized = normalize(report);
                 let path = args.output.clone().unwrap_or_else(|| {
@@ -179,12 +185,8 @@ pub fn output_batch_report(
             output_text(&output, &args.output, "JSON batch", args.quiet)?;
         }
         OutputFormat::Table => {
-            if let Some(path) = &args.output {
-                let output = format_batch_table(batch_report, args.level, false);
-                output_text(&output, &Some(path.clone()), "Table batch", args.quiet)?;
-            } else {
-                print_batch_table(batch_report, args.level);
-            }
+            let output = auditmysite::output::terminal::render_batch_report(batch_report, args);
+            output_text(&output, &args.output, "Table batch", args.quiet)?;
         }
         OutputFormat::Pdf => {
             #[cfg(feature = "pdf")]

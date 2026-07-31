@@ -34,9 +34,9 @@ thiserror = "1.0"
 
 # Output formatting
 colored = "2.0"
-comfy-table = "7"
-indicatif = "0.17"
 dialoguer = { version = "0.11", features = ["fuzzy-select"] }
+runemark = { version = "0.2.0", features = ["progress"] }
+console = "0.16"
 
 # URL handling
 url = "2.5"
@@ -75,6 +75,14 @@ renderreport = { version = "0.2.38", optional = true }
 # transitively via renderreport's own image handling.
 image = { version = "0.25", default-features = false, features = ["png"], optional = true }
 
+# C2PA (Content Credentials) manifest reading for the ai-transparency module.
+# default-features = false drops the crate's default `openssl` (native OpenSSL,
+# avoided in favor of the pure-Rust crypto backend) and `default_http` (pulls in
+# reqwest/ureq/wasi/wstd HTTP clients for online OCSP/trust-list/remote-manifest
+# fetching) — this module only reads manifests already embedded in fetched image
+# bytes and must stay fully offline, never phoning out on its own.
+c2pa = { version = "0.90.3", optional = true, default-features = false, features = ["rust_native_crypto"] }
+
 [dev-dependencies]
 tempfile = "3"
 jsonschema = "0.18"
@@ -97,3 +105,8 @@ pdf = ["dep:renderreport", "dep:image"]
 # Enables the heavy PDF smoke tests (Typst rendering). Run separately:
 #   cargo test --features pdf_test -- --test-threads=1
 pdf_test = ["pdf"]
+# Opt-in C2PA image-provenance check (EU AI Act Art. 50 transparency duties).
+# Not in `default` — pulls in real crypto dependencies (ed25519-dalek, p256/
+# p384, rsa) purely for a niche, legally-experimental check. Requires both this
+# build-time feature AND the runtime --ai-transparency flag to actually run.
+ai-transparency = ["dep:c2pa"]

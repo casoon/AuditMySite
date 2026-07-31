@@ -267,6 +267,12 @@ pub(super) fn build_detail(ctx: &AuditContext<'_>, detail_ctx: DetailContext) ->
         dark_mode: ctx
             .raw_dark_mode
             .map(|m| inject_grade(m.to_json(), m.score)),
+        design_quality: ctx
+            .raw_design_quality
+            .map(|m| with_measurement_type(m.to_json(), "heuristic")),
+        ai_transparency: ctx
+            .raw_ai_transparency
+            .map(|m| with_measurement_type(m.to_json(), "c2pa_manifest")),
         source_quality: ctx
             .raw_source_quality
             .map(|m| with_measurement_type(m.to_json(), "heuristic")),

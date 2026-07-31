@@ -8,7 +8,6 @@ use std::sync::Arc;
 
 use colored::Colorize;
 use dialoguer::Select;
-use indicatif::{ProgressBar, ProgressStyle};
 use tracing::info;
 
 use auditmysite::audit::normalize;
@@ -21,8 +20,8 @@ use auditmysite::audit::{
 use auditmysite::browser::{BrowserManager, BrowserOptions};
 use auditmysite::cli::{Args, OutputFormat, RequestMode};
 use auditmysite::error::{AuditError, Result};
-use auditmysite::util::truncate_url;
 
+use crate::batch_lifecycle::BatchLifecyclePresenter;
 use crate::plan::{print_batch_audit_plan, print_single_audit_plan};
 use crate::report_writers::{
     output_batch_as_single_reports, output_batch_report, output_screen_reader_sidecar,
@@ -38,10 +37,29 @@ const BOT_USER_AGENT: &str = concat!(
     " (+https://github.com/casoon/auditmysite)"
 );
 
+/// Fail loudly, before the pipeline runs, if `--ai-transparency` was passed
+/// but the binary wasn't built with the `ai-transparency` Cargo feature.
+///
+/// Without this check the flag would silently no-op: `PipelineConfig.
+/// check_ai_transparency` would still be set, but `AiTransparencyModule::
+/// collect()`'s `#[cfg(not(feature = "ai-transparency"))]` fallback just
+/// returns `ModuleData::None` — indistinguishable from "nothing found".
+/// Mirrors `report_writers.rs`'s PDF-feature error (same message shape).
+fn check_ai_transparency_feature(args: &Args) -> Result<()> {
+    if args.ai_transparency && !cfg!(feature = "ai-transparency") {
+        return Err(AuditError::ConfigError(
+            "AI transparency check requires the 'ai-transparency' feature. Rebuild with: cargo build --features ai-transparency".to_string(),
+        ));
+    }
+    Ok(())
+}
+
 pub async fn run_single_mode(
     args: &Args,
     config: &Option<auditmysite::cli::Config>,
 ) -> Result<Verdict> {
+    check_ai_transparency_feature(args)?;
+
     let url = args
         .url
         .as_ref()
@@ -325,13 +343,21 @@ pub async fn run_batch_mode(
     args: &Args,
     config: &Option<auditmysite::cli::Config>,
 ) -> Result<Verdict> {
+    check_ai_transparency_feature(args)?;
+    if args.ai_transparency && !args.quiet {
+        eprintln!(
+            "{} --ai-transparency is single-URL-only and has no effect on this batch run.",
+            "Note:".yellow().bold()
+        );
+    }
+
     let mut crawl_result: Option<CrawlResult> = None;
 
     let url_source: &str;
     let urls = if let Some(ref sitemap_url) = args.sitemap {
         url_source = "sitemap";
         if !args.quiet {
-            println!("{} {}", "Fetching sitemap:".cyan().bold(), sitemap_url);
+            eprintln!("{} {}", "Fetching sitemap:".cyan().bold(), sitemap_url);
         }
         parse_sitemap(sitemap_url).await?
     } else if args.crawl {
@@ -341,11 +367,11 @@ pub async fn run_batch_mode(
             .as_deref()
             .ok_or_else(|| AuditError::ConfigError("No crawl seed URL specified".to_string()))?;
         if !args.quiet {
-            println!("{} {}", "Crawling site:".cyan().bold(), seed_url);
+            eprintln!("{} {}", "Crawling site:".cyan().bold(), seed_url);
         }
         let crawl = crawl_site(seed_url, args.max_pages, args.crawl_depth).await?;
         if !args.quiet {
-            println!(
+            eprintln!(
                 "{} {} pages discovered at depth <= {}",
                 "Discovered:".cyan().bold(),
                 crawl.pages.len(),
@@ -358,7 +384,7 @@ pub async fn run_batch_mode(
     } else if let Some(ref url_file) = args.url_file {
         url_source = "url_file";
         if !args.quiet {
-            println!(
+            eprintln!(
                 "{} {}",
                 "Reading URL file:".cyan().bold(),
                 url_file.display()
@@ -373,7 +399,7 @@ pub async fn run_batch_mode(
 
     if urls.is_empty() {
         if !args.quiet {
-            println!("{} No URLs found to audit.", "Warning:".yellow().bold());
+            eprintln!("{} No URLs found to audit.", "Warning:".yellow().bold());
         }
         return Ok(Verdict::Warn);
     }
@@ -411,7 +437,7 @@ pub async fn run_batch_mode(
 
     if !args.quiet {
         if sample.is_sample {
-            println!(
+            eprintln!(
                 "{} auditing {} of {} discovered URLs ({} order, first {})",
                 "Sample:".yellow().bold(),
                 total_urls,
@@ -420,7 +446,7 @@ pub async fn run_batch_mode(
                 total_urls
             );
         }
-        println!(
+        eprintln!(
             "{} {} URLs with {} parallel workers\n",
             "Auditing:".cyan().bold(),
             total_urls,
@@ -431,34 +457,27 @@ pub async fn run_batch_mode(
 
     let batch_config = BatchConfig::from(args);
 
-    let progress_bar = if !args.quiet {
-        let pb = ProgressBar::new(total_urls as u64);
-        pb.set_style(
-            ProgressStyle::default_bar()
-                .template("{spinner:.green} [{elapsed_precise}] [{bar:40.cyan/blue}] {pos}/{len} ({eta}) {msg}")
-                .expect("Invalid template")
-                .progress_chars("#>-"),
-        );
-        Some(pb)
-    } else {
-        None
-    };
+    let console = runemark::Console::stderr(runemark::ColorMode::from(args.color));
+    let presenter = Arc::new(BatchLifecyclePresenter::new(
+        args.progress,
+        args.quiet,
+        console,
+        io::stderr().is_terminal(),
+    ));
+    presenter.start(total_urls, "Auditing URLs");
 
     #[allow(clippy::type_complexity)]
-    let progress: Option<Arc<dyn Fn(usize, usize, &str, Option<&str>) + Send + Sync>> =
-        if let Some(ref pb) = progress_bar {
-            let pb_clone = pb.clone();
-            Some(Arc::new(move |current, _total, url, error| {
-                pb_clone.set_position(current as u64);
+    let progress: Option<Arc<dyn Fn(usize, usize, &str, Option<&str>) + Send + Sync>> = {
+        let presenter = Arc::clone(&presenter);
+        Some(Arc::new(
+            move |current, _total, url: &str, error: Option<&str>| {
                 if let Some(err) = error {
-                    pb_clone.println(format!("  ✗ {url}\n    {err}"));
-                } else {
-                    pb_clone.set_message(truncate_url(url, 50));
+                    presenter.notice_error(url, err);
                 }
-            }))
-        } else {
-            None
-        };
+                presenter.advance(current, url);
+            },
+        ))
+    };
 
     let mut batch_report = run_concurrent_batch(urls, &batch_config, progress).await?;
     batch_report = batch_report.with_sample(sample);
@@ -466,62 +485,63 @@ pub async fn run_batch_mode(
     if url_source == "sitemap" {
         let diagnostics =
             analyze_sitemap_diagnostics(&full_sitemap_urls, &batch_report.reports).await;
-        if !args.quiet {
-            println!(
-                "{} {} URLs checked, {} sitemap issues",
-                "Sitemap check:".cyan().bold(),
-                diagnostics.checked_urls,
-                diagnostics.http_issues.len()
-                    + diagnostics.orphan_sitemap_urls.len()
-                    + diagnostics.linked_not_in_sitemap.len()
-            );
-        }
+        presenter.notice(&format!(
+            "Sitemap check: {} URLs checked, {} sitemap issues",
+            diagnostics.checked_urls,
+            diagnostics.http_issues.len()
+                + diagnostics.orphan_sitemap_urls.len()
+                + diagnostics.linked_not_in_sitemap.len()
+        ));
         batch_report = batch_report.with_sitemap_diagnostics(diagnostics);
     }
 
     if let Some(ref crawl) = crawl_result {
         let diagnostics = analyze_crawl_links(crawl).await;
-        if !args.quiet {
-            println!(
-                "{} {} internal links checked, {} broken",
-                "Link check:".cyan().bold(),
-                diagnostics.checked_internal_links,
-                diagnostics.broken_internal_links.len()
-            );
-        }
+        presenter.notice(&format!(
+            "Link check: {} internal links checked, {} broken",
+            diagnostics.checked_internal_links,
+            diagnostics.broken_internal_links.len()
+        ));
         batch_report = batch_report.with_crawl_diagnostics(diagnostics);
     }
 
-    if let Some(pb) = progress_bar {
-        pb.finish_with_message("Complete");
-    }
-
-    if !args.quiet {
-        println!(
-            "\n{} {}/{} passed, {} violations found in {}ms",
-            "Results:".green().bold(),
-            batch_report.summary.passed,
-            batch_report.summary.total_urls,
-            batch_report.summary.total_violations,
-            batch_report.total_duration_ms
-        );
-    }
+    presenter.notice(&format!(
+        "Results: {}/{} passed, {} violations found in {}ms",
+        batch_report.summary.passed,
+        batch_report.summary.total_urls,
+        batch_report.summary.total_violations,
+        batch_report.total_duration_ms
+    ));
 
     let verdict_cfg = config
         .as_ref()
         .map(|c| c.effective_verdict_config())
         .unwrap_or_default();
     let verdict_result = compute_batch_verdict(&batch_report.summary, &verdict_cfg);
+    let verdict_message = verdict_message_text(&verdict_result);
 
     if args.per_page_reports {
         output_batch_as_single_reports(&batch_report, args)?;
-        print_verdict(&verdict_result, args.quiet);
+        presenter.finish_verdict(verdict_result.verdict, &verdict_message);
         return Ok(verdict_result.verdict);
     }
 
     output_batch_report(&batch_report, args, Some(&verdict_result))?;
-    print_verdict(&verdict_result, args.quiet);
+    presenter.finish_verdict(verdict_result.verdict, &verdict_message);
     Ok(verdict_result.verdict)
+}
+
+fn verdict_message_text(vr: &auditmysite::VerdictResult) -> String {
+    let label = match vr.verdict {
+        auditmysite::Verdict::Pass => "PASS",
+        auditmysite::Verdict::Warn => "WARN",
+        auditmysite::Verdict::Fail => "FAIL",
+    };
+    if vr.reasons.is_empty() {
+        label.to_string()
+    } else {
+        format!("{label} — {}", vr.reasons.join(", "))
+    }
 }
 
 fn print_verdict(vr: &auditmysite::VerdictResult, quiet: bool) {
@@ -534,8 +554,47 @@ fn print_verdict(vr: &auditmysite::VerdictResult, quiet: bool) {
         auditmysite::Verdict::Fail => "FAIL".red().bold(),
     };
     if vr.reasons.is_empty() {
-        println!("\n{}", label);
+        eprintln!("\n{}", label);
     } else {
-        println!("\n{} — {}", label, vr.reasons.join(", ").dimmed());
+        eprintln!("\n{} — {}", label, vr.reasons.join(", ").dimmed());
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use clap::Parser;
+
+    fn args_with_ai_transparency(flag: bool) -> Args {
+        let mut args = Args::parse_from(["auditmysite", "https://example.com"]);
+        args.ai_transparency = flag;
+        args
+    }
+
+    #[test]
+    fn flag_off_never_errors() {
+        assert!(check_ai_transparency_feature(&args_with_ai_transparency(false)).is_ok());
+    }
+
+    #[test]
+    fn flag_on_matches_compiled_feature_state() {
+        let result = check_ai_transparency_feature(&args_with_ai_transparency(true));
+        if cfg!(feature = "ai-transparency") {
+            assert!(
+                result.is_ok(),
+                "feature is compiled in, flag must be accepted"
+            );
+        } else {
+            let err = result.expect_err("feature is not compiled in, flag must be rejected");
+            let msg = err.to_string();
+            assert!(
+                msg.contains("ai-transparency"),
+                "error must name the feature: {msg}"
+            );
+            assert!(
+                msg.contains("cargo build --features ai-transparency"),
+                "error must include the rebuild instruction: {msg}"
+            );
+        }
     }
 }

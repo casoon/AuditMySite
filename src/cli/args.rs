@@ -145,6 +145,14 @@ pub struct Args {
     #[arg(short = 'q', long, global = true)]
     pub quiet: bool,
 
+    /// Terminal color policy for table output and batch progress (#529)
+    #[arg(long, default_value = "auto")]
+    pub color: ColorPolicy,
+
+    /// Batch lifecycle progress policy, independent of --quiet (#530)
+    #[arg(long, default_value = "auto")]
+    pub progress: ProgressPolicy,
+
     /// Detect Chrome and print path (then exit)
     #[arg(long)]
     pub detect_chrome: bool,
@@ -178,6 +186,18 @@ pub struct Args {
     /// Skip mobile analysis even when --full is used
     #[arg(long)]
     pub skip_mobile: bool,
+
+    /// Enable the design-quality module (opt-in UX/readability heuristics;
+    /// does not affect score, grade, or certificate). Not part of --full yet.
+    #[arg(long)]
+    pub design_quality: bool,
+
+    /// Enable the C2PA image-provenance check (EU AI Act Art. 50
+    /// transparency duties; opt-in, single-URL mode only, score-neutral).
+    /// Requires the binary to be built with `--features ai-transparency`;
+    /// otherwise the audit fails with a rebuild instruction before starting.
+    #[arg(long)]
+    pub ai_transparency: bool,
 
     /// Attempt to dismiss cookie consent banners before auditing.
     ///
@@ -473,6 +493,36 @@ impl std::fmt::Display for ReportLevel {
     }
 }
 
+/// Terminal color policy for `--format table` and batch progress output (#529).
+#[derive(Debug, Clone, Copy, PartialEq, Eq, ValueEnum, Default)]
+pub enum ColorPolicy {
+    /// Color only for an interactive terminal, honouring `NO_COLOR` (default)
+    #[default]
+    #[value(name = "auto")]
+    Auto,
+    /// Always emit ANSI color
+    #[value(name = "always")]
+    Always,
+    /// Never emit ANSI color
+    #[value(name = "never")]
+    Never,
+}
+
+/// Batch lifecycle progress policy, independent of `--quiet` (#530).
+#[derive(Debug, Clone, Copy, PartialEq, Eq, ValueEnum, Default)]
+pub enum ProgressPolicy {
+    /// Interactive bar for a terminal, bounded lifecycle lines otherwise (default)
+    #[default]
+    #[value(name = "auto")]
+    Auto,
+    /// Force the interactive bar even when not a terminal
+    #[value(name = "always")]
+    Always,
+    /// No progress/lifecycle output at all
+    #[value(name = "never")]
+    Never,
+}
+
 /// How the browser should identify itself when making requests
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default, ValueEnum, Serialize, Deserialize)]
 #[serde(rename_all = "lowercase")]
@@ -696,6 +746,8 @@ mod tests {
             disable_images: false,
             verbose: false,
             quiet: false,
+            color: ColorPolicy::Auto,
+            progress: ProgressPolicy::Auto,
             detect_chrome: false,
             full: false,
             performance: false,
@@ -704,6 +756,8 @@ mod tests {
             security: false,
             mobile: false,
             skip_mobile: false,
+            design_quality: false,
+            ai_transparency: false,
             stack: false,
             reuse_cache: false,
             force_refresh: false,

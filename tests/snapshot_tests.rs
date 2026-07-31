@@ -23,6 +23,30 @@ use auditmysite::AXTree;
 
 // ─── Shared Fixtures ────────────────────────────────────────────────────────
 
+/// Recursively sorts object keys so these snapshot assertions are stable
+/// regardless of `serde_json`'s `preserve_order` feature — which the optional
+/// `ai-transparency` feature's `c2pa` dependency unconditionally enables
+/// (hardcoded in its own `Cargo.toml`, not one of its own optional features),
+/// changing `serde_json::Value::Object`'s backing map from a sorted
+/// `BTreeMap` to an insertion-order `IndexMap` for the *whole* binary via
+/// Cargo feature unification — not just the module that needs it.
+fn sort_json_keys(value: serde_json::Value) -> serde_json::Value {
+    match value {
+        serde_json::Value::Object(map) => {
+            let mut entries: Vec<(String, serde_json::Value)> = map
+                .into_iter()
+                .map(|(k, v)| (k, sort_json_keys(v)))
+                .collect();
+            entries.sort_by(|a, b| a.0.cmp(&b.0));
+            serde_json::Value::Object(entries.into_iter().collect())
+        }
+        serde_json::Value::Array(arr) => {
+            serde_json::Value::Array(arr.into_iter().map(sort_json_keys).collect())
+        }
+        other => other,
+    }
+}
+
 fn make_violations() -> WcagResults {
     let mut results = WcagResults::new();
     results.passes = 50;
@@ -169,7 +193,7 @@ fn snapshot_normalized_report_fields() {
         "finding_rule_ids": finding_ids,
     });
 
-    insta::assert_json_snapshot!("normalized_report_fields", value);
+    insta::assert_json_snapshot!("normalized_report_fields", sort_json_keys(value));
 }
 
 // ─── Snapshot B: ReportViewModel key fields ─────────────────────────────────
@@ -237,7 +261,7 @@ fn snapshot_view_model_fields() {
         "total_action_items": total_action_items,
     });
 
-    insta::assert_json_snapshot!("view_model_fields", value);
+    insta::assert_json_snapshot!("view_model_fields", sort_json_keys(value));
 }
 
 // ─── Snapshot C: BatchPresentation key fields ────────────────────────────────
@@ -272,5 +296,5 @@ fn snapshot_batch_presentation_fields() {
         "url_ranking_count": pres.url_ranking.len(),
     });
 
-    insta::assert_json_snapshot!("batch_presentation_fields", value);
+    insta::assert_json_snapshot!("batch_presentation_fields", sort_json_keys(value));
 }
