@@ -278,6 +278,14 @@ pub struct PipelineConfig {
     pub check_ai_transparency: bool,
     /// Run tech stack detection and stack-specific audits
     pub check_stack: bool,
+    /// `[rules] disabled`/`enabled_only` from `auditmysite.toml`, by axe_id.
+    /// Consulted by `check_all_with_config` for tree-based rules and, inline,
+    /// by contrast (`color-contrast`) and reflow (`css-overflow-hidden`,
+    /// matching the user-visible finding id rather than the `"reflow"`
+    /// logging-only label — #560). Table-driven `PAGE_RULES` entries are not
+    /// yet covered (their `rule_id` is logging-only; a single check_fn can
+    /// emit more than one real axe_id).
+    pub rule_filter: crate::wcag::RuleFilterConfig,
     /// Persist audit artifacts under ~/.auditmysite/cache
     pub persist_artifacts: bool,
     /// Capture desktop + mobile screenshots for PDF cover page
@@ -328,10 +336,15 @@ impl PipelineConfig {
         // 8 for commerce conversion signals, 9 for structured-data rule and
         // page-fit assessments, 10 for the report quality model, 11 for
         // page-stability provenance, 12 for the design_quality module field,
-        // 13 for the ai_transparency module field.
-        const CACHE_FMT: u8 = 13;
+        // 13 for the ai_transparency module field, 14 for rule_filter (#560
+        // — disabled/enabled_only now actually change which findings run).
+        const CACHE_FMT: u8 = 14;
+        let mut disabled = self.rule_filter.disabled_rules.clone();
+        disabled.sort();
+        let mut enabled_only = self.rule_filter.enabled_only_rules.clone();
+        enabled_only.sort();
         format!(
-            "v={};fmt={};level={};perf={};seo={};sec={};mobile={};dark={};design_quality={};ai_transparency={};stack={};consent={};interactive={:?};journey_budget_ms={};lang={}",
+            "v={};fmt={};level={};perf={};seo={};sec={};mobile={};dark={};design_quality={};ai_transparency={};stack={};consent={};interactive={:?};journey_budget_ms={};lang={};disabled={};enabled_only={}",
             env!("CARGO_PKG_VERSION"),
             CACHE_FMT,
             self.wcag_level,
@@ -347,6 +360,8 @@ impl PipelineConfig {
             self.interactive,
             self.journey_budget_ms,
             self.lang,
+            disabled.join(","),
+            enabled_only.join(","),
         )
     }
 }
@@ -391,6 +406,14 @@ impl PipelineConfig {
         let journey_budget_ms = toml_cfg
             .and_then(|c| c.interactive.journey_budget_ms)
             .unwrap_or(crate::a11y_journey::DEFAULT_BUDGET_MS);
+        let rule_filter = crate::wcag::RuleFilterConfig {
+            disabled_rules: toml_cfg
+                .map(|c| c.rules.disabled.clone())
+                .unwrap_or_default(),
+            enabled_only_rules: toml_cfg
+                .map(|c| c.rules.enabled_only.clone())
+                .unwrap_or_default(),
+        };
         Self {
             wcag_level: args.level,
             timeout_secs: args.effective_timeout(),
@@ -410,6 +433,7 @@ impl PipelineConfig {
             // detail is only ever `fix_guidance`/`en301549_annex`).
             check_ai_transparency: args.ai_transparency && args.url.is_some(),
             check_stack: full_audit || args.stack,
+            rule_filter,
             persist_artifacts: true,
             capture_screenshots: args.url.is_some()
                 && matches!(args.format, None | Some(crate::cli::OutputFormat::Pdf)),
@@ -668,8 +692,14 @@ pub async fn audit_page(
     )
     .await;
 
-    // 1.4.10 Reflow — temporarily sets viewport to 320×256, then restores mobile
-    if matches!(config.wcag_level, WcagLevel::AA | WcagLevel::AAA) {
+    // 1.4.10 Reflow — temporarily sets viewport to 320×256, then restores mobile.
+    // Filtered by the finding's own axe_id ("css-overflow-hidden", REFLOW_RULE.axe_id)
+    // rather than the "reflow" logging-only label used for RuleOutcome below, since
+    // that's the id `[rules] disabled`/`enabled_only` in auditmysite.toml is
+    // documented against and the one users actually see on the finding (#560).
+    if matches!(config.wcag_level, WcagLevel::AA | WcagLevel::AAA)
+        && config.rule_filter.should_run("css-overflow-hidden")
+    {
         info!("Running reflow check at 320 CSS px...");
         let raw_reflow_findings = wcag::check_reflow_with_page(page).await;
         let (reflow_outcome, reflow_findings) =
@@ -1257,7 +1287,8 @@ async fn run_rules(
     evidence_budget: &mut crate::accessibility::ElementEvidenceBudget,
 ) -> WcagResults {
     debug!("Running WCAG checks at level {}...", config.wcag_level);
-    let mut wcag_results = wcag::check_all(&snapshot.ax_tree, config.wcag_level);
+    let mut wcag_results =
+        wcag::check_all_with_config(&snapshot.ax_tree, config.wcag_level, &config.rule_filter);
     for outcome in &mut wcag_results.rule_outcomes {
         outcome.viewport = Some(viewport_label.to_string());
     }
@@ -1266,7 +1297,9 @@ async fn run_rules(
     wcag_results.rule_outcomes.push(lang_outcome);
 
     // Contrast carries extra args (ax tree, level, screenshot) and stays inline.
-    if matches!(config.wcag_level, WcagLevel::AA | WcagLevel::AAA) {
+    if matches!(config.wcag_level, WcagLevel::AA | WcagLevel::AAA)
+        && config.rule_filter.should_run("color-contrast")
+    {
         info!("Running contrast check with CDP...");
         let contrast_violations = wcag::rules::ContrastRule::check_with_page(
             page,
@@ -2187,6 +2220,7 @@ mod tests {
             check_design_quality: false,
             check_ai_transparency: false,
             check_stack: false,
+            rule_filter: crate::wcag::RuleFilterConfig::default(),
             persist_artifacts: true,
             capture_screenshots: false,
             capture_element_evidence: false,
@@ -2227,6 +2261,41 @@ mod tests {
         let mut other = test_pipeline_config();
         other.lang = "en".to_string();
         assert_ne!(base_sig, other.audit_signature());
+
+        // Disabling a rule changes which findings can appear (#560).
+        let mut other = test_pipeline_config();
+        other.rule_filter.disabled_rules = vec!["color-contrast".to_string()];
+        assert_ne!(base_sig, other.audit_signature());
+    }
+
+    #[test]
+    fn from_args_and_config_threads_rule_filter_from_toml_config() {
+        let args = Args::parse_from(["auditmysite", "https://example.com"]);
+        let toml_cfg = crate::cli::config::Config {
+            rules: crate::cli::config::RulesConfig {
+                disabled: vec![
+                    "color-contrast".to_string(),
+                    "css-overflow-hidden".to_string(),
+                ],
+                enabled_only: vec![],
+                ..Default::default()
+            },
+            ..Default::default()
+        };
+        let config = PipelineConfig::from_args_and_config(&args, Some(&toml_cfg));
+
+        assert!(!config.rule_filter.should_run("color-contrast"));
+        assert!(!config.rule_filter.should_run("css-overflow-hidden"));
+        assert!(config.rule_filter.should_run("image-alt"));
+    }
+
+    #[test]
+    fn from_args_and_config_defaults_rule_filter_to_allow_all_without_toml_config() {
+        let args = Args::parse_from(["auditmysite", "https://example.com"]);
+        let config = PipelineConfig::from_args_and_config(&args, None);
+
+        assert!(config.rule_filter.should_run("color-contrast"));
+        assert!(config.rule_filter.should_run("css-overflow-hidden"));
     }
 
     #[test]
