@@ -3,7 +3,9 @@
 //! Analyzes HTTP security headers and SSL/TLS configuration.
 
 pub mod module;
+mod sourcemap;
 pub use module::SecurityModule;
+pub use sourcemap::{audit_source_maps, SourceMapLeak, SourceMapLeakAudit};
 
 use reqwest::header::HeaderMap;
 use serde::{Deserialize, Serialize};
@@ -48,6 +50,9 @@ pub struct SecurityAnalysis {
     pub recommendations: Vec<String>,
     /// Detected CDN/WAF/hosting protection
     pub protection: ProtectionDetection,
+    /// Publicly reachable source maps for loaded scripts/stylesheets (#538)
+    #[serde(default)]
+    pub sourcemap_leaks: SourceMapLeakAudit,
 }
 
 /// Security headers status
@@ -221,7 +226,23 @@ pub async fn analyze_security(url: &str) -> Result<SecurityAnalysis> {
     let ssl = analyze_ssl(https, &headers);
 
     // Generate issues
-    let issues = generate_security_issues(&headers, https);
+    let mut issues = generate_security_issues(&headers, https);
+
+    // Public source-map leak check (#538)
+    let sourcemap_leaks = audit_source_maps(url).await;
+    if !sourcemap_leaks.leaks.is_empty() {
+        issues.push(SecurityIssue {
+            header: "Source Map".to_string(),
+            issue_type: "public_source_map".to_string(),
+            message: format!(
+                "{} publicly reachable source map{} found (e.g. {}) — exposes original source, comments, and internal file paths",
+                sourcemap_leaks.leaks.len(),
+                if sourcemap_leaks.leaks.len() == 1 { "" } else { "s" },
+                sourcemap_leaks.leaks[0].map_url
+            ),
+            severity: Severity::High,
+        });
+    }
 
     // Generate recommendations
     let recommendations = generate_recommendations(&headers, https);
@@ -250,6 +271,7 @@ pub async fn analyze_security(url: &str) -> Result<SecurityAnalysis> {
         issues,
         recommendations,
         protection,
+        sourcemap_leaks,
     })
 }
 

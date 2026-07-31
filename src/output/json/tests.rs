@@ -431,6 +431,7 @@ fn test_modules_under_page_detail() {
         issues: vec![],
         recommendations: vec![],
         protection: Default::default(),
+        sourcemap_leaks: Default::default(),
     })
     .with_ux(crate::ux::analyze_ux(&crate::AXTree::new()))
     .with_journey(crate::journey::analyze_journey(&crate::AXTree::new()));
@@ -505,6 +506,7 @@ fn all_active_modules_report() -> AuditReport {
         issues: vec![],
         recommendations: vec![],
         protection: Default::default(),
+        sourcemap_leaks: Default::default(),
     })
     .with_mobile(MobileFriendliness {
         score: 75,

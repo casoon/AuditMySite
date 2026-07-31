@@ -4035,6 +4035,7 @@ mod tests {
             ssl: SslInfo::default(),
             issues: vec![],
             protection: Default::default(),
+            sourcemap_leaks: Default::default(),
             recommendations: vec![],
         });
         report.best_practices = Some(BestPracticesAnalysis {

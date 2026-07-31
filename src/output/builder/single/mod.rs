@@ -778,7 +778,7 @@ mod tests {
             ssl: Default::default(),
             issues: vec![],
             recommendations: vec![],
-            protection: Default::default(),
+            protection: Default::default(),            sourcemap_leaks: Default::default(),
         })
         .with_mobile(MobileFriendliness {
             score: 75,

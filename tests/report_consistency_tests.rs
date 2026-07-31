@@ -108,6 +108,7 @@ fn make_security() -> SecurityAnalysis {
         issues: vec![],
         recommendations: vec![],
         protection: Default::default(),
+        sourcemap_leaks: Default::default(),
     }
 }
 
