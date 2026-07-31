@@ -4,7 +4,6 @@
 
 pub mod ai;
 pub mod builder;
-mod cli;
 pub mod explanations;
 mod json;
 #[cfg(feature = "pdf")]
@@ -19,9 +18,9 @@ pub mod search_experience;
 pub mod snapshot_export;
 pub mod sr_audit_json;
 pub mod summary;
+pub mod terminal;
 
 pub use ai::format_ai_json;
-pub use cli::{format_batch_table, format_violations_list, print_batch_table, print_report};
 pub use json::{format_json_batch, format_json_cached, format_json_normalized, UnifiedReport};
 #[cfg(feature = "pdf")]
 pub use pdf::{generate_batch_pdf, generate_batch_typ, generate_pdf, generate_typ};
