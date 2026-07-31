@@ -51,6 +51,8 @@ src/
 ├── security/            # Security header analysis
 ├── mobile/              # Mobile friendliness analysis
 ├── dark_mode/           # Dark mode support detection and contrast
+├── design_quality/      # Opt-in UX/readability heuristics (overflow-clip, line length/height, all-caps, layout transitions) — score-neutral (#528)
+├── ai_transparency/     # Opt-in C2PA image-provenance check (EU AI Act Art. 50), single-URL only, score-neutral; requires `ai-transparency` Cargo feature
 ├── ux/                  # UX analysis (5 dimensions, saturation curves)
 ├── journey/             # User journey analysis, page intent detection
 ├── screen_reader/       # Screen-reader reading-order primitives
@@ -244,6 +246,186 @@ Bewusste, über alle Phasen hinweg getroffene Entscheidung statt einer nachträg
   Differenzprüfungen** statt gespeicherter Pixel-Baselines erkannt, siehe Phase-5-Eintrag unten.
 
 ## Current State (v1.1.0)
+- **Neues `ai_transparency`-Modul: C2PA-Bildherkunfts-Check (EU AI Act Art. 50), 2026-07-31:**
+  neues, **opt-in** (`--ai-transparency`) und **score-neutrales** Modul, das eingebettete C2PA-
+  ("Content Credentials"-)Manifeste auf `<img>`-Elementen der geprüften Seite liest und —
+  falls das Manifest eine KI-/algorithmische Erzeugung ausweist (IPTC `digitalSourceType`
+  `trainedAlgorithmicMedia`/`compositeWithTrainedAlgorithmicMedia`/`compositeSynthetic`/
+  `virtualRecording`/`trainedAlgorithmicData`) — einen Manual-Review-Advisory-Fund erzeugt.
+  Bewusst **nur Presence melden**, kein Versuch, eine sichtbare Kennzeichnung in Bild-Nähe
+  automatisch zu erkennen (gleiches Fragilitäts-Problem wie Chat-Widget-Disclosure-Detection,
+  daher aus dem Scope genommen), und bewusst **kein EXIF-Software-Tag-Fallback** (C2PA ist der
+  vom AI Act referenzierte Standard-Mechanismus, EXIF wäre eine zweite, unsichere
+  Erkennungslogik). **Nur Single-URL-Modus** (`PipelineConfig.check_ai_transparency =
+  args.ai_transparency && args.url.is_some()`, exaktes Muster wie `capture_element_evidence`):
+  ein Batch-Lauf würde pro Bild einen Netzwerk-Fetch + C2PA-Parse machen, nur damit
+  `build_batch_detail()` den gesamten Modul-Blob pro Seite ohnehin verwirft (#256).
+  **Doppeltes Opt-in:** neues Cargo-Feature `ai-transparency` (`c2pa = "0.90.3"`,
+  `default-features = false, features = ["rust_native_crypto"]` — kein natives OpenSSL, keine
+  HTTP-Client-Features, damit der Reader strukturell nie selbst nachlädt/telefoniert), nicht Teil
+  von `default` (Precedent: `pdf`-Feature) — **plus** der Laufzeit-Flag. Fehlt das Feature beim
+  Build, aber ist der Flag gesetzt, bricht `src/cli/runners.rs`s `check_ai_transparency_feature`
+  vor Pipeline-Start laut mit `ConfigError` ab (Rebuild-Hinweis) statt still No-op zu bleiben.
+  **SSRF-Härtung** (erster Fetch dieses Codebase auf fremde, potenziell durch die geprüfte Seite
+  kontrollierte Origins — anders als `seo::robots`/`security` mit reinem Same-Origin-Fetch):
+  eigene DNS-Auflösung + IP-Range-Check (privat/loopback/link-local/multicast/IPv4-mapped-IPv6,
+  explizite Range-Checks statt neuerer, ggf. noch nicht überall stabiler `Ipv6Addr`-Methoden) VOR
+  jedem Fetch, plus `reqwest::ClientBuilder::resolve()` pinnt die Verbindung auf exakt die
+  geprüfte IP (verhindert einen zweiten, nicht erneut geprüften DNS-Lookup beim eigentlichen
+  Connect — DNS-Rebinding-TOCTOU). Manifest-Auswertung nutzt die **typisierte** `c2pa`-API
+  (`Manifest::find_assertion::<Actions>(labels::ACTIONS)` → `Action::source_type()`/
+  `.software_agent()`, `Reader::validation_state()`), kein Blind-JSON-String-Walk — robuster
+  gegen Schema-Drift und Fließtext-False-Positives. Lokalisierung folgt dem etablierten
+  kind-Enum-Muster (#406): `finding_message_text(rule_id, en)` einzige Textquelle. Neue lokale
+  Enums `AiProvenanceKind`/`ManifestValidation` spiegeln `c2pa::DigitalSourceType`/
+  `ValidationState`, damit `src/ai_transparency/mod.rs` (Typen, JSON/PDF-Anbindung) **ohne** das
+  Cargo-Feature kompiliert — nur `image_provenance.rs` (der eigentliche Fetch+Parse) ist
+  `#[cfg(feature = "ai-transparency")]`-gated; Modul-Registrierung in `AuditCatalog`, `ModuleData`-
+  Variante, `ExperienceSection.ai_transparency`, `ModuleBlob`/PDF-Dispatch bleiben unconditional
+  (kleinerer Diff als ursprünglich geplant, keine `#[cfg]`-Streuung über Catalog/Report/Output).
+  Test-Fixtures für den C2PA-Parser sind **synthetisch selbst erzeugt** zur Testzeit
+  (`c2pa::Builder` + `EphemeralSigner`, in ein hartcodiertes 1×1-PNG signiert) statt aus den
+  öffentlichen C2PA-Testdateien (`c2pa-org/public-testfiles`, CC-BY-SA-4.0) vendored — die
+  enthalten keine eindeutig als KI-generiert gekennzeichneten Samples (nur Adobe-Editing-
+  Konformitätstests von 2022), und eine synthetische Fixture vermeidet jede Lizenz-/
+  Attributions-Frage. **Realer, dabei entdeckter Nebeneffekt:** `c2pa` aktiviert unconditional
+  (fest in dessen eigener `Cargo.toml`, nicht hinter einem seiner optionalen Features)
+  `serde_json`s `preserve_order`-Feature — durch Cargo-Feature-Unification ändert das
+  `serde_json::Value::Object`s Backing-Map **projektweit** von sortiertem `BTreeMap` auf
+  insertion-order `IndexMap`, sobald `ai-transparency` mitgebaut wird, unabhängig davon ob der
+  Laufzeit-Flag je gesetzt wird. Betraf 4 bestehende Snapshot-Tests (`src/output/sr_audit_json.rs`,
+  3× `tests/snapshot_tests.rs`), die stillschweigend alphabetische Schlüssel-Reihenfolge
+  voraussetzten — behoben mit einer kleinen `sort_json_keys`-Normalisierungsfunktion vor dem
+  jeweiligen `assert_json_snapshot!`, nicht durch Snapshot-Neuaufnahme (die Reihenfolge muss
+  unabhängig vom Feature-Set stabil bleiben). Vollständig grün verifiziert:
+  `cargo test --all-features --lib` (1157 passed), `cargo clippy --all-features -- -D warnings`
+  auf lib+bins+den beiden betroffenen Test-Targets (ein separates, bereits vor dieser Session
+  bestehendes Dead-Code-Problem in `tests/wcag_rule_id_inventory.rs`/`tests/common/` — unfertige,
+  uncommittete Arbeit an anderer Stelle — via `git stash` als vorbestehend verifiziert, nicht
+  Teil dieser Änderung). Batch-Report-Rollup (analog `template_clusters`) bewusst **nicht** Teil
+  dieser Änderung — separates Folge-Issue.
+- **Kanonische WCAG-Regel-ID-Inventur, 2026-07-31 (#552, tracking #559):** schließt eine
+  vorher falsche Annahme — `src/taxonomy/rules.rs`s `RULES` (117 Einträge, 85
+  `Dimension::Accessibility`) wurde fälschlich als vollständige Liste aller Regeln behandelt.
+  Tatsächlich ist `RULES` eine kuratierte Scoring-/Report-Klassifikationstabelle, kein
+  Laufzeit-Register; `PAGE_RULES`s `rule_id` (`page_rules.rs`) ist laut eigenem Doc-Kommentar
+  "used for logging only", `run_if_allowed!`s axe_id (`engine.rs`) ist nur `RuleOutcome`-
+  Telemetrie. Der tatsächliche Mechanismus hinter `Violation.rule_id`: eine `RuleMetadata`-
+  Konstante pro Regeldatei. Neuer, browser-freier Test `tests/wcag_rule_id_inventory.rs`
+  scannt `src/wcag/rules/*.rs` (RuleMetadata-Literale + die bare `*_AXE_ID`-Konstanten in
+  `aria_roles.rs`/`widget_rules.rs`) und `src/patterns/*.rs` (literale `.with_rule_id("...")`-
+  Aufrufe in den Pattern-Detection-Modulen Accordion/Modal/TabList/DisclosureMenu, die ganz
+  ohne `RuleMetadata` auskommen) — **reale, verifizierte Zahl: 116 distinkte `rule_id`s**,
+  nicht 117/85. Empirisch gegen einen vollen `--full --level aaa`-Lauf (casoon.de) abgeglichen;
+  zwei reale, vorher unbemerkte Diskrepanzen dabei gefunden: (1) `NormalizedFinding.rule_id`
+  führt einen zweiten, parallelen ID-Namensraum (`a11y.*`, aus `taxonomy::rules::RULES`) neben
+  dem hier inventarisierten axe_id-Namensraum — beide sind für dieselbe Regel im JSON
+  gleichzeitig sichtbar, je nach Report-Stelle; kein Bug, aber wichtig für zukünftige
+  Regel-Vergleiche (welchen Namensraum meint man?). (2) Reflow trägt zwei abweichende IDs für
+  dieselbe Prüfung — `RuleOutcome.rule_id = "reflow"` (Telemetrie-Label in `pipeline.rs`) vs.
+  `Violation.rule_id = "css-overflow-hidden"` (`REFLOW_RULE.axe_id`, tatsächliches Finding).
+  Dabei zusätzlich entdeckt und als eigenes Bug-Issue #560 angelegt (bewusst nicht in #552
+  mitgefixt, unabhängiges Problem): Kontrast (`1.4.3`) und Reflow (`1.4.10`) laufen beide
+  direkt inline in `pipeline.rs`s `run_rules`, ohne je `RuleFilterConfig.should_run(...)` zu
+  prüfen — `[rules] disabled`/`enabled_only` in `auditmysite.toml` (dokumentiertes Feature,
+  `src/cli/config.rs:75`) hat für diese zwei Regeln aktuell keine Wirkung. Diese Inventur ist
+  die Grundlage für den geplanten Ground-Truth-Detection-Corpus (#553–#558, siehe
+  `plans/contrast-a11y-detection-testbed.md`), nicht `RULES`.
+- **Detection-Corpus-Format + Completeness-Check, 2026-07-31 (#553, #554, tracking #559):**
+  baut auf der Regel-Inventur (#552) auf. Neues, browser-freies `tests/common/` (geteilter
+  Test-Support, nicht selbst ein Testbinary — Standard-Rust-Idiom): `rule_inventory.rs` (die
+  #552-Scan-Logik, jetzt wiederverwendbar) und `detection_corpus.rs` (`ExpectedCase`/
+  `Expectation`/`Verdict`-Typen + Loader für `tests/fixtures/detection_corpus/<case>.expected.json`
+  und `structurally_deferred.json` — beide Loader liefern eine leere Liste statt zu fehlern, wenn
+  Verzeichnis/Datei noch nicht existiert, da der Corpus bewusst leer startet und erst #556 ihn
+  befüllt). `tests/detection_corpus_format_test.rs` (7 Tests, Parsing/Loader gegen ein Tempdir,
+  kein echtes Fixture nötig — vermeidet unverifizierte Ground-Truth-Werte vor #556).
+  `tests/detection_corpus_completeness.rs` diffed die 116 Regel-IDs gegen die im Corpus
+  referenzierten IDs + `structurally_deferred.json`, meldet covered/deferred/gap **ohne bei
+  niedriger Abdeckung zu scheitern** (Startzustand aktuell: 0/0/116 — erwarteter Rückstand,
+  kein Regressions-Fehlschlag), schlägt aber hart fehl bei einem echten Autoren-Fehler
+  (referenzierte `rule_id` existiert gar nicht in der Inventur, oder eine Regel ist gleichzeitig
+  abgedeckt und als `structurally_deferred` markiert).
+- **Runemark-Terminalpräsentation + Batch-Progress-Adapter, 2026-07-30 (#529, #530):**
+  #529 ersetzt den bisherigen `colored`/`comfy-table`-Renderer (`src/output/cli.rs`, gelöscht)
+  für `--format table` durch eine dünne Präsentationsschicht auf `runemark` (eigenes,
+  auf crates.io veröffentlichtes Schwester-Crate wie `renderreport`; **Version live gegen
+  crates.io geprüft**: 0.2.0 ist die aktuell veröffentlichte Version, nicht geraten). Neues
+  `src/output/terminal.rs` mappt die bereits existierende, von JSON/PDF geteilte
+  Präsentationsschicht (`ReportViewModel`/`BatchPresentation` — bewusst wiederverwendet statt
+  neu gebaut, beide sind **nicht** hinter `feature = "pdf"` gegated, also für `--format table`
+  in jeder Feature-Kombination verfügbar) auf `runemark::report::Report` (`Console`,
+  `Verdict`, `Metric`, `FindingGroup`, `NextStep`, `RenderOptions`). Neuer `--color
+  {auto,always,never}`-Flag (`ColorPolicy`); Terminalbreite via `console::Term::stdout()`
+  (bereits transitive Dependency von `dialoguer`, jetzt direkt). `console_for()` erzwingt
+  `Never`, wenn das Ergebnis in eine Datei geschrieben wird (`--output`), außer bei
+  explizitem `--color always` — verhindert ANSI-Bytes in gespeicherten Report-Dateien.
+  `comfy-table` komplett entfernt (0 verbleibende Referenzen); `colored` bleibt, da an vielen
+  anderen CLI-Stellen (Banner, doctor, sitemap-suggest) weiter genutzt — bewusst nicht im
+  Scope dieses Issues, das Issue verlangt nur "remove only once nothing requires it".
+  #530 ersetzt die direkte `indicatif::ProgressBar`-Nutzung in `run_batch_mode`
+  (`src/cli/runners.rs`) durch `BatchLifecyclePresenter` (neu, `src/cli/batch_lifecycle.rs`),
+  einen dünnen Adapter über `runemark::ProgressSink` (`TerminalProgress`/`SilentProgress`,
+  `progress`-Feature von runemark, zieht `indicatif` jetzt transitiv statt direkt — eigene
+  `indicatif`-Dependency entfernt). Neuer `--progress {auto,always,never}`-Flag
+  (`ProgressPolicy`), unabhängig von `--quiet` (das weiterhin vollständig unterdrückt).
+  `run_concurrent_batch`s Signatur/Concurrency-Algorithmus **unverändert** — nur der
+  Callback-Body in `runners.rs` ruft jetzt `presenter.advance/notice_error` statt direkt
+  die Progress-Bar zu berühren. **Realer, dabei entdeckter Bug behoben**: Banner-/Plan-/
+  Diagnose-/Ergebnis-/Verdict-Zeilen in `src/cli/plan.rs` und `run_batch_mode` waren
+  durchgehend `println!` (stdout), nur von `--quiet` gegated, nicht vom Output-Format — ein
+  Batch-Lauf mit `--format json` ohne `--output`/`--quiet` mischte Klartext in den
+  JSON-Payload auf stdout. Mechanischer Fix: alle diese Zeilen jetzt `eprintln!` (stderr)
+  bzw. laufen für die eigentliche Batch-Lifecycle (Sitemap-/Crawl-Diagnose-Einzeiler,
+  Results-Zeile, finaler Verdict) durch `presenter.notice()`/`presenter.finish_verdict()`.
+  `print_verdict()` (auch von Single-Mode genutzt) bleibt als eigenständige Funktion
+  bestehen, aber jetzt `eprintln!`-basiert — behebt dieselbe Bug-Klasse auch für
+  Single-Mode-JSON-Läufe. **Zweiter, von der ersten Live-Verifikation aufgedeckter Leck
+  gefunden und gefixt:** der globale `tracing_subscriber::fmt()` in `src/main.rs` hatte
+  keinen expliziten `.with_writer(...)` und schrieb dadurch (tracing-subscribers eigener
+  Default) selbst auf **stdout** — ein `tracing::warn!` während eines Batch-Laufs (z. B. ein
+  Page-Timeout in `src/audit/batch.rs:164`) landete dadurch weiterhin, ANSI-gefärbt, vor dem
+  JSON-Payload auf stdout und brach `jq`. Jetzt `.with_writer(std::io::stderr)` +
+  `.with_ansi(...)`, Letzteres an dieselbe `--color`-Policy gekoppelt (nicht an
+  tracing-subscribers eigene, unabhängige Auto-Erkennung). Nach diesem Fix erneut live
+  verifiziert (Timeout-Fall gezielt reproduziert): stdout bei `--format json` bleibt bei
+  einem Batch-Lauf ohne `--quiet` jetzt auch bei einem Page-Timeout sauberes, von `jq`
+  valide geparstes JSON; `--progress never --quiet` erzeugt exakt 0 Byte auf stderr;
+  `--color always` erzwingt ANSI auf stderr; `report-lint` auf dem Ergebnis-JSON liefert
+  keine Findings.
+- **Contrast pixel-sampling coverage + neues `design_quality`-Modul, 2026-07-30 (#527, #528):**
+  #527 behebt eine reale Lücke bei WCAG 1.4.3: `build_sample_tasks` (`src/wcag/rules/contrast.rs`)
+  sampelte bisher nur, wenn der Hintergrund unsicher WAR **und** das CSS-Ratio bereits durchfiel —
+  ein Element mit optisch plausiblen CSS-Farben, dessen gerendertes Ergebnis durch Opacity-Stack,
+  Blend-Mode oder ein echtes `<img>` hinter dem Text reduziert wird, wurde nie gesampelt und blieb
+  komplett unsichtbar (live an casoon.de bestätigt: `finding_count: 0` trotz sichtbar fehlschlagendem
+  Hero-Bereich). Fix: die Sampling-Bedingung sampelt jetzt bei jedem unsicheren Hintergrund
+  unabhängig vom CSS-Ratio (mit `MAX_SAMPLE_TASKS = 60`-Deckel, größte Fläche zuerst);
+  `styles.rs`s Ancestor-Walk erkennt „unsicher" jetzt zusätzlich bei `opacity < 1`,
+  `mix-blend-mode`/`background-blend-mode` und einem überlappenden `<img>`/positionierten
+  Overlay-Geschwister (begrenzt auf die ersten 3 Ancestor-Ebenen). Ein dabei gefundener echter
+  Duplicate-Finding-Bug wurde mitgefixt: dieselbe Selector/Regel-Kombination konnte durch
+  unterschiedliche Sampling-Ergebnisse zwischen Desktop- und Mobile-Pass gleichzeitig als
+  bestätigter Violation UND als NeedsReview-Warning auftauchen — `merge_wcag_violations`
+  (`src/audit/pipeline.rs`) unterdrückt jetzt Warnings für jede Selector/Regel-Kombination, die
+  bereits als Violation vorliegt. Neue Fixture `tests/fixtures/opacity_overlay_contrast.html` +
+  `test_opacity_overlay_contrast_pixel_sampling`.
+  #528 fügt `design_quality` als neues, **opt-in** (`--design-quality`, bewusst noch nicht Teil von
+  `--full`) und **score-neutrales** Modul hinzu: heuristische UX-/Lesbarkeits-Hinweise (Overflow-Clip
+  bei positionierten/interaktiven Elementen, Zeilenlänge, Zeilenabstand, langer Großbuchstaben-Text,
+  layoutwirksame CSS-Transitions) aus der bereits offenen CDP-Seite, ein einziger `page.evaluate()`-
+  Durchlauf für alle Textregeln. Eigener `DesignQualityFinding`-Typ (nicht `wcag::types::Violation`)
+  garantiert Score-Neutralität durch Konstruktion — es gibt nie einen `push_indicator`-Aufruf/
+  `ModuleScoreEntry`, daher berührt kein Codepfad `AccessibilityScorer`/den gewichteten
+  Overall-Score; per Integrationstest verifiziert (`report.accessibility.score/grade/certificate`
+  byte-identisch mit und ohne Modul). Layout-Transition-Regel erkennt Transitions nicht selbst neu,
+  sondern projiziert `performance::animations`-Funde (auf layoutwirksame Properties gefiltert) als
+  Advisories — vermeidet einen zweiten unabhängigen Erkennungspfad und damit Duplicate Findings by
+  construction. Lokalisierung folgt dem etablierten kind-Enum-Muster (#406):
+  `finding_message_text(rule_id, level, en)` ist die einzige Textquelle, Analyse ruft mit `en=true`
+  (JSON kanonisch Englisch), PDF-Builder mit der Lauf-Sprache. Neues `ExperienceSection.design_quality`-
+  Feld, volle JSON/PDF-Anbindung (`ReportModule`, `ModuleBlob`, `ModuleDetailsBlock`,
+  eigener PDF-Renderer ohne ScoreCard). Cache-Signatur auf `fmt=12` gebumpt.
 - **Report Quality Layer v1.2 — Phase 5: visuelle Prüfpipeline, 2026-07-16 (#510, tracking #512):**
   schließt die zuvor als offen dokumentierte Lücke (siehe vorheriger Eintrag unten, "partial").
   Statt einer gespeicherten Pixel-Diff-Baseline (Font-Rendering/Anti-Aliasing würde das über
@@ -530,7 +712,7 @@ Bewusste, über alle Phasen hinweg getroffene Entscheidung statt einer nachträg
 - 2 output formats (json, pdf); table for quick terminal checks
 - Batch processing with configurable concurrency
 - Pattern Detection: MainNavigation, SkipLink, Accordion, Dialog, DisclosureMenu, TabList, Form
-- Modules: Performance, SEO, Security, Mobile, Dark Mode, UX, Journey, AI Visibility, Content Visibility, Source Quality, Tech Stack, Best Practices, Commerce, Accessibility Journey Layer
+- Modules: Performance, SEO, Security, Mobile, Dark Mode, Design Quality (opt-in, score-neutral), UX, Journey, AI Visibility, Content Visibility, Source Quality, Tech Stack, Best Practices, Commerce, Accessibility Journey Layer
 - Consent: `--dismiss-consent` Flag; CMP-Cookie-Injection + Banner-Click; `consent_banner` audit_flag im JSON
 - `audit_flags` kinds: `conflicting_signal` (3.1.1 vs. SEO lang), `viewport_gap` (Desktop/Mobile ≥20 Punkte), `consent_banner`, `consent_wall_artifact`, `bypass_blocks_untested` (Skip-Link vorhanden aber funktional kaputt — statischer Check hat PASS, Journey FAIL)
 - JSON: **Unified Report Envelope v2.0** — einheitliches Schema für single + batch (`schema_version`, `report_type`, `summary`, `pages[]`, `pages[i].detail`). Breaking Change ggü. v0.17.

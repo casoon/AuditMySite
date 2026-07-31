@@ -206,6 +206,15 @@ src/
 ├── dark_mode/           # Dark mode support detection and contrast
 │   └── mod.rs, module.rs
 │
+├── design_quality/      # Opt-in, score-neutral UX/readability heuristics (#528)
+│   ├── mod.rs, module.rs
+│   └── extract.js
+│
+├── ai_transparency/     # Opt-in, score-neutral C2PA image-provenance check (EU AI Act Art. 50)
+│   ├── mod.rs, module.rs
+│   ├── image_provenance.rs # cfg(feature = "ai-transparency") — fetch + c2pa parsing
+│   └── extract.js
+│
 ├── ux/                  # UX analysis (5 dimensions, saturation curves)
 │   ├── mod.rs, module.rs
 │   ├── analysis.rs
@@ -404,6 +413,16 @@ Maps WCAG rule IDs to rich metadata:
 - Link-local (169.254.x)
 - Non-HTTP schemes
 
+### Third-Party Image Fetching (ai_transparency)
+
+`src/ai_transparency/image_provenance.rs::safe_fetch_image` is the first fetch in this
+codebase against **arbitrary third-party origins** (image URLs sourced from the audited
+page's own markup, not same-origin like `seo::robots`/`security`). Before every request:
+resolves DNS itself, rejects private/loopback/link-local/multicast/unspecified addresses
+(including IPv4-mapped IPv6), and pins the connection to the exact validated IP via
+`reqwest::ClientBuilder::resolve()` to close a DNS-rebinding TOCTOU gap between the check
+and the actual connect.
+
 ### Path Traversal
 
 `read_url_file()` uses `canonicalize()` to prevent `../` attacks.
@@ -455,3 +474,4 @@ Key crates:
 - `fluent-bundle` / `unic-langid` - i18n (Project Fluent, default language German)
 - `reqwest` (rustls) - Sitemap fetching, Chromium download
 - `renderreport` (optional, `pdf` feature) - PDF generation (Typst-based)
+- `c2pa` (optional, `ai-transparency` feature, `rust_native_crypto` only — no OpenSSL, no HTTP client) - C2PA Content Credentials manifest reading for the ai_transparency module
