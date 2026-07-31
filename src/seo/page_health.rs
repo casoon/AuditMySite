@@ -60,6 +60,9 @@ pub struct PageHealthAnalysis {
 
     /// www ↔ non-www redirect configuration
     pub www_consolidation: Option<WwwConsolidation>,
+    /// Trailing-slash and http→https redirect consistency (#542)
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub url_canonicalization: Option<UrlCanonicalizationCheck>,
 
     /// Duplicate ID count across the DOM
     pub duplicate_id_count: u32,
@@ -198,7 +201,9 @@ pub struct Custom404Check {
     pub custom_page: bool,
 }
 
-/// Cache-policy summary for static subresources.
+/// Cache-policy and Content-Type-header summary for static subresources.
+/// Both audits share one probe pass over the same already-collected asset
+/// URLs (#544) — no extra requests beyond the existing cache audit.
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]
 pub struct ResourceCacheAudit {
     pub checked_resources: u32,
@@ -209,6 +214,15 @@ pub struct ResourceCacheAudit {
     pub expires_resources: u32,
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub samples: Vec<ResourceCacheFinding>,
+    /// Static resources (by recognized extension) with no Content-Type header at all.
+    #[serde(default)]
+    pub missing_content_type: u32,
+    /// Static resources whose Content-Type header doesn't match their file extension
+    /// (e.g. a `.js` file served as `text/html`).
+    #[serde(default)]
+    pub incorrect_content_type: u32,
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub content_type_samples: Vec<ContentTypeFinding>,
 }
 
 /// Single inefficient static-resource cache finding.
@@ -219,6 +233,16 @@ pub struct ResourceCacheFinding {
     pub has_etag: bool,
     pub has_expires: bool,
     pub reason: String,
+}
+
+/// Single missing/incorrect Content-Type header finding (#544).
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ContentTypeFinding {
+    pub url: String,
+    /// Substring expected in a correct Content-Type for this extension (e.g. "javascript")
+    pub expected: String,
+    /// Actual Content-Type header value, if any
+    pub actual: Option<String>,
 }
 
 /// www ↔ non-www redirect configuration
@@ -236,6 +260,25 @@ pub struct WwwConsolidation {
     pub canonical_variant: String,
     /// True when one variant properly redirects to the other
     pub is_consolidated: bool,
+}
+
+/// Trailing-slash and http→https redirect consistency (#542).
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct UrlCanonicalizationCheck {
+    /// HTTP status of the URL variant with the trailing slash toggled
+    /// (added if absent, removed if present). `None` for the root path,
+    /// where a trailing slash is unambiguous and not checked.
+    pub trailing_slash_variant_status: Option<u16>,
+    /// True when the original URL and its trailing-slash variant both
+    /// answer 200 independently instead of one redirecting to the other —
+    /// a duplicate-content risk.
+    pub trailing_slash_inconsistent: bool,
+    /// HTTP status of the plain `http://` version of an `https://` page.
+    /// `None` when the audited URL is not `https://`.
+    pub http_status: Option<u16>,
+    /// True when the audited URL is `https://` and its `http://` version
+    /// does not redirect to `https://`.
+    pub http_to_https_missing: bool,
 }
 
 /// A single HTML validation finding
@@ -837,9 +880,17 @@ async fn run_http_probes(url: &str, a: &mut PageHealthAnalysis) {
     // Run all probes concurrently
     let probe_url = format!("{}/auditmysite-404-probe-xyz123", origin);
     let cache_probe_urls = a.resource_cache_probe_urls.clone();
-    let (custom_404_result, www_result, header_result, redirect_chain, resource_cache) = tokio::join!(
+    let (
+        custom_404_result,
+        www_result,
+        url_canonicalization_result,
+        header_result,
+        redirect_chain,
+        resource_cache,
+    ) = tokio::join!(
         probe_custom_404(&probe_url),
         check_www_consolidation(url),
+        check_url_canonicalization(url),
         probe_headers(url),
         follow_redirect_chain(url),
         audit_resource_cache(&cache_probe_urls)
@@ -860,6 +911,9 @@ async fn run_http_probes(url: &str, a: &mut PageHealthAnalysis) {
 
     // www consolidation
     a.www_consolidation = www_result;
+
+    // Trailing-slash and http→https consistency (#542)
+    a.url_canonicalization = url_canonicalization_result;
 
     // Redirect chain
     let hops: Vec<RedirectHop> = redirect_chain
@@ -1036,6 +1090,31 @@ async fn audit_resource_cache(urls: &[String]) -> ResourceCacheAudit {
             audit.immutable_resources += 1;
         }
 
+        if let Some(expected) = expected_content_type_substring(url) {
+            let actual = headers
+                .get("content-type")
+                .and_then(|v| v.to_str().ok())
+                .map(String::from);
+            let matches_expected = actual
+                .as_deref()
+                .map(|ct| ct.to_ascii_lowercase().contains(expected))
+                .unwrap_or(false);
+            if !matches_expected {
+                if actual.is_none() {
+                    audit.missing_content_type += 1;
+                } else {
+                    audit.incorrect_content_type += 1;
+                }
+                if audit.content_type_samples.len() < 5 {
+                    audit.content_type_samples.push(ContentTypeFinding {
+                        url: url.clone(),
+                        expected: expected.to_string(),
+                        actual,
+                    });
+                }
+            }
+        }
+
         if !is_static_cache_candidate(url) {
             continue;
         }
@@ -1110,6 +1189,39 @@ fn is_static_cache_candidate(url: &str) -> bool {
                 || filename.ends_with(".svg")
         })
         .unwrap_or(false)
+}
+
+/// Substring expected in a correct Content-Type header for this URL's file
+/// extension, or `None` when the extension isn't one we have an opinion on.
+fn expected_content_type_substring(url: &str) -> Option<&'static str> {
+    let filename = url::Url::parse(url)
+        .ok()?
+        .path_segments()
+        .and_then(|mut segments| segments.next_back().map(str::to_ascii_lowercase))?;
+
+    if filename.ends_with(".js") || filename.ends_with(".mjs") {
+        Some("javascript")
+    } else if filename.ends_with(".css") {
+        Some("css")
+    } else if filename.ends_with(".json") {
+        Some("json")
+    } else if filename.ends_with(".svg") {
+        Some("svg")
+    } else if filename.ends_with(".png") {
+        Some("png")
+    } else if filename.ends_with(".jpg") || filename.ends_with(".jpeg") {
+        Some("jpeg")
+    } else if filename.ends_with(".gif") {
+        Some("gif")
+    } else if filename.ends_with(".webp") {
+        Some("webp")
+    } else if filename.ends_with(".avif") {
+        Some("avif")
+    } else if filename.ends_with(".woff") || filename.ends_with(".woff2") {
+        Some("font")
+    } else {
+        None
+    }
 }
 
 fn is_cache_policy_efficient(cache_control: &str) -> bool {
@@ -1226,6 +1338,78 @@ async fn check_www_consolidation(url: &str) -> Option<WwwConsolidation> {
         non_www_redirects_to_www: non_www_redirects,
         canonical_variant,
         is_consolidated,
+    })
+}
+
+/// Check trailing-slash and http→https redirect consistency (#542).
+async fn check_url_canonicalization(url: &str) -> Option<UrlCanonicalizationCheck> {
+    let parsed = url::Url::parse(url).ok()?;
+    let host = parsed.host_str()?;
+
+    // Skip IPs and localhost — canonicalization redirects aren't meaningful there.
+    if host == "localhost" || host.parse::<std::net::IpAddr>().is_ok() {
+        return None;
+    }
+
+    let client = reqwest::Client::builder()
+        .redirect(reqwest::redirect::Policy::none())
+        .timeout(std::time::Duration::from_secs(8))
+        .user_agent("auditmysite-probe/1.0")
+        .build()
+        .ok()?;
+
+    let path = parsed.path();
+    let trailing_slash_variant_url = if path.is_empty() || path == "/" {
+        // Root path: a trailing slash is unambiguous, nothing to compare.
+        None
+    } else {
+        let mut variant = parsed.clone();
+        if let Some(stripped) = path.strip_suffix('/') {
+            variant.set_path(stripped);
+        } else {
+            variant.set_path(&format!("{path}/"));
+        }
+        Some(variant)
+    };
+
+    let (trailing_slash_variant_status, trailing_slash_inconsistent) =
+        if let Some(variant_url) = &trailing_slash_variant_url {
+            let (orig_resp, variant_resp) = tokio::join!(
+                client.head(url).send(),
+                client.head(variant_url.as_str()).send()
+            );
+            let orig_status = orig_resp.ok().map(|r| r.status().as_u16());
+            let variant_status = variant_resp.ok().map(|r| r.status().as_u16());
+            // Both variants answering 200 independently means neither redirects to a
+            // single canonical form — a duplicate-content risk. A 30x on either side
+            // (redirecting to the other) is the expected, consistent case.
+            let inconsistent = orig_status == Some(200) && variant_status == Some(200);
+            (variant_status, inconsistent)
+        } else {
+            (None, false)
+        };
+
+    let (http_status, http_to_https_missing) = if parsed.scheme() == "https" {
+        let mut http_variant = parsed.clone();
+        let _ = http_variant.set_scheme("http");
+        let resp = client.head(http_variant.as_str()).send().await.ok();
+        let status = resp.as_ref().map(|r| r.status().as_u16());
+        let location = resp
+            .and_then(|r| r.headers().get("location").cloned())
+            .and_then(|v| v.to_str().ok().map(String::from))
+            .unwrap_or_default();
+        let redirects_to_https = matches!(status, Some(301) | Some(302) | Some(307) | Some(308))
+            && location.starts_with("https://");
+        (status, !redirects_to_https)
+    } else {
+        (None, false)
+    };
+
+    Some(UrlCanonicalizationCheck {
+        trailing_slash_variant_status,
+        trailing_slash_inconsistent,
+        http_status,
+        http_to_https_missing,
     })
 }
 
@@ -1716,6 +1900,52 @@ pub fn collect_issues(a: &PageHealthAnalysis, en: bool) -> Vec<PageHealthIssue> 
         });
     }
 
+    if a.resource_cache.missing_content_type > 0 || a.resource_cache.incorrect_content_type > 0 {
+        let sample = a
+            .resource_cache
+            .content_type_samples
+            .first()
+            .map(|finding| {
+                let actual =
+                    finding
+                        .actual
+                        .as_deref()
+                        .unwrap_or(if en { "none" } else { "keiner" });
+                if en {
+                    format!(
+                        " (e.g. {}: expected {}, got {})",
+                        finding.url, finding.expected, actual
+                    )
+                } else {
+                    format!(
+                        " (z.B. {}: erwartet {}, erhalten {})",
+                        finding.url, finding.expected, actual
+                    )
+                }
+            })
+            .unwrap_or_default();
+        let total = a.resource_cache.missing_content_type + a.resource_cache.incorrect_content_type;
+        issues.push(PageHealthIssue {
+            issue_type: "incorrect_content_type".to_string(),
+            message: if en {
+                format!(
+                    "{total} static {} with a missing or incorrect Content-Type header{sample}",
+                    if total == 1 { "resource" } else { "resources" }
+                )
+            } else {
+                format!(
+                    "{total} statische {} mit fehlendem oder falschem Content-Type-Header{sample}",
+                    if total == 1 {
+                        "Ressource"
+                    } else {
+                        "Ressourcen"
+                    }
+                )
+            },
+            severity: "medium".to_string(),
+        });
+    }
+
     if a.hreflang_invalid_count > 0 {
         issues.push(PageHealthIssue {
             issue_type: "hreflang_invalid".to_string(),
@@ -2045,6 +2275,40 @@ pub fn collect_issues(a: &PageHealthAnalysis, en: bool) -> Vec<PageHealthIssue> 
         }
     }
 
+    if let Some(ref canon) = a.url_canonicalization {
+        if canon.trailing_slash_inconsistent {
+            issues.push(PageHealthIssue {
+                issue_type: "trailing_slash_inconsistent".to_string(),
+                message: if en {
+                    "URL is reachable with and without a trailing slash as two separate 200 responses — duplicate-content risk without a canonical redirect".to_string()
+                } else {
+                    "URL ist mit und ohne abschließendem Slash als zwei getrennte 200-Antworten erreichbar — Duplicate-Content-Risiko ohne kanonischen Redirect".to_string()
+                },
+                severity: "medium".to_string(),
+            });
+        }
+        if canon.http_to_https_missing {
+            let status_text = canon.http_status.map(|s| s.to_string()).unwrap_or_else(|| {
+                if en {
+                    "unreachable".to_string()
+                } else {
+                    "nicht erreichbar".to_string()
+                }
+            });
+            issues.push(PageHealthIssue {
+                issue_type: "http_not_redirected_to_https".to_string(),
+                message: if en {
+                    format!("http:// version does not redirect to https:// (status: {status_text})")
+                } else {
+                    format!(
+                        "http://-Version leitet nicht auf https:// weiter (Status: {status_text})"
+                    )
+                },
+                severity: "high".to_string(),
+            });
+        }
+    }
+
     issues
 }
 
@@ -2111,6 +2375,46 @@ mod tests {
         assert!(issues
             .iter()
             .any(|i| i.issue_type == "custom_404_invalid_status"));
+    }
+
+    #[test]
+    fn test_collect_issues_url_canonicalization() {
+        let a = PageHealthAnalysis {
+            url_canonicalization: Some(UrlCanonicalizationCheck {
+                trailing_slash_variant_status: Some(200),
+                trailing_slash_inconsistent: true,
+                http_status: Some(200),
+                http_to_https_missing: true,
+            }),
+            ..Default::default()
+        };
+        let issues = collect_issues(&a, false);
+        assert!(issues
+            .iter()
+            .any(|i| i.issue_type == "trailing_slash_inconsistent"));
+        assert!(issues
+            .iter()
+            .any(|i| i.issue_type == "http_not_redirected_to_https"));
+    }
+
+    #[test]
+    fn test_collect_issues_url_canonicalization_consistent_is_silent() {
+        let a = PageHealthAnalysis {
+            url_canonicalization: Some(UrlCanonicalizationCheck {
+                trailing_slash_variant_status: Some(301),
+                trailing_slash_inconsistent: false,
+                http_status: Some(301),
+                http_to_https_missing: false,
+            }),
+            ..Default::default()
+        };
+        let issues = collect_issues(&a, false);
+        assert!(!issues
+            .iter()
+            .any(|i| i.issue_type == "trailing_slash_inconsistent"));
+        assert!(!issues
+            .iter()
+            .any(|i| i.issue_type == "http_not_redirected_to_https"));
     }
 
     #[test]
@@ -2182,6 +2486,12 @@ mod tests {
                 non_www_redirects_to_www: false,
                 canonical_variant: "inconsistent".to_string(),
                 is_consolidated: false,
+            }),
+            url_canonicalization: Some(UrlCanonicalizationCheck {
+                trailing_slash_variant_status: Some(200),
+                trailing_slash_inconsistent: true,
+                http_status: Some(200),
+                http_to_https_missing: true,
             }),
             custom_404: Some(Custom404Check {
                 probe_url: "https://example.com/auditmysite-404-probe-xyz123".to_string(),
@@ -2301,6 +2611,45 @@ mod tests {
         assert!(issues
             .iter()
             .any(|issue| issue.issue_type == "inefficient_resource_cache"));
+    }
+
+    #[test]
+    fn collect_issues_reports_incorrect_content_type() {
+        let a = PageHealthAnalysis {
+            resource_cache: ResourceCacheAudit {
+                missing_content_type: 1,
+                incorrect_content_type: 1,
+                content_type_samples: vec![ContentTypeFinding {
+                    url: "https://example.com/app.js".to_string(),
+                    expected: "javascript".to_string(),
+                    actual: Some("text/html".to_string()),
+                }],
+                ..Default::default()
+            },
+            ..Default::default()
+        };
+
+        let issues = collect_issues(&a, false);
+
+        assert!(issues
+            .iter()
+            .any(|issue| issue.issue_type == "incorrect_content_type"));
+    }
+
+    #[test]
+    fn expected_content_type_substring_recognizes_common_extensions() {
+        assert_eq!(
+            expected_content_type_substring("https://example.com/app.js"),
+            Some("javascript")
+        );
+        assert_eq!(
+            expected_content_type_substring("https://example.com/style.css"),
+            Some("css")
+        );
+        assert_eq!(
+            expected_content_type_substring("https://example.com/page.html"),
+            None
+        );
     }
 
     #[test]
