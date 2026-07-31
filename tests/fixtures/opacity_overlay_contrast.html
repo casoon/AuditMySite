@@ -1,0 +1,120 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="description" content="Test page for pixel contrast sampling triggered by opacity stacks, blend-mode overlays, and img-behind-text — not just CSS background-image (#527).">
+    <meta name="robots" content="index, follow">
+    <title>Opacity/Overlay Contrast Test Page</title>
+    <style>
+        body {
+            font-family: sans-serif;
+            margin: 0;
+            padding: 2rem;
+            background-color: #ffffff;
+            color: #111111;
+        }
+
+        /*
+         * 1. Opacity stack: CSS colors alone (dark text on white box) would
+         * pass, but the ancestor's opacity halves the rendered result against
+         * the page's dark section background — must now be sampled and fail.
+         */
+        .opacity-section {
+            background-color: rgb(20, 20, 20);
+            padding: 1.5rem;
+            margin-bottom: 1.5rem;
+        }
+        .opacity-box {
+            opacity: 0.5;
+            background-color: rgb(255, 255, 255);
+            padding: 1rem;
+        }
+        .opacity-box p {
+            color: rgb(235, 235, 235);
+            margin: 0;
+        }
+
+        /*
+         * 2. Translucent overlay: a semi-transparent absolutely-positioned
+         * sibling sits over the text container. CSS colors on the text itself
+         * look fine against its own white box, but the rendered overlay
+         * darkens it — must be sampled and fail.
+         */
+        .overlay-container {
+            position: relative;
+            background-color: rgb(255, 255, 255);
+            padding: 1.5rem;
+            margin-bottom: 1.5rem;
+        }
+        .overlay-container .overlay {
+            position: absolute;
+            inset: 0;
+            background-color: rgba(0, 0, 0, 0.55);
+        }
+        .overlay-container p {
+            position: relative;
+            color: rgb(200, 200, 200);
+            margin: 0;
+        }
+
+        /*
+         * 3. Img-behind-text: an actual <img> element (not a CSS
+         * background-image) rendered behind overlaid text. CSS colors on the
+         * text look fine against the section's own background-color, but the
+         * painted result behind the text is the image — must be sampled.
+         */
+        .img-container {
+            position: relative;
+            width: 400px;
+            height: 160px;
+            margin-bottom: 1.5rem;
+            background-color: rgb(255, 255, 255);
+        }
+        .img-container img {
+            position: absolute;
+            inset: 0;
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+        }
+        .img-container p {
+            position: absolute;
+            inset: 0;
+            margin: 0;
+            padding: 1rem;
+            color: rgb(230, 230, 230);
+        }
+    </style>
+</head>
+<body>
+    <main>
+        <h1>Opacity / Overlay / Img-Behind-Text Contrast Test</h1>
+
+        <section aria-labelledby="opacity-heading">
+            <h2 id="opacity-heading">Opacity Stack Box (Fail)</h2>
+            <div class="opacity-section">
+                <div class="opacity-box" id="opacity-box">
+                    <p class="opacity-text">This text sits in a box whose opacity blends it into a dark section background.</p>
+                </div>
+            </div>
+        </section>
+
+        <section aria-labelledby="overlay-heading">
+            <h2 id="overlay-heading">Translucent Overlay Box (Fail)</h2>
+            <div class="overlay-container" id="overlay-box">
+                <div class="overlay"></div>
+                <p class="overlay-text">This text is covered by a semi-transparent dark overlay sibling.</p>
+            </div>
+        </section>
+
+        <section aria-labelledby="img-heading">
+            <h2 id="img-heading">Img-Behind-Text Box (Fail)</h2>
+            <div class="img-container" id="img-box">
+                <img src="data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSI0MDAiIGhlaWdodD0iMTYwIj48cmVjdCB3aWR0aD0iNDAwIiBoZWlnaHQ9IjE2MCIgZmlsbD0iI2VlZWVlZSIvPjwvc3ZnPg==" alt="" role="presentation">
+                <p class="img-text">This text is layered over an actual &lt;img&gt; element, not a CSS background-image.</p>
+            </div>
+        </section>
+    </main>
+</body>
+</html>

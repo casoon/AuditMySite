@@ -127,15 +127,65 @@ const STYLES_EXTRACT_JS: &str = r#"
         return styles.backgroundImage && styles.backgroundImage !== 'none';
     }
 
+    // #527: a non-default blend mode means the painted result depends on
+    // layers below it, not just this element's own CSS colors.
+    function hasBlendEffect(styles) {
+        return (styles.mixBlendMode && styles.mixBlendMode !== 'normal') ||
+               (styles.backgroundBlendMode && styles.backgroundBlendMode !== 'normal');
+    }
+
+    // #527: cheap, bounded check for a direct sibling of `node` that is
+    // either an <img> or a positioned (absolute/fixed) element with a
+    // painted background, whose box overlaps `targetRect` — covers both the
+    // "hero <img> behind overlaid text" and "translucent overlay div on top
+    // of text" patterns without a full paint-order simulation.
+    function hasOverlappingPaintedSibling(node, targetRect) {
+        const parent = node.parentElement;
+        if (!parent) return false;
+        for (const sibling of parent.children) {
+            if (sibling === node) continue;
+            const siblingStyles = window.getComputedStyle(sibling);
+            const isImg = sibling.tagName === 'IMG';
+            if (!isImg) {
+                const isPositioned = siblingStyles.position === 'absolute' || siblingStyles.position === 'fixed';
+                if (!isPositioned) continue;
+                const bg = parseCssColor(siblingStyles.backgroundColor);
+                if (!bg || bg.a <= 0) continue;
+            }
+            const r = sibling.getBoundingClientRect();
+            if (r.width === 0 || r.height === 0) continue;
+            const overlaps = !(r.right <= targetRect.left || r.left >= targetRect.right ||
+                                r.bottom <= targetRect.top || r.top >= targetRect.bottom);
+            if (overlaps) return true;
+        }
+        return false;
+    }
+
     function getEffectiveBackground(el) {
         let current = el;
         const layers = [];
-        let hasUnresolvedImageBackground = false;
+        let hasUncertainBackground = false;
+        const elRect = el.getBoundingClientRect();
+        const MAX_OVERLAY_CHECK_DEPTH = 3;
+        let overlayCheckDepth = 0;
 
         while (current && current !== document.documentElement) {
             const styles = window.getComputedStyle(current);
             if (hasPaintedBackgroundImage(styles)) {
-                hasUnresolvedImageBackground = true;
+                hasUncertainBackground = true;
+            }
+            const opacity = parseFloat(styles.opacity);
+            if (!Number.isNaN(opacity) && opacity < 1) {
+                hasUncertainBackground = true;
+            }
+            if (hasBlendEffect(styles)) {
+                hasUncertainBackground = true;
+            }
+            if (overlayCheckDepth < MAX_OVERLAY_CHECK_DEPTH) {
+                if (hasOverlappingPaintedSibling(current, elRect)) {
+                    hasUncertainBackground = true;
+                }
+                overlayCheckDepth++;
             }
 
             const bg = parseCssColor(styles.backgroundColor);
@@ -149,7 +199,7 @@ const STYLES_EXTRACT_JS: &str = r#"
 
         const htmlStyles = window.getComputedStyle(document.documentElement);
         if (hasPaintedBackgroundImage(htmlStyles)) {
-            hasUnresolvedImageBackground = true;
+            hasUncertainBackground = true;
         }
         const htmlBg = parseCssColor(htmlStyles.backgroundColor);
         if (htmlBg && htmlBg.a > 0) {
@@ -163,7 +213,7 @@ const STYLES_EXTRACT_JS: &str = r#"
 
         return {
             color: `rgb(${color.r}, ${color.g}, ${color.b})`,
-            uncertain: hasUnresolvedImageBackground
+            uncertain: hasUncertainBackground
         };
     }
 
@@ -201,6 +251,8 @@ const STYLES_EXTRACT_JS: &str = r#"
             finalFg = composite(fg, bgParsed);
         }
 
+        const rect = el.getBoundingClientRect();
+
         results.push({
             cssPath: __amsCssSelector(el),
             snippet: el.outerHTML.substring(0, 200),
@@ -211,7 +263,9 @@ const STYLES_EXTRACT_JS: &str = r#"
             fontSize: styles.fontSize,
             fontWeight: styles.fontWeight,
             visibility: styles.visibility,
-            display: styles.display
+            display: styles.display,
+            width: rect.width,
+            height: rect.height
         });
     }
 
@@ -283,6 +337,12 @@ pub async fn extract_text_styles(page: &Page) -> Result<Vec<ComputedStyles>> {
                                 }
                                 if let Some(disp) = item.get("display").and_then(|v| v.as_str()) {
                                     properties.insert("display".to_string(), disp.to_string());
+                                }
+                                if let Some(width) = item.get("width").and_then(|v| v.as_f64()) {
+                                    properties.insert("width".to_string(), width.to_string());
+                                }
+                                if let Some(height) = item.get("height").and_then(|v| v.as_f64()) {
+                                    properties.insert("height".to_string(), height.to_string());
                                 }
 
                                 let selector = item

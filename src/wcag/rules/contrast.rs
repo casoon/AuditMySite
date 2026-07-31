@@ -155,10 +155,23 @@ impl ContrastRule {
             || style.get("display").is_some_and(|v| v == "none")
     }
 
-    /// Collect pixel-sampling tasks for uncertain-background elements that appear
-    /// to fail the contrast check based on their CSS colors alone.
+    /// Bound on how many uncertain-background elements get pixel-sampled per
+    /// page (#527). Sampling reads every pixel in an element's bounding box,
+    /// so an unbounded candidate set on an image-heavy page would be
+    /// expensive; candidates beyond the cap are dropped, largest-area first.
+    const MAX_SAMPLE_TASKS: usize = 60;
+
+    /// Collect pixel-sampling tasks for every element with an uncertain
+    /// effective background (image, opacity stack, blend mode, or an
+    /// overlapping `<img>` — see `styles.rs`'s `getEffectiveBackground`).
+    ///
+    /// Previously this only queued a task when the CSS-derived ratio already
+    /// failed, which meant a rendered failure sitting on colors that look
+    /// fine in isolation (e.g. text under a semi-transparent overlay) was
+    /// never sampled and never surfaced at all (#527). Sampling now runs for
+    /// every uncertain-background candidate regardless of the CSS ratio.
     fn build_sample_tasks(styles: &[ComputedStyles], level: WcagLevel) -> Vec<serde_json::Value> {
-        let mut tasks = Vec::new();
+        let mut candidates: Vec<(f64, serde_json::Value)> = Vec::new();
         for style in styles {
             let fg_str = match style.color() {
                 Some(c) => c,
@@ -170,31 +183,29 @@ impl ContrastRule {
             {
                 continue;
             }
-            let fg = match Color::from_css(fg_str) {
-                Some(c) => c,
-                None => continue,
-            };
-            let bg_str = style.background_color().unwrap_or("rgb(255, 255, 255)");
-            let bg = match Color::from_css(bg_str) {
-                Some(c) => c,
-                None => continue,
-            };
-            let white = Color::new(255, 255, 255);
-            let bg_eff = bg.composite_over(&white);
-            let fg_eff = fg.composite_over(&bg_eff);
-            let ratio = Self::calculate_contrast_ratio(&fg_eff, &bg_eff);
             let is_large = style.is_large_text();
-            if !Self::meets_requirement(ratio, is_large, level) {
-                if let Some(ref sel) = style.selector {
-                    tasks.push(serde_json::json!({
-                        "selector": sel,
-                        "fgColor": fg_str,
-                        "threshold": Self::contrast_threshold(is_large, level),
-                    }));
-                }
-            }
+            let area = style
+                .get("width")
+                .zip(style.get("height"))
+                .and_then(|(w, h)| Some(w.parse::<f64>().ok()? * h.parse::<f64>().ok()?))
+                .unwrap_or(0.0);
+            let selector = match &style.selector {
+                Some(sel) => sel,
+                None => continue,
+            };
+            candidates.push((
+                area,
+                serde_json::json!({
+                    "selector": selector,
+                    "fgColor": fg_str,
+                    "threshold": Self::contrast_threshold(is_large, level),
+                }),
+            ));
         }
-        tasks
+
+        candidates.sort_by(|a, b| b.0.total_cmp(&a.0));
+        candidates.truncate(Self::MAX_SAMPLE_TASKS);
+        candidates.into_iter().map(|(_, task)| task).collect()
     }
 
     /// Run the in-browser canvas pixel-sampling script and return per-selector verdicts.
@@ -1067,6 +1078,81 @@ mod tests {
         assert_eq!(
             ContrastRule::verdict(3.0, true, WcagLevel::AA, true),
             ContrastVerdict::Pass
+        );
+    }
+
+    fn uncertain_background_style(node_id: i64, passing_ratio: bool) -> ComputedStyles {
+        let mut properties = std::collections::HashMap::new();
+        properties.insert(
+            "color".to_string(),
+            if passing_ratio {
+                "rgb(0, 0, 0)".to_string()
+            } else {
+                "rgb(200, 200, 200)".to_string()
+            },
+        );
+        properties.insert(
+            "background-color".to_string(),
+            "rgb(255, 255, 255)".to_string(),
+        );
+        properties.insert("background-uncertain".to_string(), "true".to_string());
+        ComputedStyles {
+            node_id,
+            selector: Some(format!("p.uncertain-{node_id}")),
+            html_snippet: None,
+            properties,
+        }
+    }
+
+    #[test]
+    fn build_sample_tasks_samples_uncertain_background_even_when_css_ratio_passes() {
+        // Regression for #527: previously an uncertain-background element
+        // whose CSS-derived ratio already passed was never queued for pixel
+        // sampling, so a rendered failure (opacity/overlay/blend) sitting on
+        // CSS colors that look fine in isolation was silently missed.
+        let styles = vec![uncertain_background_style(1, true)];
+        let tasks = ContrastRule::build_sample_tasks(&styles, WcagLevel::AA);
+        assert_eq!(
+            tasks.len(),
+            1,
+            "a passing-CSS-ratio candidate must still be sampled"
+        );
+        assert_eq!(tasks[0]["selector"], "p.uncertain-1");
+    }
+
+    #[test]
+    fn build_sample_tasks_ignores_certain_background_elements() {
+        let mut style = uncertain_background_style(1, false);
+        style
+            .properties
+            .insert("background-uncertain".to_string(), "false".to_string());
+        let tasks = ContrastRule::build_sample_tasks(&[style], WcagLevel::AA);
+        assert!(tasks.is_empty());
+    }
+
+    #[test]
+    fn build_sample_tasks_caps_candidates_by_area_largest_first() {
+        let mut styles = Vec::new();
+        for i in 0..(ContrastRule::MAX_SAMPLE_TASKS + 10) {
+            let mut style = uncertain_background_style(i as i64, false);
+            // Give the last-created style the largest area so we can assert
+            // it survives the cap despite insertion order.
+            let area = if i == ContrastRule::MAX_SAMPLE_TASKS + 9 {
+                "10000".to_string()
+            } else {
+                "1".to_string()
+            };
+            style.properties.insert("width".to_string(), area.clone());
+            style.properties.insert("height".to_string(), area);
+            styles.push(style);
+        }
+
+        let tasks = ContrastRule::build_sample_tasks(&styles, WcagLevel::AA);
+        assert_eq!(tasks.len(), ContrastRule::MAX_SAMPLE_TASKS);
+        assert_eq!(
+            tasks[0]["selector"],
+            format!("p.uncertain-{}", ContrastRule::MAX_SAMPLE_TASKS + 9),
+            "the largest-area candidate must be prioritized ahead of the cap"
         );
     }
 }
