@@ -20,9 +20,9 @@
 //! duty (Art. 50(2)) actually references; an EXIF heuristic would be a
 //! second, much weaker detection path for uncertain benefit.
 
-pub mod module;
 #[cfg(feature = "ai-transparency")]
 mod image_provenance;
+pub mod module;
 
 pub use module::AiTransparencyModule;
 

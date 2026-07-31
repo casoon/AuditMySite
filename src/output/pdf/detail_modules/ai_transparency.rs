@@ -58,12 +58,20 @@ pub(in crate::output::pdf) fn render_ai_transparency(
     builder = builder.add_component(
         MetricStrip::new(vec![
             MetricStripItem::new(
-                if en { "Images checked" } else { "Geprüfte Bilder" },
+                if en {
+                    "Images checked"
+                } else {
+                    "Geprüfte Bilder"
+                },
                 at.images_checked.to_string(),
             )
             .with_accent(crate::output::pdf::design::tokens::NEUTRAL),
             MetricStripItem::new(
-                if en { "AI provenance found" } else { "KI-Herkunft gefunden" },
+                if en {
+                    "AI provenance found"
+                } else {
+                    "KI-Herkunft gefunden"
+                },
                 at.findings.len().to_string(),
             )
             .with_status("warn")

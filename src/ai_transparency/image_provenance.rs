@@ -61,10 +61,9 @@ struct RawImageUrls {
 /// manifest asserting AI/algorithmic generation.
 pub async fn analyze_ai_transparency(page: &Page) -> Result<AiTransparencyAnalysis> {
     let js_code = format!("(() => {{ {EXTRACT_JS} }})();");
-    let eval_result = page
-        .evaluate(js_code.as_str())
-        .await
-        .map_err(|e| AuditError::CdpError(format!("AI transparency image extraction failed: {e}")))?;
+    let eval_result = page.evaluate(js_code.as_str()).await.map_err(|e| {
+        AuditError::CdpError(format!("AI transparency image extraction failed: {e}"))
+    })?;
 
     let raw: RawImageUrls = match eval_result.value() {
         Some(value) => serde_json::from_value(value.clone()).unwrap_or_default(),
@@ -130,7 +129,10 @@ async fn safe_fetch_image(url: &str) -> Option<(Vec<u8>, String)> {
 
     let bytes = resp.bytes().await.ok()?;
     if bytes.len() as u64 > MAX_IMAGE_FETCH_BYTES {
-        debug!("Skipping oversized image (actual {} bytes): {url}", bytes.len());
+        debug!(
+            "Skipping oversized image (actual {} bytes): {url}",
+            bytes.len()
+        );
         return None;
     }
     Some((bytes.to_vec(), content_type))
@@ -231,7 +233,9 @@ fn inspect_image_manifest(
 
 fn map_source_type(dst: &DigitalSourceType) -> Option<AiProvenanceKind> {
     match dst {
-        DigitalSourceType::TrainedAlgorithmicMedia => Some(AiProvenanceKind::TrainedAlgorithmicMedia),
+        DigitalSourceType::TrainedAlgorithmicMedia => {
+            Some(AiProvenanceKind::TrainedAlgorithmicMedia)
+        }
         DigitalSourceType::CompositeWithTrainedAlgorithmicMedia => {
             Some(AiProvenanceKind::CompositeWithTrainedAlgorithmicMedia)
         }
@@ -308,8 +312,14 @@ mod tests {
         let finding = inspect_image_manifest("https://example.com/hero.png", "image/png", bytes)
             .expect("finding expected for AI-generated image");
 
-        assert_eq!(finding.provenance, AiProvenanceKind::TrainedAlgorithmicMedia);
-        assert_eq!(finding.generator.as_deref(), Some("Test Generative Tool 1.0"));
+        assert_eq!(
+            finding.provenance,
+            AiProvenanceKind::TrainedAlgorithmicMedia
+        );
+        assert_eq!(
+            finding.generator.as_deref(),
+            Some("Test Generative Tool 1.0")
+        );
         // EphemeralSigner's certs are self-signed/untrusted, never chaining to
         // a trust list — the manifest is well-formed and signed, so `Valid`,
         // never `Trusted`.
@@ -319,8 +329,11 @@ mod tests {
 
     #[test]
     fn plain_image_without_manifest_yields_no_finding() {
-        let finding =
-            inspect_image_manifest("https://example.com/plain.png", "image/png", BLANK_PNG.to_vec());
+        let finding = inspect_image_manifest(
+            "https://example.com/plain.png",
+            "image/png",
+            BLANK_PNG.to_vec(),
+        );
         assert!(finding.is_none());
     }
 
@@ -331,7 +344,13 @@ mod tests {
 
     #[test]
     fn private_ip_v4_rejected() {
-        for ip in ["10.0.0.1", "172.16.0.1", "192.168.1.1", "127.0.0.1", "169.254.1.1"] {
+        for ip in [
+            "10.0.0.1",
+            "172.16.0.1",
+            "192.168.1.1",
+            "127.0.0.1",
+            "169.254.1.1",
+        ] {
             assert!(!is_public_ip(&ip.parse().unwrap()), "{ip} must be rejected");
         }
     }
