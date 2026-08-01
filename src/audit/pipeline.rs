@@ -407,8 +407,18 @@ impl PipelineConfig {
             .and_then(|c| c.interactive.journey_budget_ms)
             .unwrap_or(crate::a11y_journey::DEFAULT_BUDGET_MS);
         let rule_filter = crate::wcag::RuleFilterConfig {
+            // `ignore` was a previously-dead, undocumented synonym for
+            // `disabled` (#561, follow-up to #560) — folded in here rather
+            // than removed, since any existing config already setting it now
+            // starts working instead of staying silently inert.
             disabled_rules: toml_cfg
-                .map(|c| c.rules.disabled.clone())
+                .map(|c| {
+                    let mut disabled = c.rules.disabled.clone();
+                    if let Some(ignored) = &c.rules.ignore {
+                        disabled.extend(ignored.iter().cloned());
+                    }
+                    disabled
+                })
                 .unwrap_or_default(),
             enabled_only_rules: toml_cfg
                 .map(|c| c.rules.enabled_only.clone())
@@ -1324,7 +1334,21 @@ async fn run_rules(
         if config.wcag_level < rule.min_level {
             continue;
         }
-        let raw_findings = (rule.check_fn)(page).await;
+        // `rule.rule_id` is logging-only (a single check_fn can emit findings
+        // under more than one real axe_id — see page_rules.rs's own doc
+        // comment), so `[rules] disabled`/`enabled_only` (#561, follow-up to
+        // #560) is applied per finding's own `rule_id` after the call rather
+        // than gating the call itself. A finding without its own rule_id
+        // can't be filtered and is always kept.
+        let raw_findings: Vec<Violation> = (rule.check_fn)(page)
+            .await
+            .into_iter()
+            .filter(|v| {
+                v.rule_id
+                    .as_deref()
+                    .is_none_or(|id| config.rule_filter.should_run(id))
+            })
+            .collect();
         let criterion = rule
             .rule_id
             .split('/')
@@ -2296,6 +2320,24 @@ mod tests {
 
         assert!(config.rule_filter.should_run("color-contrast"));
         assert!(config.rule_filter.should_run("css-overflow-hidden"));
+    }
+
+    #[test]
+    fn from_args_and_config_folds_legacy_ignore_field_into_disabled_rules() {
+        let args = Args::parse_from(["auditmysite", "https://example.com"]);
+        let toml_cfg = crate::cli::config::Config {
+            rules: crate::cli::config::RulesConfig {
+                disabled: vec!["color-contrast".to_string()],
+                ignore: Some(vec!["image-alt".to_string()]),
+                enabled_only: vec![],
+            },
+            ..Default::default()
+        };
+        let config = PipelineConfig::from_args_and_config(&args, Some(&toml_cfg));
+
+        assert!(!config.rule_filter.should_run("color-contrast"));
+        assert!(!config.rule_filter.should_run("image-alt"));
+        assert!(config.rule_filter.should_run("landmark-one-main"));
     }
 
     #[test]
