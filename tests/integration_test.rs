@@ -94,7 +94,10 @@ async fn chrome_axtree_exposes_svg_graphics_roles_and_the_rule_checks_names() {
             .any(|role| { matches!(*role, "graphics-document" | "graphics-symbol") }),
         "Chrome AXTree did not expose a graphics-* role: {roles:?}"
     );
-    let results = auditmysite::wcag::rules::check_text_alternatives(&tree);
+    // #563: graphics-document/graphics-symbol are unambiguous AX roles (never
+    // shared with a native <img>), so check_svg_rules owns this case under
+    // the svg-img-alt axe_id — moved out of check_text_alternatives.
+    let results = auditmysite::wcag::rules::check_svg_rules(&tree);
     assert!(results.violations.iter().any(|finding| {
         finding.role.as_deref() == Some("graphics-symbol") || finding.message.contains("graphic")
     }));

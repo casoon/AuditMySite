@@ -2,6 +2,27 @@
 //!
 //! Dedicated rules for SVG elements exposed with role="img" in the accessibility tree.
 //! Focuses on SVG-specific patterns distinct from general media checks.
+//!
+//! ## `svg-img-alt` reachability (#563)
+//!
+//! Real Chrome exposes a bare `<svg>` (no explicit `role` attribute) — and an
+//! `<svg role="img">` — as AX role **`"image"`**, indistinguishable from a
+//! native `<img>` (confirmed live). `check_svg_img_name`'s `"img"` match below
+//! and `text_alternatives.rs`'s general image loop therefore necessarily
+//! overlap for that case; both existed before this fix and neither is new
+//! false-positive risk, so it's left as-is (`image-alt` catches it, same
+//! observable behavior as today) rather than attempting an unverified DOM
+//! cross-reference to reassign it to `svg-img-alt`. `role="SVGRoot"`/
+//! `"SvgRoot"` (this file's other historical match arms) have never been
+//! confirmed to occur in real Chrome output and are believed dead, but are
+//! left in place as a harmless no-op fallback.
+//!
+//! `role="graphics-document"` and `role="graphics-symbol"` are different:
+//! confirmed live to compute to their own distinct AX roles, never `"image"`
+//! or `"img"` — unambiguous, so `check_svg_rules` owns them outright (moved
+//! here from `text_alternatives.rs::check_svg_elements`, which mis-filed them
+//! under the more generic `image-alt` axe_id despite the unique role making
+//! precise attribution possible with no double-report risk).
 
 use crate::accessibility::{AXNode, AXTree};
 use crate::cli::WcagLevel;
@@ -40,6 +61,8 @@ pub fn check_svg_rules(tree: &AXTree) -> WcagResults {
         let is_svg = role == "img"
             || role == "SVGRoot"
             || role == "SvgRoot"
+            || role == "graphics-document"
+            || role == "graphics-symbol"
             // Some browsers expose SVG with an explicit SVG-related name source
             || node
                 .name_source
@@ -68,6 +91,12 @@ pub fn check_svg_rules(tree: &AXTree) -> WcagResults {
                 // role=img on an SVG element: check name and whitespace-only names
                 check_svg_img_name(node, &mut results);
             }
+            "graphics-document" | "graphics-symbol" => {
+                // Explicit ARIA graphics roles — unique to authored SVGs, never
+                // shared with a native <img> (#563), so owning this outright
+                // carries no double-report risk.
+                check_svg_graphics_role_has_name(node, &mut results);
+            }
             _ => {}
         }
     }
@@ -92,6 +121,30 @@ fn check_svg_root_has_name(node: &AXNode, results: &mut WcagResults) {
         )
         .with_help_url(RULE_META.help_url)
             .with_rule_id(RULE_META.axe_id);
+
+        results.add_violation(violation);
+    } else {
+        results.passes += 1;
+    }
+}
+
+/// SVG elements with an explicit `role="graphics-document"`/`"graphics-symbol"`
+/// need an accessible name — moved from `text_alternatives.rs::check_svg_elements`
+/// (#563), same message/severity, now filed under `svg-img-alt`.
+fn check_svg_graphics_role_has_name(node: &AXNode, results: &mut WcagResults) {
+    if !node.has_name() {
+        let violation = Violation::new(
+            RULE_META.id,
+            RULE_META.name,
+            RULE_META.level,
+            Severity::High,
+            "SVG graphic is missing alternative text",
+            &node.node_id,
+        )
+        .with_role(node.role.clone())
+        .with_fix("Add <title> element inside SVG, or aria-label on the SVG element")
+        .with_help_url(RULE_META.help_url)
+        .with_rule_id(RULE_META.axe_id);
 
         results.add_violation(violation);
     } else {
@@ -221,5 +274,38 @@ mod tests {
         let tree = AXTree::from_nodes(nodes);
         let results = check_svg_rules(&tree);
         assert!(results.violations.is_empty());
+    }
+
+    #[test]
+    fn test_svg_graphics_document_without_name_flagged() {
+        let nodes = vec![make_node("1", "graphics-document", None)];
+        let tree = AXTree::from_nodes(nodes);
+        let results = check_svg_rules(&tree);
+        assert!(results
+            .violations
+            .iter()
+            .any(|v| v.rule_id.as_deref() == Some("svg-img-alt")
+                && v.message.contains("missing alternative text")));
+    }
+
+    #[test]
+    fn test_svg_graphics_symbol_without_name_flagged() {
+        let nodes = vec![make_node("1", "graphics-symbol", None)];
+        let tree = AXTree::from_nodes(nodes);
+        let results = check_svg_rules(&tree);
+        assert!(results
+            .violations
+            .iter()
+            .any(|v| v.rule_id.as_deref() == Some("svg-img-alt")
+                && v.message.contains("missing alternative text")));
+    }
+
+    #[test]
+    fn test_svg_graphics_document_with_name_passes() {
+        let nodes = vec![make_node("1", "graphics-document", Some("Sales chart"))];
+        let tree = AXTree::from_nodes(nodes);
+        let results = check_svg_rules(&tree);
+        assert!(results.violations.is_empty());
+        assert_eq!(results.passes, 1);
     }
 }

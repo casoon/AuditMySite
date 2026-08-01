@@ -81,7 +81,6 @@ pub fn check_text_alternatives(tree: &AXTree) -> WcagResults {
 
     // Also check for other non-text content
     check_icons(tree, &flagged_image_ids, &mut results);
-    check_svg_elements(tree, &mut results);
 
     results
 }
@@ -137,36 +136,6 @@ fn check_icons(tree: &AXTree, flagged_image_ids: &HashSet<&str>, results: &mut W
 
                 results.add_violation(violation);
             }
-        }
-    }
-}
-
-/// Check SVG elements for text alternatives
-fn check_svg_elements(tree: &AXTree, results: &mut WcagResults) {
-    for node in tree.iter() {
-        if node.ignored {
-            continue;
-        }
-
-        // SVG elements often appear as graphics role
-        if (node.role.as_deref() == Some("graphics-document")
-            || node.role.as_deref() == Some("graphics-symbol"))
-            && !node.has_name()
-        {
-            let violation = Violation::new(
-                RULE_META.id,
-                RULE_META.name,
-                RULE_META.level,
-                Severity::High,
-                "SVG graphic is missing alternative text",
-                &node.node_id,
-            )
-            .with_role(node.role.clone())
-            .with_fix("Add <title> element inside SVG, or aria-label on the SVG element")
-            .with_help_url(RULE_META.help_url)
-            .with_rule_id(RULE_META.axe_id);
-
-            results.add_violation(violation);
         }
     }
 }
