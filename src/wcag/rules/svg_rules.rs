@@ -90,7 +90,8 @@ fn check_svg_root_has_name(node: &AXNode, results: &mut WcagResults) {
         .with_fix(
             "Add a <title> as the first child of the <svg>, use aria-label, or hide decorative SVGs with aria-hidden=\"true\"",
         )
-        .with_help_url(RULE_META.help_url);
+        .with_help_url(RULE_META.help_url)
+            .with_rule_id(RULE_META.axe_id);
 
         results.add_violation(violation);
     } else {
@@ -115,7 +116,8 @@ fn check_svg_img_name(node: &AXNode, results: &mut WcagResults) {
             .with_fix(
                 "Add a <title> element as the first child of the SVG, or use aria-label/aria-labelledby",
             )
-            .with_help_url(RULE_META.help_url);
+            .with_help_url(RULE_META.help_url)
+            .with_rule_id(RULE_META.axe_id);
 
             results.add_violation(violation);
         }
@@ -134,7 +136,8 @@ fn check_svg_img_name(node: &AXNode, results: &mut WcagResults) {
             .with_fix(
                 "Replace the empty accessible name with a meaningful description, or mark the SVG as decorative with role=\"presentation\" and aria-hidden=\"true\"",
             )
-            .with_help_url(RULE_META.help_url);
+            .with_help_url(RULE_META.help_url)
+            .with_rule_id(RULE_META.axe_id);
 
             results.add_violation(violation);
         }

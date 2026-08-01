@@ -532,6 +532,7 @@ impl ContrastRule {
         .with_selector(selector)
         .with_fix(&fix)
         .with_help_url(CONTRAST_RULE.help_url)
+        .with_rule_id(CONTRAST_RULE.axe_id)
         // Measured values as machine-readable evidence (evidence-grade
         // findings, slice 3) — canonical English, JSON-safe (#406), rendered
         // in the PDF as "Contrast X:Y (required A:B)" in the run locale.

@@ -65,7 +65,8 @@ pub fn check_focus_visible(tree: &AXTree) -> WcagResults {
         )
         .with_selector("root")
         .with_fix("Ensure interactive elements are keyboard focusable")
-        .with_help_url(FOCUS_VISIBLE_RULE.help_url);
+        .with_help_url(FOCUS_VISIBLE_RULE.help_url)
+        .with_rule_id(FOCUS_VISIBLE_RULE.axe_id);
 
         results.add_violation(violation);
     }

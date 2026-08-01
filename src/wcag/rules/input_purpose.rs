@@ -118,7 +118,8 @@ pub fn check_input_purpose(tree: &AXTree) -> WcagResults {
                 .with_role(node.role.clone())
                 .with_name(node.name.clone())
                 .with_fix("Use a valid autocomplete token from the HTML specification")
-                .with_help_url(INPUT_PURPOSE_RULE.help_url);
+                .with_help_url(INPUT_PURPOSE_RULE.help_url)
+                .with_rule_id(INPUT_PURPOSE_RULE.axe_id);
 
                 results.add_violation(violation);
             } else {
@@ -152,7 +153,8 @@ pub fn check_input_purpose(tree: &AXTree) -> WcagResults {
                 .with_fix(
                     "Add an appropriate autocomplete attribute (e.g., autocomplete=\"email\")",
                 )
-                .with_help_url(INPUT_PURPOSE_RULE.help_url);
+                .with_help_url(INPUT_PURPOSE_RULE.help_url)
+                .with_rule_id(INPUT_PURPOSE_RULE.axe_id);
 
                 results.add_violation(violation);
             }

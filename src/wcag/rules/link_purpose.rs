@@ -53,7 +53,8 @@ pub fn check_link_purpose(tree: &AXTree) -> WcagResults {
             .with_role(node.role.clone())
             .with_name(node.name.clone())
             .with_fix("Use descriptive link text that explains where the link goes")
-            .with_help_url(LINK_PURPOSE_RULE.help_url);
+            .with_help_url(LINK_PURPOSE_RULE.help_url)
+            .with_rule_id(LINK_PURPOSE_RULE.axe_id);
 
             results.add_violation(violation);
         } else if looks_like_url(link_text) && !has_link_context(node, tree) {
@@ -69,7 +70,8 @@ pub fn check_link_purpose(tree: &AXTree) -> WcagResults {
             .with_role(node.role.clone())
             .with_name(node.name.clone())
             .with_fix("Replace URL with descriptive text")
-            .with_help_url(LINK_PURPOSE_RULE.help_url);
+            .with_help_url(LINK_PURPOSE_RULE.help_url)
+            .with_rule_id(LINK_PURPOSE_RULE.axe_id);
 
             results.add_violation(violation.as_warning());
         } else if link_text.len() == 1
@@ -91,7 +93,8 @@ pub fn check_link_purpose(tree: &AXTree) -> WcagResults {
             .with_role(node.role.clone())
             .with_name(node.name.clone())
             .with_fix("Expand single character links to be more descriptive")
-            .with_help_url(LINK_PURPOSE_RULE.help_url);
+            .with_help_url(LINK_PURPOSE_RULE.help_url)
+            .with_rule_id(LINK_PURPOSE_RULE.axe_id);
 
             results.add_violation(violation);
         } else {
@@ -111,7 +114,8 @@ pub fn check_link_purpose(tree: &AXTree) -> WcagResults {
             .with_role(node.role.clone())
             .with_name(node.name.clone())
             .with_fix("Add '(opens in new window)' to link text")
-            .with_help_url(LINK_PURPOSE_RULE.help_url);
+            .with_help_url(LINK_PURPOSE_RULE.help_url)
+            .with_rule_id(LINK_PURPOSE_RULE.axe_id);
 
             results.add_violation(violation);
         }

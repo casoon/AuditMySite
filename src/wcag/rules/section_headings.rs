@@ -46,7 +46,8 @@ pub fn check_section_headings(tree: &AXTree) -> WcagResults {
             "page",
         )
         .with_fix("Add descriptive headings to each section/article element")
-        .with_help_url(SECTION_HEADINGS_RULE.help_url);
+        .with_help_url(SECTION_HEADINGS_RULE.help_url)
+        .with_rule_id(SECTION_HEADINGS_RULE.axe_id);
 
         results.add_violation(violation);
     } else if total_sections > 0 {
@@ -68,7 +69,8 @@ pub fn check_section_headings(tree: &AXTree) -> WcagResults {
             "page",
         )
         .with_fix("Break up long content with descriptive section headings")
-        .with_help_url(SECTION_HEADINGS_RULE.help_url);
+        .with_help_url(SECTION_HEADINGS_RULE.help_url)
+        .with_rule_id(SECTION_HEADINGS_RULE.axe_id);
 
         results.add_violation(violation);
     }
@@ -85,7 +87,8 @@ pub fn check_section_headings(tree: &AXTree) -> WcagResults {
             "page",
         )
         .with_fix("Use consecutive heading levels (h1, h2, h3) without skipping")
-        .with_help_url(SECTION_HEADINGS_RULE.help_url);
+        .with_help_url(SECTION_HEADINGS_RULE.help_url)
+        .with_rule_id(SECTION_HEADINGS_RULE.axe_id);
 
         results.add_violation(violation);
     }

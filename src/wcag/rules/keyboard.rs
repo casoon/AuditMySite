@@ -60,7 +60,8 @@ pub fn check_keyboard(tree: &AXTree) -> WcagResults {
             .with_role(node.role.clone())
             .with_name(node.name.clone())
             .with_fix("Add an appropriate ARIA role or use a native interactive element")
-            .with_help_url(KEYBOARD_RULE.help_url);
+            .with_help_url(KEYBOARD_RULE.help_url)
+            .with_rule_id(KEYBOARD_RULE.axe_id);
 
             results.add_violation(violation);
         }
@@ -87,6 +88,7 @@ pub fn check_keyboard(tree: &AXTree) -> WcagResults {
                 "Add tabindex=\"0\" to make the element focusable, or use the native HTML element (e.g. <button>, <a>).",
             )
             .with_help_url(KEYBOARD_RULE.help_url)
+            .with_rule_id(KEYBOARD_RULE.axe_id)
             .as_warning();
             results.add_violation(warning);
         }
@@ -104,7 +106,8 @@ pub fn check_keyboard(tree: &AXTree) -> WcagResults {
             .with_role(node.role.clone())
             .with_name(node.name.clone())
             .with_fix("Ensure focus can be moved away using standard keyboard navigation")
-            .with_help_url(NO_KEYBOARD_TRAP_RULE.help_url);
+            .with_help_url(NO_KEYBOARD_TRAP_RULE.help_url)
+            .with_rule_id(NO_KEYBOARD_TRAP_RULE.axe_id);
 
             results.add_violation(violation);
         }
@@ -127,6 +130,7 @@ pub fn check_keyboard(tree: &AXTree) -> WcagResults {
             "Ensure every focusable region has a keyboard escape path (Escape key, visible close button reachable by Tab, or documented keyboard shortcut).",
         )
         .with_help_url(NO_KEYBOARD_TRAP_RULE.help_url)
+            .with_rule_id(NO_KEYBOARD_TRAP_RULE.axe_id)
         .with_kind(FindingKind::NotTestable),
     );
 

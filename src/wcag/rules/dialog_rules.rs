@@ -64,7 +64,8 @@ fn check_dialog_has_name(node: &AXNode, results: &mut WcagResults) {
         )
         .with_role(node.role.clone())
         .with_fix("Add aria-labelledby pointing to the dialog title, or use aria-label")
-        .with_help_url(RULE_META.help_url);
+        .with_help_url(RULE_META.help_url)
+        .with_rule_id(RULE_META.axe_id);
 
         results.add_violation(violation);
     } else {
@@ -88,7 +89,8 @@ fn check_dialog_modal_property(node: &AXNode, results: &mut WcagResults) {
         .with_role(node.role.clone())
         .with_name(node.name.clone())
         .with_fix("Add aria-modal=\"true\" to the dialog element so assistive technologies know to restrict focus")
-        .with_help_url("https://www.w3.org/WAI/ARIA/apg/patterns/dialog-modal/");
+        .with_help_url("https://www.w3.org/WAI/ARIA/apg/patterns/dialog-modal/")
+        .with_rule_id(RULE_META.axe_id);
 
         results.add_violation(violation);
     } else {
@@ -109,7 +111,8 @@ fn check_alert_has_name(node: &AXNode, results: &mut WcagResults) {
         )
         .with_role(node.role.clone())
         .with_fix("Add aria-label or aria-labelledby to identify the alert or status region")
-        .with_help_url("https://www.w3.org/WAI/WCAG21/Understanding/name-role-value.html");
+        .with_help_url("https://www.w3.org/WAI/WCAG21/Understanding/name-role-value.html")
+        .with_rule_id(RULE_META.axe_id);
 
         results.add_violation(violation);
     } else {

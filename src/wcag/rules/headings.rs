@@ -69,7 +69,8 @@ fn check_empty_heading(heading: &AXNode, results: &mut WcagResults) {
         )
         .with_role(heading.role.clone())
         .with_fix("Add descriptive text content to the heading")
-        .with_help_url(RULE_META.help_url);
+        .with_help_url(RULE_META.help_url)
+        .with_rule_id(RULE_META.axe_id);
 
         results.add_violation(violation);
     } else {
@@ -150,7 +151,8 @@ fn check_multiple_h1(headings: &[&AXNode], results: &mut WcagResults) {
             .with_role(heading.role.clone())
             .with_name(heading.name.clone())
             .with_fix("Consider using h2 or lower for secondary main headings")
-            .with_help_url(RULE_META.help_url);
+            .with_help_url(RULE_META.help_url)
+            .with_rule_id(RULE_META.axe_id);
 
             results.add_violation(violation);
         }
@@ -176,7 +178,8 @@ fn check_missing_h1(headings: &[&AXNode], results: &mut WcagResults) {
                 &first_heading.node_id,
             )
             .with_fix("Add an h1 element as the main page heading")
-            .with_help_url(RULE_META.help_url);
+            .with_help_url(RULE_META.help_url)
+            .with_rule_id(RULE_META.axe_id);
 
             results.add_violation(violation);
         }

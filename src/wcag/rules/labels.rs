@@ -106,7 +106,8 @@ fn check_form_control(node: &crate::accessibility::AXNode, results: &mut WcagRes
         .with_role(node.role.clone())
         .with_name(node.name.clone())
         .with_fix(fix)
-        .with_help_url(RULE_META.help_url);
+        .with_help_url(RULE_META.help_url)
+        .with_rule_id(RULE_META.axe_id);
 
         results.add_violation(violation);
     } else {
@@ -127,7 +128,8 @@ fn check_link(node: &crate::accessibility::AXNode, results: &mut WcagResults) {
         )
         .with_role(node.role.clone())
         .with_fix("Add text content inside the link, or use aria-label")
-        .with_help_url(RULE_META.help_url);
+        .with_help_url(RULE_META.help_url)
+        .with_rule_id(RULE_META.axe_id);
 
         results.add_violation(violation);
     } else {
@@ -179,7 +181,8 @@ fn check_button(node: &crate::accessibility::AXNode, results: &mut WcagResults) 
         )
         .with_role(node.role.clone())
         .with_fix("Add text content inside the button, or use aria-label")
-        .with_help_url(RULE_META.help_url);
+        .with_help_url(RULE_META.help_url)
+        .with_rule_id(RULE_META.axe_id);
 
         results.add_violation(violation);
     } else {

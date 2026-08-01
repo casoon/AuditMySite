@@ -45,7 +45,8 @@ pub fn check_bypass_blocks(tree: &AXTree) -> WcagResults {
             "Add a skip link (e.g. <a href=\"#main\">Skip to content</a>) \
              or wrap the main content in a <main> element",
         )
-        .with_help_url(BYPASS_BLOCKS_RULE.help_url);
+        .with_help_url(BYPASS_BLOCKS_RULE.help_url)
+        .with_rule_id(BYPASS_BLOCKS_RULE.axe_id);
 
         results.add_violation(violation);
     } else {
@@ -62,6 +63,7 @@ pub fn check_bypass_blocks(tree: &AXTree) -> WcagResults {
                     "page",
                 )
                 .with_help_url(BYPASS_BLOCKS_RULE.help_url)
+                .with_rule_id(BYPASS_BLOCKS_RULE.axe_id)
                 .with_kind(FindingKind::Positive),
             );
         }
@@ -76,6 +78,7 @@ pub fn check_bypass_blocks(tree: &AXTree) -> WcagResults {
                     "page",
                 )
                 .with_help_url(BYPASS_BLOCKS_RULE.help_url)
+            .with_rule_id(BYPASS_BLOCKS_RULE.axe_id)
                 .with_kind(FindingKind::Positive),
             );
         }
@@ -93,7 +96,8 @@ pub fn check_bypass_blocks(tree: &AXTree) -> WcagResults {
             "page",
         )
         .with_fix("Add headings (h1-h6) to structure your content")
-        .with_help_url(BYPASS_BLOCKS_RULE.help_url);
+        .with_help_url(BYPASS_BLOCKS_RULE.help_url)
+        .with_rule_id(BYPASS_BLOCKS_RULE.axe_id);
 
         results.add_violation(violation);
     } else {

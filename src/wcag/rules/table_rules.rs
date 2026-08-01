@@ -88,7 +88,8 @@ fn check_table_accessible_name(node: &AXNode, results: &mut WcagResults) {
         )
         .with_role(node.role.clone())
         .with_fix("Add a <caption> element inside the table, or use aria-label/aria-labelledby")
-        .with_help_url(RULE_META.help_url);
+        .with_help_url(RULE_META.help_url)
+        .with_rule_id(RULE_META.axe_id);
 
         results.add_violation(violation);
     } else {
@@ -115,7 +116,8 @@ fn check_table_has_headers(node: &AXNode, tree: &AXTree, results: &mut WcagResul
         .with_fix(
             "Add <th> elements (or role=\"columnheader\"/\"rowheader\") to identify table headers",
         )
-        .with_help_url(RULE_META.help_url);
+        .with_help_url(RULE_META.help_url)
+        .with_rule_id(RULE_META.axe_id);
 
         results.add_violation(violation);
     } else {
@@ -141,7 +143,8 @@ fn check_presentational_table_headers(node: &AXNode, tree: &AXTree, results: &mu
         .with_fix(
             "Remove role=\"presentation\"/\"none\" if this is a data table, or remove header cells if purely for layout",
         )
-        .with_help_url(RULE_META.help_url);
+        .with_help_url(RULE_META.help_url)
+            .with_rule_id(RULE_META.axe_id);
 
         results.add_violation(violation);
     } else {
@@ -170,7 +173,8 @@ fn check_cell_has_row_parent(node: &AXNode, tree: &AXTree, results: &mut WcagRes
         )
         .with_role(node.role.clone())
         .with_fix("Ensure each table cell is inside a <tr> element (role=\"row\")")
-        .with_help_url(RULE_META.help_url);
+        .with_help_url(RULE_META.help_url)
+        .with_rule_id(RULE_META.axe_id);
 
         results.add_violation(violation);
     } else {

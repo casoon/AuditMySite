@@ -48,7 +48,8 @@ pub fn check_instructions(tree: &AXTree) -> WcagResults {
                 .with_role(node.role.clone())
                 .with_name(node.name.clone())
                 .with_fix("Add a <label> element, aria-label, or aria-labelledby attribute")
-                .with_help_url(INSTRUCTIONS_RULE.help_url);
+                .with_help_url(INSTRUCTIONS_RULE.help_url)
+                .with_rule_id(INSTRUCTIONS_RULE.axe_id);
 
                 results.add_violation(violation);
                 continue;
@@ -74,7 +75,8 @@ pub fn check_instructions(tree: &AXTree) -> WcagResults {
                 .with_role(node.role.clone())
                 .with_name(node.name.clone())
                 .with_fix("Add a visible <label> element. Placeholder should supplement, not replace, labels")
-                .with_help_url(INSTRUCTIONS_RULE.help_url);
+                .with_help_url(INSTRUCTIONS_RULE.help_url)
+            .with_rule_id(INSTRUCTIONS_RULE.axe_id);
 
                 results.add_violation(violation);
             }
@@ -92,7 +94,8 @@ pub fn check_instructions(tree: &AXTree) -> WcagResults {
                 .with_role(node.role.clone())
                 .with_name(node.name.clone())
                 .with_fix("Add visual indicator (e.g., asterisk *) and screen reader text for required fields")
-                .with_help_url(INSTRUCTIONS_RULE.help_url);
+                .with_help_url(INSTRUCTIONS_RULE.help_url)
+            .with_rule_id(INSTRUCTIONS_RULE.axe_id);
 
                 results.add_violation(violation);
             }
@@ -110,7 +113,8 @@ pub fn check_instructions(tree: &AXTree) -> WcagResults {
                 .with_role(node.role.clone())
                 .with_name(node.name.clone())
                 .with_fix("Consider adding format instructions (e.g., 'DD/MM/YYYY' for dates)")
-                .with_help_url(INSTRUCTIONS_RULE.help_url);
+                .with_help_url(INSTRUCTIONS_RULE.help_url)
+                .with_rule_id(INSTRUCTIONS_RULE.axe_id);
 
                 results.add_violation(violation);
             }
@@ -138,7 +142,8 @@ pub fn check_instructions(tree: &AXTree) -> WcagResults {
                 )
                 .with_role(node.role.clone())
                 .with_fix("Use <fieldset> with <legend>, or add aria-labelledby to the group")
-                .with_help_url(INSTRUCTIONS_RULE.help_url);
+                .with_help_url(INSTRUCTIONS_RULE.help_url)
+                .with_rule_id(INSTRUCTIONS_RULE.axe_id);
 
                 results.add_violation(violation);
             } else {

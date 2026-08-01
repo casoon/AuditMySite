@@ -62,7 +62,8 @@ fn check_listitem_in_list(node: &AXNode, tree: &AXTree, results: &mut WcagResult
         .with_role(node.role.clone())
         .with_name(node.name.clone())
         .with_fix("Ensure list items (role=\"listitem\") are inside a list (role=\"list\") element")
-        .with_help_url(RULE_META.help_url);
+        .with_help_url(RULE_META.help_url)
+        .with_rule_id(RULE_META.axe_id);
 
         results.add_violation(violation);
     } else {
@@ -91,7 +92,8 @@ fn check_list_not_empty(node: &AXNode, tree: &AXTree, results: &mut WcagResults)
         .with_role(node.role.clone())
         .with_name(node.name.clone())
         .with_fix("Either remove the empty list or add list item elements inside it")
-        .with_help_url(RULE_META.help_url);
+        .with_help_url(RULE_META.help_url)
+        .with_rule_id(RULE_META.axe_id);
 
         results.add_violation(violation);
     } else {
@@ -118,7 +120,8 @@ fn check_term_has_definition(node: &AXNode, tree: &AXTree, results: &mut WcagRes
             .with_fix(
                 "Each <dt> (role=\"term\") must be paired with at least one <dd> (role=\"definition\") under the same parent",
             )
-            .with_help_url(RULE_META.help_url);
+            .with_help_url(RULE_META.help_url)
+            .with_rule_id(RULE_META.axe_id);
 
             results.add_violation(violation);
             return;
@@ -149,7 +152,8 @@ fn check_term_has_definition(node: &AXNode, tree: &AXTree, results: &mut WcagRes
         .with_fix(
             "Each <dt> (role=\"term\") must be paired with at least one <dd> (role=\"definition\") under the same parent",
         )
-        .with_help_url(RULE_META.help_url);
+        .with_help_url(RULE_META.help_url)
+            .with_rule_id(RULE_META.axe_id);
 
         results.add_violation(violation);
     } else {

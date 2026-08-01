@@ -70,7 +70,8 @@ pub fn check_text_alternatives(tree: &AXTree) -> WcagResults {
             .with_fix(
                 "Add an alt attribute describing the image content, or alt=\"\" if decorative",
             )
-            .with_help_url(RULE_META.help_url);
+            .with_help_url(RULE_META.help_url)
+            .with_rule_id(RULE_META.axe_id);
 
             results.add_violation(violation);
         } else {
@@ -131,7 +132,8 @@ fn check_icons(tree: &AXTree, flagged_image_ids: &HashSet<&str>, results: &mut W
                 .with_fix(
                     "Add aria-label for meaningful icons, or aria-hidden=\"true\" for decorative",
                 )
-                .with_help_url(RULE_META.help_url);
+                .with_help_url(RULE_META.help_url)
+                .with_rule_id(RULE_META.axe_id);
 
                 results.add_violation(violation);
             }
@@ -161,7 +163,8 @@ fn check_svg_elements(tree: &AXTree, results: &mut WcagResults) {
             )
             .with_role(node.role.clone())
             .with_fix("Add <title> element inside SVG, or aria-label on the SVG element")
-            .with_help_url(RULE_META.help_url);
+            .with_help_url(RULE_META.help_url)
+            .with_rule_id(RULE_META.axe_id);
 
             results.add_violation(violation);
         }

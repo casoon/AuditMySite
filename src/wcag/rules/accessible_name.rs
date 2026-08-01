@@ -103,6 +103,7 @@ pub fn check_accessible_name(tree: &AXTree) -> WcagResults {
             .with_role(node.role.clone())
             .with_fix("Add aria-label, aria-labelledby, or visible text content")
             .with_help_url(RULE_META.help_url)
+            .with_rule_id(RULE_META.axe_id)
             .with_evidence_item(ViolationEvidence::dom_attribute(
                 "aria-label",
                 Some(aria_label_state.to_string()),
@@ -134,7 +135,8 @@ pub fn check_accessible_name(tree: &AXTree) -> WcagResults {
             .with_role(node.role.clone())
             .with_name(node.name.clone())
             .with_fix("Provide a descriptive accessible name using aria-label or visible text")
-            .with_help_url(RULE_META.help_url);
+            .with_help_url(RULE_META.help_url)
+            .with_rule_id(RULE_META.axe_id);
 
             results.add_violation(violation);
             continue;
@@ -159,7 +161,8 @@ pub fn check_accessible_name(tree: &AXTree) -> WcagResults {
                 .with_fix(
                     "The accessible description should provide additional information beyond the name",
                 )
-                .with_help_url(RULE_META.help_url);
+                .with_help_url(RULE_META.help_url)
+            .with_rule_id(RULE_META.axe_id);
 
                 results.add_violation(violation);
                 continue;
@@ -179,7 +182,8 @@ pub fn check_accessible_name(tree: &AXTree) -> WcagResults {
                 )
                 .with_role(node.role.clone())
                 .with_fix("Provide a valid ID reference in aria-labelledby")
-                .with_help_url(RULE_META.help_url);
+                .with_help_url(RULE_META.help_url)
+                .with_rule_id(RULE_META.axe_id);
 
                 results.add_violation(violation);
                 continue;
@@ -201,7 +205,8 @@ pub fn check_accessible_name(tree: &AXTree) -> WcagResults {
                 .with_fix(
                     "Provide a valid ID reference in aria-describedby or remove the attribute",
                 )
-                .with_help_url(RULE_META.help_url);
+                .with_help_url(RULE_META.help_url)
+                .with_rule_id(RULE_META.axe_id);
 
                 results.add_violation(violation);
                 continue;
