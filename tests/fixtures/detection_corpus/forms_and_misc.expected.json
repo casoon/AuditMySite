@@ -8,8 +8,8 @@
     { "rule_id": "form-field-multiple-labels", "verdict": "violation" },
     { "rule_id": "label-content-name-mismatch", "verdict": "violation" },
     { "rule_id": "server-side-image-map", "verdict": "violation" },
-    { "rule_id": "location", "verdict": "needs_review" },
-    { "rule_id": "skip-link", "verdict": "needs_review" },
+    { "rule_id": "location", "verdict": "violation" },
+    { "rule_id": "skip-link", "verdict": "violation" },
     { "rule_id": "content-on-hover-focus", "verdict": "violation" }
   ]
 }

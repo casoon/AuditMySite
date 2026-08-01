@@ -3,7 +3,7 @@
   "expectations": [
     { "rule_id": "landmark-main-present", "verdict": "violation" },
     { "rule_id": "region", "verdict": "violation" },
-    { "rule_id": "landmark-one-main", "verdict": "needs_review" },
-    { "rule_id": "bypass", "verdict": "needs_review" }
+    { "rule_id": "landmark-one-main", "verdict": "violation" },
+    { "rule_id": "bypass", "verdict": "violation" }
   ]
 }

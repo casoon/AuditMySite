@@ -51,10 +51,24 @@ pub async fn enrich_violations_with_page(
             .and_then(|n| n.backend_dom_node_id)
         {
             Some(id) => id,
-            // AX node exists in tree but has no DOM node ID — ghost element.
-            // Demote to warning: cannot be verified or located by a developer.
             None => {
-                violation.kind = crate::wcag::types::FindingKind::Warning;
+                // Two different situations land here, and only one is a real
+                // "ghost element": either `node_id` names a real AX node that
+                // has no backend DOM node id (element vanished — genuinely
+                // unconfirmable, demote), or `node_id` is one of the
+                // well-known page-level placeholders ("page"/"root"/
+                // "document") that dozens of page-wide checks (skip-link,
+                // css-orientation-lock, location, css-order-reading-sequence,
+                // …) intentionally use for findings that were never tied to
+                // one specific DOM element in the first place — those were
+                // never "resolvable" to begin with, so failing to resolve
+                // them isn't evidence of anything and must not silently
+                // downgrade an otherwise-confident violation to a warning
+                // (#562: this was the actual root cause of a violation→
+                // warning downgrade affecting many unrelated rule files).
+                if !is_page_level_placeholder_node_id(&violation.node_id) {
+                    violation.kind = crate::wcag::types::FindingKind::Warning;
+                }
                 continue;
             }
         };
@@ -126,6 +140,23 @@ pub async fn enrich_violations_with_page(
             );
         }
     }
+}
+
+/// True for a `node_id` that could never have come from CDP in the first
+/// place — real `Accessibility.AXNodeId` values are always non-negative
+/// integer strings (confirmed by `extractor.rs`'s own parsing: a fresh tree's
+/// first node is literally `"1"`). Dozens of page-wide WCAG checks
+/// (skip-link, css-orientation-lock, location, css-order-reading-sequence,
+/// visual-presentation's `"stylesheet"`, and others) intentionally use a
+/// word like `"page"`/`"root"`/`"document"`/`"stylesheet"` as the `node_id`
+/// for findings that were never tied to one specific DOM element — those
+/// were never resolvable to begin with, so failing to look them up in the AX
+/// tree isn't evidence the underlying element vanished (#562). Checking "is
+/// this a real CDP id shape" instead of matching a fixed word list is
+/// deliberate: it stays correct for whichever placeholder word some new rule
+/// file picks next, without needing this list edited every time.
+fn is_page_level_placeholder_node_id(node_id: &str) -> bool {
+    !node_id.is_empty() && !node_id.bytes().all(|b| b.is_ascii_digit())
 }
 
 /// Detects JS lazy-load `<img>` placeholders whose real source/alt is deferred to
@@ -428,6 +459,30 @@ mod tests {
     fn short_url_keeps_short_src() {
         let short = "/img/logo.png";
         assert_eq!(short_url(short), short);
+    }
+
+    #[test]
+    fn page_level_placeholder_node_ids_are_recognized() {
+        // Every known placeholder word in use across the rule files, plus a
+        // hypothetical new one — the point of the numeric-shape heuristic is
+        // that it doesn't need this list maintained.
+        assert!(is_page_level_placeholder_node_id("page"));
+        assert!(is_page_level_placeholder_node_id("root"));
+        assert!(is_page_level_placeholder_node_id("document"));
+        assert!(is_page_level_placeholder_node_id("stylesheet"));
+        assert!(is_page_level_placeholder_node_id("some-future-placeholder"));
+    }
+
+    #[test]
+    fn real_ax_node_ids_are_not_page_level_placeholders() {
+        // Real CDP AX node ids look like small integers-as-strings
+        // (extractor.rs's own parsing: a fresh tree's first node is "1").
+        assert!(!is_page_level_placeholder_node_id("42"));
+        assert!(!is_page_level_placeholder_node_id("1"));
+        // Empty is treated as a genuine unknown, not a placeholder — still
+        // demoted, since there's no signal it was ever an intentional
+        // page-wide reference rather than a bug.
+        assert!(!is_page_level_placeholder_node_id(""));
     }
 
     #[test]
