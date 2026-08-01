@@ -228,6 +228,30 @@ pub async fn analyze_security(url: &str) -> Result<SecurityAnalysis> {
     // Generate issues
     let mut issues = generate_security_issues(&headers, https);
 
+    // HSTS preload eligibility + Permissions-Policy quality (#535)
+    if hsts_preload_ineligible(&ssl) {
+        issues.push(SecurityIssue {
+            header: "Strict-Transport-Security".to_string(),
+            issue_type: "hsts_preload_ineligible".to_string(),
+            message: format!(
+                "HSTS preload directive is set but requirements aren't met (max-age={}, includeSubDomains={}) — the site won't qualify for the HSTS preload list",
+                ssl.hsts_max_age
+                    .map(|v| v.to_string())
+                    .unwrap_or_else(|| "unset".to_string()),
+                ssl.hsts_include_subdomains
+            ),
+            severity: Severity::Low,
+        });
+    }
+    if permissions_policy_is_permissive(&headers) {
+        issues.push(SecurityIssue {
+            header: "Permissions-Policy".to_string(),
+            issue_type: "permissions_policy_permissive".to_string(),
+            message: "Permissions-Policy header is present but doesn't restrict any feature (empty or wildcard-only)".to_string(),
+            severity: Severity::Low,
+        });
+    }
+
     // Public source-map leak check (#538)
     let sourcemap_leaks = audit_source_maps(url).await;
     if !sourcemap_leaks.leaks.is_empty() {
@@ -531,6 +555,35 @@ fn cors_allows_wildcard_credentials(headers: &SecurityHeaders) -> bool {
             .access_control_allow_credentials
             .as_deref()
             .is_some_and(|credentials| credentials.trim().eq_ignore_ascii_case("true"))
+}
+
+/// True when the HSTS header's `preload` directive is present but the site
+/// doesn't actually meet the HSTS preload list requirements (max-age of at
+/// least one year AND `includeSubDomains`) — claiming preload readiness
+/// without meeting it is a misleading/incomplete configuration (#535).
+fn hsts_preload_ineligible(ssl: &SslInfo) -> bool {
+    const ONE_YEAR_SECONDS: u64 = 31_536_000;
+    ssl.hsts_preload
+        && (ssl.hsts_max_age.unwrap_or(0) < ONE_YEAR_SECONDS || !ssl.hsts_include_subdomains)
+}
+
+/// True when Permissions-Policy is present but restricts nothing: an empty
+/// value, or every listed feature left wide open with `*` (#535).
+fn permissions_policy_is_permissive(headers: &SecurityHeaders) -> bool {
+    let Some(value) = headers.permissions_policy.as_deref() else {
+        return false;
+    };
+    let trimmed = value.trim();
+    if trimmed.is_empty() {
+        return true;
+    }
+    trimmed.split(',').all(|directive| {
+        directive
+            .split('=')
+            .nth(1)
+            .map(|allowlist| allowlist.trim() == "*")
+            .unwrap_or(false)
+    })
 }
 
 fn collect_csp_quality_issues(policy: &str) -> Vec<SecurityIssue> {
@@ -983,6 +1036,83 @@ mod tests {
         assert!(!issues
             .iter()
             .any(|issue| issue.issue_type == "cors_wildcard_credentials"));
+    }
+
+    #[test]
+    fn hsts_preload_ineligible_flags_short_max_age() {
+        let ssl = SslInfo {
+            hsts_preload: true,
+            hsts_max_age: Some(3600),
+            hsts_include_subdomains: true,
+            ..Default::default()
+        };
+        assert!(hsts_preload_ineligible(&ssl));
+    }
+
+    #[test]
+    fn hsts_preload_ineligible_flags_missing_subdomains() {
+        let ssl = SslInfo {
+            hsts_preload: true,
+            hsts_max_age: Some(31536000),
+            hsts_include_subdomains: false,
+            ..Default::default()
+        };
+        assert!(hsts_preload_ineligible(&ssl));
+    }
+
+    #[test]
+    fn hsts_preload_eligible_is_not_flagged() {
+        let ssl = SslInfo {
+            hsts_preload: true,
+            hsts_max_age: Some(31536000),
+            hsts_include_subdomains: true,
+            ..Default::default()
+        };
+        assert!(!hsts_preload_ineligible(&ssl));
+    }
+
+    #[test]
+    fn hsts_preload_not_set_is_not_flagged_regardless_of_max_age() {
+        let ssl = SslInfo {
+            hsts_preload: false,
+            hsts_max_age: Some(60),
+            hsts_include_subdomains: false,
+            ..Default::default()
+        };
+        assert!(!hsts_preload_ineligible(&ssl));
+    }
+
+    #[test]
+    fn permissions_policy_empty_value_is_permissive() {
+        let headers = SecurityHeaders {
+            permissions_policy: Some("".to_string()),
+            ..Default::default()
+        };
+        assert!(permissions_policy_is_permissive(&headers));
+    }
+
+    #[test]
+    fn permissions_policy_wildcard_only_is_permissive() {
+        let headers = SecurityHeaders {
+            permissions_policy: Some("camera=*, microphone=*".to_string()),
+            ..Default::default()
+        };
+        assert!(permissions_policy_is_permissive(&headers));
+    }
+
+    #[test]
+    fn permissions_policy_restrictive_is_not_flagged() {
+        let headers = SecurityHeaders {
+            permissions_policy: Some("camera=(), microphone=(self)".to_string()),
+            ..Default::default()
+        };
+        assert!(!permissions_policy_is_permissive(&headers));
+    }
+
+    #[test]
+    fn permissions_policy_absent_is_not_flagged_as_permissive() {
+        let headers = SecurityHeaders::default();
+        assert!(!permissions_policy_is_permissive(&headers));
     }
 
     #[test]
