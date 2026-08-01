@@ -1,0 +1,14 @@
+{
+  "case": "aria_naming_roles",
+  "expectations": [
+    { "rule_id": "aria-command-name", "verdict": "violation" },
+    { "rule_id": "aria-input-field-name", "verdict": "violation" },
+    { "rule_id": "aria-meter-name", "verdict": "violation" },
+    { "rule_id": "aria-progressbar-name", "verdict": "violation" },
+    { "rule_id": "aria-toggle-field-name", "verdict": "violation" },
+    { "rule_id": "aria-treeitem-name", "verdict": "violation" },
+    { "rule_id": "aria-dialog-name", "verdict": "violation" },
+    { "rule_id": "dialog-name", "verdict": "violation" },
+    { "rule_id": "dialog-no-focusable", "verdict": "violation" }
+  ]
+}

@@ -1,0 +1,10 @@
+{
+  "case": "keyboard_and_targets",
+  "expectations": [
+    { "rule_id": "keyboard", "verdict": "violation" },
+    { "rule_id": "click-events-have-key-events", "verdict": "violation" },
+    { "rule_id": "target-size", "verdict": "violation" },
+    { "rule_id": "target-size-minimum", "verdict": "violation" },
+    { "rule_id": "form-no-submit", "verdict": "violation" }
+  ]
+}

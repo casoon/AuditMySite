@@ -1,0 +1,11 @@
+{
+  "case": "landmark_granular",
+  "expectations": [
+    { "rule_id": "landmark-banner-is-top-level", "verdict": "violation" },
+    { "rule_id": "landmark-main-is-top-level", "verdict": "violation" },
+    { "rule_id": "landmark-no-duplicate-banner", "verdict": "violation" },
+    { "rule_id": "landmark-no-duplicate-contentinfo", "verdict": "violation" },
+    { "rule_id": "landmark-no-duplicate-main", "verdict": "violation" },
+    { "rule_id": "landmark-unique", "verdict": "violation" }
+  ]
+}

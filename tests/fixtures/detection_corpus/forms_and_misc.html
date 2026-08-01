@@ -1,0 +1,45 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <title>Forms and misc corpus case</title>
+</head>
+<body>
+    <nav>
+        <a href="/a">Section A</a>
+        <a href="/b">Section B</a>
+        <a href="/c">Section C</a>
+    </nav>
+    <main>
+        <h1>Various form and misc issues</h1>
+
+        <!-- duplicate-id-aria: two owners claim the same aria-owns target -->
+        <div aria-owns="shared-target">Owner 1</div>
+        <div aria-owns="shared-target">Owner 2</div>
+        <div id="shared-target">Target</div>
+
+        <form>
+            <!-- autocomplete-valid -->
+            <label for="misc1">Misc field</label>
+            <input type="text" id="misc1" autocomplete="not-a-real-token">
+
+            <!-- identify-purpose + help: personal-data input, no autocomplete/describedby -->
+            <label for="user-email">Email</label>
+            <input type="email" id="user-email" name="user_email">
+
+            <!-- label-title-only -->
+            <input type="text" title="Search field only">
+
+            <!-- form-field-multiple-labels (grouped radios without fieldset/legend) -->
+            <input type="radio" name="color" id="c1"><label for="c1">Red</label>
+            <input type="radio" name="color" id="c2"><label for="c2">Blue</label>
+
+            <!-- label-content-name-mismatch -->
+            <button aria-label="Submit the entire form now">Send</button>
+        </form>
+
+        <!-- server-side-image-map -->
+        <a href="/map"><img src="map.png" ismap alt="Site map"></a>
+    </main>
+</body>
+</html>

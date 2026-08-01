@@ -1,0 +1,19 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <title>ARIA role naming corpus case</title>
+</head>
+<body>
+    <main>
+        <h1>Widgets with role but no accessible name</h1>
+        <div role="menuitem" tabindex="0"></div>
+        <div role="slider" tabindex="0" aria-valuenow="5" aria-valuemin="0" aria-valuemax="10"></div>
+        <div role="meter" aria-valuenow="5" aria-valuemin="0" aria-valuemax="10"></div>
+        <div role="progressbar" aria-valuenow="50" aria-valuemin="0" aria-valuemax="100"></div>
+        <div role="switch" tabindex="0" aria-checked="false"></div>
+        <div role="tree"><div role="treeitem" tabindex="0"></div></div>
+        <div role="dialog"></div>
+    </main>
+</body>
+</html>

@@ -134,6 +134,11 @@ async fn detection_corpus_matches_real_audit_run() {
         for exp in &case.expectations {
             let matches_violations = wcag.violations.iter().any(|v| finding_matches(v, exp));
             let matches_warnings = wcag.warnings.iter().any(|v| finding_matches(v, exp));
+            // FindingKind::NotTestable findings (always-manual-review checks like
+            // media-alt/help's page-wide notice) route to their own bucket, not
+            // warnings — treated the same as "needs review" here since both mean
+            // "no automated verdict, a human must look."
+            let matches_not_testable = wcag.not_testables.iter().any(|v| finding_matches(v, exp));
 
             match exp.verdict {
                 Verdict::Violation => {
@@ -149,7 +154,7 @@ async fn detection_corpus_matches_real_audit_run() {
                     }
                 }
                 Verdict::NeedsReview => {
-                    if !matches_violations && !matches_warnings {
+                    if !matches_violations && !matches_warnings && !matches_not_testable {
                         false_negatives.push(expectation_label(
                             exp,
                             "expected needs_review, found neither",

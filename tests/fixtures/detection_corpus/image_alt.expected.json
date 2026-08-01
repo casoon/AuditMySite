@@ -1,6 +1,15 @@
 {
   "case": "image_alt",
   "expectations": [
-    { "rule_id": "image-alt", "verdict": "violation" }
+    { "rule_id": "image-alt", "verdict": "violation" },
+    { "rule_id": "unusual-words", "verdict": "needs_review" },
+    { "rule_id": "keyboard-trap", "verdict": "needs_review" },
+    { "rule_id": "pointer-gestures", "verdict": "needs_review" },
+    { "rule_id": "pointer-cancellation", "verdict": "needs_review" },
+    { "rule_id": "motion-actuation", "verdict": "needs_review" },
+    { "rule_id": "no-timing", "verdict": "needs_review" },
+    { "rule_id": "no-interruptions", "verdict": "needs_review" },
+    { "rule_id": "re-authenticate", "verdict": "needs_review" },
+    { "rule_id": "timeouts", "verdict": "needs_review" }
   ]
 }

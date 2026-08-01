@@ -1,0 +1,29 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <title>Widget pattern corpus case</title>
+</head>
+<body>
+    <main>
+        <h1>Accordion, tablist, and combobox patterns</h1>
+
+        <!-- accordion-trigger-not-button: aria-expanded on a non-button element -->
+        <div aria-expanded="false">Section 1 (div trigger)</div>
+
+        <!-- accordion-no-controls: button trigger without aria-controls -->
+        <button aria-expanded="false">Section 2</button>
+
+        <!-- aria-tablist-tabpanel + aria-tab-selected-state: no tabpanel, no aria-selected -->
+        <div role="tablist" aria-label="Sections">
+            <div role="tab" id="tab1">Tab 1</div>
+        </div>
+
+        <!-- aria-combobox-options: listbox is a sibling, not a subtree descendant -->
+        <div role="combobox" aria-expanded="true" aria-label="Fruit" tabindex="0"></div>
+        <ul id="listbox1" role="listbox">
+            <li role="option">Apple</li>
+        </ul>
+    </main>
+</body>
+</html>

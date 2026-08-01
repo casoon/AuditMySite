@@ -1,0 +1,19 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <title>Keyboard and target size corpus case</title>
+</head>
+<body>
+    <main>
+        <h1>Keyboard access and target size issues</h1>
+        <div tabindex="0">Focusable div without an interactive role</div>
+        <div onclick="console.log('clicked')">Clickable div with no keyboard handler</div>
+        <button style="width:16px;height:16px;padding:0;min-width:0;min-height:0;border:none;">X</button>
+        <form>
+            <label for="q">Search</label>
+            <input type="text" id="q" name="q">
+        </form>
+    </main>
+</body>
+</html>

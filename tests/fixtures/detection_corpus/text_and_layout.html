@@ -1,0 +1,47 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <title>Text and layout corpus case</title>
+    <style>
+        .justified {
+            text-align: justify;
+        }
+        .flex-reorder {
+            display: flex;
+        }
+        .flex-reorder .second {
+            order: 1;
+        }
+        .flex-reorder .first {
+            order: 2;
+        }
+        .tight-box {
+            width: 110px;
+            height: 20px;
+            overflow: hidden;
+            font-size: 14px;
+            line-height: 1.1;
+        }
+    </style>
+</head>
+<body>
+    <main>
+        <h1>Text alignment, reading order, and spacing</h1>
+        <p class="justified">
+            This paragraph uses justified text alignment, which creates uneven spacing
+            between words and can make reading more difficult for some users.
+        </p>
+        <div class="flex-reorder">
+            <div class="first">First in DOM</div>
+            <div class="second">Second in DOM but shown first visually</div>
+        </div>
+        <div class="tight-box">This short line of text is clipped in a fixed-height overflow-hidden box.</div>
+        <p>
+            Die Bundesrepublik Deutschland ist ein demokratischer und sozialer Bundesstaat.
+            Alle Staatsgewalt geht vom Volke aus und wird durch Wahlen und Abstimmungen sowie
+            durch besondere Organe der Gesetzgebung ausgeübt.
+        </p>
+    </main>
+</body>
+</html>

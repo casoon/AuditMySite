@@ -1,0 +1,42 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <title>ARIA attribute validation corpus case</title>
+</head>
+<body>
+    <main>
+        <h1>Various ARIA attribute misuses</h1>
+
+        <!-- aria-attr-name-invalid: not a real ARIA attribute -->
+        <div aria-nonexistentattr="true">Unknown ARIA attribute</div>
+
+        <!-- aria-prohibited-attr: aria-label is prohibited on role="presentation" -->
+        <span role="presentation" aria-label="Redundant label">Decorative span</span>
+
+        <!-- aria-allowed-attr: aria-checked is not allowed on role="img" -->
+        <div role="img" aria-checked="true" aria-label="Icon">Icon</div>
+
+        <!-- aria-roles: not a real ARIA role -->
+        <div role="not-a-real-role">Invalid role value</div>
+
+        <!-- aria-valid-attr: aria-controls present but empty -->
+        <button aria-controls="" aria-label="Toggle">Toggle</button>
+
+        <!-- aria-valid-attr-value: aria-labelledby references a non-existent id -->
+        <p aria-labelledby="does-not-exist">Broken reference</p>
+
+        <!-- aria-required-parent: role="tab" outside a tablist -->
+        <div role="tab" tabindex="0">Orphan tab</div>
+
+        <!-- aria-hidden-focus: a focusable element inside aria-hidden -->
+        <div aria-hidden="true">
+            <button tabindex="0">Hidden but still focusable</button>
+        </div>
+
+        <!-- aria-invalid-without-describedby -->
+        <label for="email-field">Email</label>
+        <input id="email-field" type="email" aria-invalid="true">
+    </main>
+</body>
+</html>

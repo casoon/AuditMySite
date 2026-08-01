@@ -1,0 +1,65 @@
+<!DOCTYPE html>
+<html lang="en" xml:lang="de">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=3">
+    <title>Misc content checks corpus case</title>
+    <style>
+        .low-contrast-checkbox {
+            border: 1px solid #f8f8f8;
+            background: #ffffff;
+        }
+        .inline-link {
+            color: blue;
+            text-decoration: none;
+        }
+    </style>
+</head>
+<body>
+    <main>
+        <h1>Image maps, tables, abbreviations, and misc issues</h1>
+
+        <!-- area-alt -->
+        <img src="/floorplan.png" usemap="#floor-map" alt="Floor plan">
+        <map name="floor-map">
+            <area href="/room1" shape="rect" coords="0,0,50,50">
+        </map>
+
+        <!-- input-image-alt -->
+        <input type="image" src="/submit.png">
+
+        <!-- presentation-semantic-children -->
+        <div role="presentation">
+            <button>Semantic button inside a presentation container</button>
+        </div>
+
+        <!-- definition-list / table-duplicate-name: data table without any headers -->
+        <table>
+            <tbody>
+                <tr><td>Alice</td><td>90</td></tr>
+                <tr><td>Bob</td><td>85</td></tr>
+            </tbody>
+        </table>
+
+        <!-- redundant-entry: two email fields without reuse/autocomplete -->
+        <form>
+            <label for="email-a">Email</label>
+            <input type="email" id="email-a" name="email_a">
+            <label for="email-b">Confirm email</label>
+            <input type="email" id="email-b" name="email_b">
+        </form>
+
+        <!-- abbreviations -->
+        <p><abbr>W3C</abbr> publishes web standards.</p>
+
+        <!-- modern-attribute-misuse: popovertarget references a missing element -->
+        <button popovertarget="missing-popover-id">Open</button>
+
+        <!-- non-text-contrast-css: checkbox border barely distinguishable from background -->
+        <input type="checkbox" class="low-contrast-checkbox">
+
+        <!-- link-in-text-block: inline link distinguished only by color -->
+        <p>Read our <a href="/policy" class="inline-link">privacy policy</a> for details.</p>
+    </main>
+</body>
+</html>
