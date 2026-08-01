@@ -3,9 +3,8 @@
 //! Validates that elements do not use ARIA attributes that are explicitly
 //! prohibited for their role.
 
-use crate::accessibility::AXTree;
 use crate::cli::WcagLevel;
-use crate::wcag::types::{RuleMetadata, Severity, Violation, WcagResults};
+use crate::wcag::types::{RuleMetadata, Severity, Violation};
 use chromiumoxide::Page;
 use tracing::warn;
 
@@ -21,7 +20,17 @@ pub const RULE_META: RuleMetadata = RuleMetadata {
     tags: &["wcag2a", "wcag412", "cat.aria"],
 };
 
-/// Roles and the ARIA attributes that are prohibited on them
+/// Roles and the ARIA attributes that are prohibited on them.
+///
+/// Checked entirely via `check_aria_prohibited_attr_with_page` (DOM-based),
+/// not the AX tree: `aria-label`/`aria-labelledby` never surface as their own
+/// AX property at all — CDP folds them directly into the computed accessible
+/// `name` instead of exposing a raw "label"/"labelledby" property the way it
+/// does for e.g. `aria-expanded` → `expanded` (#564). `aria-roledescription`
+/// *is* exposed as an unprefixed `roledescription` property, but is kept
+/// here too rather than split across two detection paths, since this table
+/// is the single source of truth the JS selector below is generated from —
+/// keep the two in sync when editing either.
 const PROHIBITED_ATTRS: &[(&str, &[&str])] = &[
     ("presentation", &["aria-label", "aria-labelledby"]),
     ("none", &["aria-label", "aria-labelledby"]),
@@ -38,80 +47,39 @@ const PROHIBITED_ATTRS: &[(&str, &[&str])] = &[
     ("insertion", &["aria-label", "aria-labelledby"]),
 ];
 
-/// Check that elements do not use ARIA attributes prohibited for their role
-pub fn check_aria_prohibited_attr(tree: &AXTree) -> WcagResults {
-    let mut results = WcagResults::new();
-
-    for node in tree.iter() {
-        if node.ignored {
-            continue;
-        }
-        results.nodes_checked += 1;
-
-        let role = match node.role.as_deref() {
-            Some(r) => r,
-            None => continue,
-        };
-
-        let prohibited = match PROHIBITED_ATTRS.iter().find(|(r, _)| *r == role) {
-            Some((_, attrs)) => attrs,
-            None => continue,
-        };
-
-        for prop in &node.properties {
-            if !prop.name.starts_with("aria-") {
-                continue;
-            }
-
-            let attr_name = prop.name.as_str();
-
-            if prohibited.contains(&attr_name) {
-                let violation = Violation::new(
-                    RULE_META.id,
-                    RULE_META.name,
-                    RULE_META.level,
-                    RULE_META.severity,
-                    format!(
-                        "ARIA attribute '{}' is prohibited on role '{}'",
-                        attr_name, role
-                    ),
-                    &node.node_id,
-                )
-                .with_role(node.role.clone())
-                .with_name(node.name.clone())
-                .with_rule_id(RULE_META.axe_id)
-                .with_tags(RULE_META.tags.iter().map(|s| s.to_string()).collect())
-                .with_fix(format!(
-                    "Remove '{}' from this element with role '{}'",
-                    attr_name, role
-                ))
-                .with_help_url(RULE_META.help_url);
-
-                results.add_violation(violation);
-            }
-        }
-    }
-
-    results
-}
-
-/// DOM supplement for generic elements that may be omitted or simplified in
-/// the AX tree. Mirrors axe-core's `aria-prohibited-attr` check for the common
-/// case of naming a generic `div`/`span` without assigning a valid role.
+/// DOM-based: elements without an explicit `role` attribute default to an
+/// implicit `generic`/`none`-like role depending on tag, so `div`/`span`
+/// carrying a prohibited attribute are checked directly by tag. Elements
+/// with an *explicit* `role="..."` matching `PROHIBITED_ATTRS` are checked
+/// by role. See `PROHIBITED_ATTRS`'s doc comment for why this can't be an
+/// AX-tree check for `aria-label`/`aria-labelledby` (#564).
 pub async fn check_aria_prohibited_attr_with_page(page: &Page) -> Vec<Violation> {
+    // Built from PROHIBITED_ATTRS so it stays the single source of truth —
+    // one `[role="x"][aria-y]` clause per (role, attribute) pair.
+    let explicit_role_selector = PROHIBITED_ATTRS
+        .iter()
+        .flat_map(|(role, attrs)| {
+            attrs
+                .iter()
+                .map(move |attr| format!("[role=\"{role}\"][{attr}]"))
+        })
+        .collect::<Vec<_>>()
+        .join(",");
+
     let js = [
         "(function() {",
         crate::accessibility::js_helpers::CSS_SELECTOR_JS,
         r#"
         var issues = [];
-        var selector = [
+        var implicitSelector = [
           'div:not([role])[aria-label]',
           'div:not([role])[aria-labelledby]',
           'div:not([role])[aria-roledescription]',
           'span:not([role])[aria-label]',
           'span:not([role])[aria-labelledby]',
           'span:not([role])[aria-roledescription]'
-        ].join(',');
+        ];
+        var selector = implicitSelector.join(',') + ',__EXPLICIT_ROLE_SELECTOR__';
         var elements = document.querySelectorAll(selector);
         for (var i = 0; i < elements.length; i++) {
           var el = elements[i];
@@ -125,14 +93,16 @@ pub async fn check_aria_prohibited_attr_with_page(page: &Page) -> Vec<Violation>
           issues.push({
             selector: __amsCssSelector(el),
             snippet: el.outerHTML.substring(0, 200),
-            attrs: attrs.join(', ')
+            attrs: attrs.join(', '),
+            role: el.getAttribute('role') || el.tagName.toLowerCase()
           });
         }
         return issues;
         "#,
         "})()",
     ]
-    .concat();
+    .concat()
+    .replace("__EXPLICIT_ROLE_SELECTOR__", &explicit_role_selector);
 
     let result = match page.evaluate(js.as_str()).await {
         Ok(r) => r,
@@ -162,15 +132,16 @@ pub async fn check_aria_prohibited_attr_with_page(page: &Page) -> Vec<Violation>
         .filter_map(|issue| {
             let selector = issue.get("selector")?.as_str()?.to_string();
             let attrs = issue.get("attrs")?.as_str()?.to_string();
+            let role = issue
+                .get("role")
+                .and_then(|v| v.as_str())
+                .unwrap_or("generic");
             let mut violation = Violation::new(
                 RULE_META.id,
                 RULE_META.name,
                 RULE_META.level,
                 RULE_META.severity,
-                format!(
-                    "ARIA attributes '{}' cannot be used on a generic element without a valid role",
-                    attrs
-                ),
+                format!("ARIA attribute(s) '{attrs}' are prohibited on role '{role}'"),
                 &selector,
             )
             .with_selector(&selector)
@@ -188,71 +159,9 @@ pub async fn check_aria_prohibited_attr_with_page(page: &Page) -> Vec<Violation>
         .collect()
 }
 
-#[cfg(test)]
-mod tests {
-    use super::*;
-    use crate::accessibility::{AXNode, AXProperty, AXTree, AXValue};
-
-    fn make_node(id: &str, role: &str, props: Vec<(&str, &str)>) -> AXNode {
-        AXNode {
-            node_id: id.to_string(),
-            ignored: false,
-            ignored_reasons: vec![],
-            role: Some(role.to_string()),
-            name: Some(format!("Node {}", id)),
-            name_source: None,
-            description: None,
-            value: None,
-            properties: props
-                .into_iter()
-                .map(|(n, v)| AXProperty {
-                    name: n.to_string(),
-                    value: AXValue::String(v.to_string()),
-                })
-                .collect(),
-            child_ids: vec![],
-            parent_id: None,
-            backend_dom_node_id: None,
-        }
-    }
-
-    #[test]
-    fn test_no_prohibited_attrs_passes() {
-        let nodes = vec![
-            make_node("1", "button", vec![("aria-label", "OK")]),
-            make_node("2", "presentation", vec![]),
-        ];
-        let tree = AXTree::from_nodes(nodes);
-        let results = check_aria_prohibited_attr(&tree);
-        assert_eq!(results.violations.len(), 0);
-    }
-
-    #[test]
-    fn test_prohibited_attr_on_presentation_flagged() {
-        let nodes = vec![make_node(
-            "1",
-            "presentation",
-            vec![("aria-label", "should not be here")],
-        )];
-        let tree = AXTree::from_nodes(nodes);
-        let results = check_aria_prohibited_attr(&tree);
-        assert_eq!(results.violations.len(), 1);
-        assert!(results.violations[0].message.contains("aria-label"));
-        assert!(results.violations[0].message.contains("presentation"));
-    }
-
-    #[test]
-    fn test_prohibited_attr_on_generic_flagged() {
-        let nodes = vec![make_node(
-            "1",
-            "generic",
-            vec![("aria-roledescription", "fancy thing")],
-        )];
-        let tree = AXTree::from_nodes(nodes);
-        let results = check_aria_prohibited_attr(&tree);
-        assert_eq!(results.violations.len(), 1);
-        assert!(results.violations[0]
-            .message
-            .contains("aria-roledescription"));
-    }
-}
+// No offline unit tests: the entire check now lives in DOM-evaluated JS
+// (see PROHIBITED_ATTRS's doc comment for why — aria-label/aria-labelledby
+// never surface as AX-tree properties, so there's no pure-Rust logic left to
+// exercise without a live Chrome session). Covered by the detection corpus
+// (tests/fixtures/detection_corpus/aria_attribute_validation.*, #556),
+// verified against real Chrome via tests/detection_corpus_test.rs.

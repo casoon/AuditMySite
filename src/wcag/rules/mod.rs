@@ -93,7 +93,7 @@ pub use accessible_name::check_accessible_name;
 pub use aria_allowed_attr::check_aria_allowed_attr_with_page;
 pub use aria_hidden_focus::check_aria_hidden_focus;
 pub use aria_naming_rules::check_aria_naming_rules;
-pub use aria_prohibited_attr::{check_aria_prohibited_attr, check_aria_prohibited_attr_with_page};
+pub use aria_prohibited_attr::check_aria_prohibited_attr_with_page;
 pub use aria_relationships::check_aria_relationships;
 pub use aria_required_attr::{check_aria_required_attr, check_checked_state_with_page};
 pub use aria_required_parent::check_aria_required_parent;

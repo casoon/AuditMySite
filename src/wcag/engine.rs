@@ -17,21 +17,20 @@ pub use super::rules::{
     check_visual_presentation_with_page,
 };
 use super::rules::{
-    check_accessible_name, check_aria_naming_rules, check_aria_prohibited_attr,
-    check_aria_relationships, check_aria_required_attr, check_aria_required_parent,
-    check_aria_roles, check_bypass_blocks, check_dialog_rules, check_error_identification,
-    check_focus_order, check_focus_visible, check_form_rules, check_headings, check_help,
-    check_info_relationships, check_input_purpose, check_instructions, check_keyboard,
-    check_label_title_only, check_labels, check_landmark_banner_is_top_level,
-    check_landmark_banner_present, check_landmark_contentinfo_is_top_level,
-    check_landmark_main_is_top_level, check_landmark_main_present,
-    check_landmark_no_duplicate_banner, check_landmark_no_duplicate_contentinfo,
-    check_landmark_no_duplicate_main, check_landmark_unique, check_landmarks, check_language,
-    check_link_purpose, check_link_purpose_link_only, check_list_structure,
-    check_media_alternative, check_media_rules, check_page_titled, check_parsing, check_region,
-    check_section_headings, check_skip_link, check_status_messages, check_summary_name,
-    check_svg_rules, check_table_extended, check_table_rules, check_text_alternatives,
-    check_unusual_words, check_widget_rules,
+    check_accessible_name, check_aria_naming_rules, check_aria_relationships,
+    check_aria_required_attr, check_aria_required_parent, check_aria_roles, check_bypass_blocks,
+    check_dialog_rules, check_error_identification, check_focus_order, check_focus_visible,
+    check_form_rules, check_headings, check_help, check_info_relationships, check_input_purpose,
+    check_instructions, check_keyboard, check_label_title_only, check_labels,
+    check_landmark_banner_is_top_level, check_landmark_banner_present,
+    check_landmark_contentinfo_is_top_level, check_landmark_main_is_top_level,
+    check_landmark_main_present, check_landmark_no_duplicate_banner,
+    check_landmark_no_duplicate_contentinfo, check_landmark_no_duplicate_main,
+    check_landmark_unique, check_landmarks, check_language, check_link_purpose,
+    check_link_purpose_link_only, check_list_structure, check_media_alternative, check_media_rules,
+    check_page_titled, check_parsing, check_region, check_section_headings, check_skip_link,
+    check_status_messages, check_summary_name, check_svg_rules, check_table_extended,
+    check_table_rules, check_text_alternatives, check_unusual_words, check_widget_rules,
 };
 use super::types::WcagResults;
 use crate::accessibility::AXTree;
@@ -234,14 +233,10 @@ fn run_level_a_rules(tree: &AXTree, results: &mut WcagResults, filter: &RuleFilt
         tree
     );
 
-    // 4.1.2 ARIA Prohibited Attributes (Level A)
-    run_if_allowed!(
-        filter,
-        "aria-prohibited-attr",
-        check_aria_prohibited_attr,
-        results,
-        tree
-    );
+    // 4.1.2 ARIA Prohibited Attributes (Level A) — DOM-based only, see
+    // page_rules.rs / check_aria_prohibited_attr_with_page (#564: the
+    // AX-tree-based version this used to call here could never detect
+    // anything — aria-label/aria-labelledby aren't exposed as AX properties).
 
     // 1.3.1 Region / Landmark (Level A)
     run_if_allowed!(filter, "region", check_region, results, tree);

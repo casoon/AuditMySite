@@ -2,6 +2,7 @@
   "case": "aria_attribute_validation",
   "expectations": [
     { "rule_id": "aria-attr-name-invalid", "verdict": "violation" },
+    { "rule_id": "aria-prohibited-attr", "verdict": "violation" },
     { "rule_id": "aria-allowed-attr", "verdict": "violation" },
     { "rule_id": "aria-roles", "verdict": "violation" },
     { "rule_id": "aria-valid-attr-value", "verdict": "violation" },
