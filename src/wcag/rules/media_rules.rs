@@ -118,6 +118,7 @@ pub fn check_media_rules(tree: &AXTree) -> WcagResults {
                  Use the <track kind=\"captions\"> element or a captioning service.",
             )
             .with_help_url(RULE_META_CAPTIONS.help_url)
+            .with_rule_id(RULE_META_CAPTIONS.axe_id)
             .with_kind(FindingKind::NotTestable),
         );
     }
@@ -390,7 +391,8 @@ fn check_application_has_name(node: &AXNode, results: &mut WcagResults) {
         .with_fix(
             "Add aria-label or aria-labelledby to the application/video element, and provide a transcript or captions",
         )
-        .with_help_url(RULE_META_MEDIA.help_url);
+        .with_help_url(RULE_META_MEDIA.help_url)
+        .with_rule_id(RULE_META_MEDIA.axe_id);
 
         results.add_violation(violation);
     } else {
@@ -413,7 +415,8 @@ fn check_img_role_has_name(node: &AXNode, results: &mut WcagResults) {
         .with_fix(
             "Add a <title> element inside the SVG, or use aria-label/aria-labelledby on the SVG element",
         )
-        .with_help_url(RULE_META_IMAGE.help_url);
+        .with_help_url(RULE_META_IMAGE.help_url)
+        .with_rule_id(RULE_META_IMAGE.axe_id);
 
         results.add_violation(violation);
     } else {
@@ -438,7 +441,8 @@ fn check_decorative_has_no_spurious_name(node: &AXNode, results: &mut WcagResult
         .with_fix(
             "Remove the accessible name (alt, aria-label) from decorative elements, or change the role to convey meaningful content",
         )
-        .with_help_url(RULE_META_IMAGE.help_url);
+        .with_help_url(RULE_META_IMAGE.help_url)
+        .with_rule_id(RULE_META_IMAGE.axe_id);
 
         results.add_violation(violation);
     } else {

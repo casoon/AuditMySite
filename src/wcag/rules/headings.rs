@@ -116,7 +116,8 @@ fn check_heading_hierarchy(headings: &[&AXNode], results: &mut WcagResults) {
                 ))
                 .with_help_url(
                     "https://www.w3.org/WAI/WCAG21/Understanding/info-and-relationships.html",
-                );
+                )
+                .with_rule_id(RULE_META.axe_id);
 
                 results.add_violation(violation);
             }

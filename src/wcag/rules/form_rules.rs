@@ -213,7 +213,8 @@ fn check_grouped_controls(tree: &AXTree, results: &mut WcagResults) {
             .with_fix(
                 "Wrap related radio buttons or checkboxes in a <fieldset> with a <legend>, or use role=\"group\" with aria-labelledby",
             )
-            .with_help_url(RULE_META_STRUCTURE.help_url);
+            .with_help_url(RULE_META_STRUCTURE.help_url)
+            .with_rule_id(RULE_META_STRUCTURE.axe_id);
 
             results.add_violation(violation);
         } else {
@@ -265,7 +266,8 @@ fn check_required_field_indication(tree: &AXTree, results: &mut WcagResults) {
             .with_fix(
                 "Include an asterisk (*) or the word \"required\" in the label, or use aria-required and explain the convention",
             )
-            .with_help_url(RULE_META_LABELS.help_url);
+            .with_help_url(RULE_META_LABELS.help_url)
+            .with_rule_id(RULE_META_LABELS.axe_id);
 
             results.add_violation(violation);
         } else {
@@ -311,7 +313,8 @@ fn check_invalid_field_description(tree: &AXTree, results: &mut WcagResults) {
             .with_fix(
                 "Add aria-describedby pointing to an element containing the error message, or use aria-errormessage",
             )
-            .with_help_url(RULE_META_ERROR.help_url);
+            .with_help_url(RULE_META_ERROR.help_url)
+            .with_rule_id(RULE_META_ERROR.axe_id);
 
             results.add_violation(violation);
         } else {

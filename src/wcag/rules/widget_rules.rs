@@ -211,7 +211,8 @@ fn check_slider_has_value(node: &AXNode, results: &mut WcagResults) {
         .with_fix(
             "Add aria-valuenow (current), aria-valuemin (minimum), and aria-valuemax (maximum) attributes to the slider",
         )
-        .with_help_url("https://www.w3.org/WAI/ARIA/apg/patterns/slider/");
+        .with_help_url("https://www.w3.org/WAI/ARIA/apg/patterns/slider/")
+        .with_rule_id(RULE_META.axe_id);
 
         results.add_violation(violation);
     } else {

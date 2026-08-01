@@ -126,7 +126,8 @@ pub fn check_focus_order(tree: &AXTree) -> WcagResults {
             .with_fix(
                 "Either remove aria-hidden or make the element not focusable with tabindex=\"-1\"",
             )
-            .with_help_url(FOCUS_ORDER_RULE.help_url);
+            .with_help_url(FOCUS_ORDER_RULE.help_url)
+            .with_rule_id(FOCUS_ORDER_RULE.axe_id);
 
             results.add_violation(violation);
         }

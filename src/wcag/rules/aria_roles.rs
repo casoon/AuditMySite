@@ -334,7 +334,8 @@ fn check_required_owned_elements(
             },
             required_child_roles.join(", ")
         ))
-        .with_help_url("https://www.w3.org/TR/wai-aria-1.2/#mustContain");
+        .with_help_url("https://www.w3.org/TR/wai-aria-1.2/#mustContain")
+        .with_rule_id(RULE_META.axe_id);
 
         results.add_violation(violation);
     }

@@ -78,7 +78,8 @@ pub fn check_page_titled(tree: &AXTree) -> WcagResults {
                 "document",
             )
             .with_fix("Add a descriptive <title> element that describes the page topic or purpose")
-            .with_help_url(PAGE_TITLED_RULE.help_url);
+            .with_help_url(PAGE_TITLED_RULE.help_url)
+            .with_rule_id(PAGE_TITLED_RULE.axe_id);
 
             results.add_violation(violation);
         }

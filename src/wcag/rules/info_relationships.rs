@@ -219,7 +219,8 @@ fn check_table_structure(node: &AXNode, tree: &AXTree, results: &mut WcagResults
         )
         .with_role(node.role.clone())
         .with_fix("Add <th> elements for column and/or row headers in data tables")
-        .with_help_url(INFO_RELATIONSHIPS_RULE.help_url);
+        .with_help_url(INFO_RELATIONSHIPS_RULE.help_url)
+        .with_rule_id(INFO_RELATIONSHIPS_RULE.axe_id);
 
         results.add_violation(violation);
     } else if has_headers {
@@ -255,7 +256,8 @@ fn check_list_structure(node: &AXNode, tree: &AXTree, results: &mut WcagResults)
         )
         .with_role(node.role.clone())
         .with_fix("Use <li> elements as direct children of <ul> or <ol> lists")
-        .with_help_url(INFO_RELATIONSHIPS_RULE.help_url);
+        .with_help_url(INFO_RELATIONSHIPS_RULE.help_url)
+        .with_rule_id(INFO_RELATIONSHIPS_RULE.axe_id);
 
         results.add_violation(violation);
     } else if has_list_items {
@@ -285,7 +287,8 @@ fn check_form_grouping(node: &AXNode, tree: &AXTree, results: &mut WcagResults) 
                     .with_role(node.role.clone())
                     .with_name(node.name.clone())
                     .with_fix("Group related radio buttons using <fieldset> and <legend> or role=\"radiogroup\"")
-                    .with_help_url(INFO_RELATIONSHIPS_RULE.help_url);
+                    .with_help_url(INFO_RELATIONSHIPS_RULE.help_url)
+                    .with_rule_id(INFO_RELATIONSHIPS_RULE.axe_id);
 
                     results.add_violation(violation);
                     return;
