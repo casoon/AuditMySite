@@ -589,5 +589,22 @@ pub(in crate::output::pdf) fn render_best_practices(
         builder = builder.add_component(TextBlock::new(i18n.t("pdf-bp-libs-up-to-date")));
     }
 
+    // Duplicate library versions (#547)
+    if !bp.vulnerable_libraries.duplicate_libraries.is_empty() {
+        builder = builder
+            .add_component(Section::new(i18n.t("pdf-bp-duplicate-libs-title")).with_level(3));
+        let mut list = List::new();
+        for dup in &bp.vulnerable_libraries.duplicate_libraries {
+            list = list.add_item(i18n.t_args(
+                "pdf-bp-duplicate-libs-item",
+                &[
+                    ("name", dup.name.clone()),
+                    ("versions", dup.versions.join(", ")),
+                ],
+            ));
+        }
+        builder = builder.add_component(list);
+    }
+
     builder
 }

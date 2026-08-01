@@ -45,6 +45,22 @@ pub struct VulnerableLibrariesAnalysis {
     pub vulnerable: Vec<VulnerableLibrary>,
     /// True if any vulnerable libraries were found
     pub has_vulnerabilities: bool,
+    /// Known libraries loaded via more than one distinct version at once
+    /// (#547) — detected from `<script src>` URLs carrying different version
+    /// strings for the same library name. Global-namespace detection
+    /// (`window.jQuery`, etc.) can only ever observe the last value written,
+    /// so this signal is URL-based only and limited to the already-cataloged
+    /// libraries in `detect_from_url`.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub duplicate_libraries: Vec<DuplicateLibraryVersions>,
+}
+
+/// A known library loaded under more than one distinct version at once.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct DuplicateLibraryVersions {
+    pub name: String,
+    /// Distinct version strings found, in first-seen order
+    pub versions: Vec<String>,
 }
 
 /// Detect JS libraries and check for known vulnerabilities.
@@ -147,17 +163,29 @@ pub async fn analyze_vulnerable_libraries(page: &Page) -> Result<VulnerableLibra
 
     let script_urls: Vec<String> = serde_json::from_str(scripts_str).unwrap_or_default();
 
+    // Every URL-based match, kept even when a name repeats — needed to spot
+    // two different versions of the same library loaded at once (#547).
+    // Global-namespace detection above can't see this: a second `window.X =`
+    // assignment silently overwrites the first, so only the URL scan (which
+    // sees every <script src> tag) can observe both.
+    let mut url_libs: Vec<RawLibOwned> = Vec::new();
     for url in &script_urls {
         if let Some(lib) = detect_from_url(url) {
-            // Avoid duplicates with globals-detected libraries
-            let already = global_libs.iter().any(|g| g.name == lib.name);
-            if !already {
-                global_libs.push(RawLib {
-                    name: lib.name,
-                    version: lib.version,
-                    source: lib.source,
-                });
-            }
+            url_libs.push(lib);
+        }
+    }
+
+    let duplicate_libraries = find_duplicate_versions(&url_libs);
+
+    for lib in &url_libs {
+        // Avoid duplicates with globals-detected libraries
+        let already = global_libs.iter().any(|g| g.name == lib.name);
+        if !already {
+            global_libs.push(RawLib {
+                name: lib.name.clone(),
+                version: lib.version.clone(),
+                source: lib.source.clone(),
+            });
         }
     }
 
@@ -190,7 +218,29 @@ pub async fn analyze_vulnerable_libraries(page: &Page) -> Result<VulnerableLibra
         detected,
         vulnerable,
         has_vulnerabilities,
+        duplicate_libraries,
     })
+}
+
+/// Group URL-detected libraries by name and return those with more than one
+/// distinct version string (#547).
+fn find_duplicate_versions(url_libs: &[RawLibOwned]) -> Vec<DuplicateLibraryVersions> {
+    let mut by_name: Vec<(String, Vec<String>)> = Vec::new();
+    for lib in url_libs {
+        match by_name.iter_mut().find(|(name, _)| name == &lib.name) {
+            Some((_, versions)) => {
+                if !versions.contains(&lib.version) {
+                    versions.push(lib.version.clone());
+                }
+            }
+            None => by_name.push((lib.name.clone(), vec![lib.version.clone()])),
+        }
+    }
+    by_name
+        .into_iter()
+        .filter(|(_, versions)| versions.len() > 1)
+        .map(|(name, versions)| DuplicateLibraryVersions { name, versions })
+        .collect()
 }
 
 struct RawLibOwned {
@@ -423,6 +473,60 @@ fn parse_semver(version: &str) -> Option<(u32, u32, u32)> {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn find_duplicate_versions_flags_two_distinct_versions() {
+        let libs = vec![
+            RawLibOwned {
+                name: "jQuery".to_string(),
+                version: "1.9.1".to_string(),
+                source: "url".to_string(),
+            },
+            RawLibOwned {
+                name: "jQuery".to_string(),
+                version: "3.6.0".to_string(),
+                source: "url".to_string(),
+            },
+        ];
+        let dupes = find_duplicate_versions(&libs);
+        assert_eq!(dupes.len(), 1);
+        assert_eq!(dupes[0].name, "jQuery");
+        assert_eq!(dupes[0].versions, vec!["1.9.1", "3.6.0"]);
+    }
+
+    #[test]
+    fn find_duplicate_versions_ignores_repeated_same_version() {
+        let libs = vec![
+            RawLibOwned {
+                name: "jQuery".to_string(),
+                version: "3.6.0".to_string(),
+                source: "url".to_string(),
+            },
+            RawLibOwned {
+                name: "jQuery".to_string(),
+                version: "3.6.0".to_string(),
+                source: "url".to_string(),
+            },
+        ];
+        assert!(find_duplicate_versions(&libs).is_empty());
+    }
+
+    #[test]
+    fn find_duplicate_versions_ignores_different_libraries() {
+        let libs = vec![
+            RawLibOwned {
+                name: "jQuery".to_string(),
+                version: "3.6.0".to_string(),
+                source: "url".to_string(),
+            },
+            RawLibOwned {
+                name: "Bootstrap".to_string(),
+                version: "5.0.0".to_string(),
+                source: "url".to_string(),
+            },
+        ];
+        assert!(find_duplicate_versions(&libs).is_empty());
+    }
 
     #[test]
     fn test_parse_semver() {

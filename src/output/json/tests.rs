@@ -547,6 +547,7 @@ fn all_active_modules_report() -> AuditReport {
             detected: vec![],
             vulnerable: vec![],
             has_vulnerabilities: false,
+            duplicate_libraries: vec![],
         },
         score: 100,
     })

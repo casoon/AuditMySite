@@ -55,6 +55,7 @@ pub async fn analyze_best_practices(page: &Page) -> Result<BestPracticesAnalysis
                 detected: vec![],
                 vulnerable: vec![],
                 has_vulnerabilities: false,
+                duplicate_libraries: vec![],
             }
         }
     };

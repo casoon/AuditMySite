@@ -818,7 +818,7 @@ mod tests {
             vulnerable_libraries: crate::best_practices::VulnerableLibrariesAnalysis {
                 detected: vec![],
                 vulnerable: vec![],
-                has_vulnerabilities: false,
+                has_vulnerabilities: false,                duplicate_libraries: vec![],
             },
             score: 100,
         })

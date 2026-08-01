@@ -3989,6 +3989,7 @@ mod tests {
                 detected: vec![],
                 vulnerable: vec![],
                 has_vulnerabilities: false,
+                duplicate_libraries: vec![],
             },
             score: 90,
         });
@@ -4064,6 +4065,7 @@ mod tests {
                     },
                 ],
                 has_vulnerabilities: true,
+                duplicate_libraries: vec![],
             },
             score: 60,
         });
