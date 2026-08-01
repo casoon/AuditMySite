@@ -29,8 +29,7 @@ pub fn check_error_identification(tree: &AXTree) -> WcagResults {
         }
         results.nodes_checked += 1;
 
-        let invalid = node.get_property_bool("invalid").unwrap_or(false);
-        if !invalid {
+        if !node.is_invalid() {
             continue;
         }
 
@@ -91,9 +90,11 @@ mod tests {
             backend_dom_node_id: None,
         };
         if invalid {
+            // Real CDP traffic carries aria-invalid as an AXValue::String
+            // token ("true"/"false"/"grammar"/"spelling"), never a Bool (#566).
             n.properties.push(AXProperty {
                 name: "invalid".into(),
-                value: AXValue::Bool(true),
+                value: AXValue::String("true".to_string()),
             });
         }
         if let Some(target) = describedby {

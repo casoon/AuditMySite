@@ -1,0 +1,23 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <title>Landmark nesting and list structure corpus case</title>
+</head>
+<body>
+    <header>Site header</header>
+    <main>
+        <h1>Landmark nesting and list structure</h1>
+
+        <footer role="contentinfo">Nested footer — contentinfo landmark should be top-level, not inside main</footer>
+
+        <div role="listitem">Explicit ARIA listitem with no list ancestor</div>
+
+        <ul aria-label="Empty list with no items"></ul>
+
+        <p>
+            <input type="radio" name="orphan-radio-test" aria-label="Orphan radio not in a group">
+        </p>
+    </main>
+</body>
+</html>

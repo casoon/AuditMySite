@@ -1,0 +1,10 @@
+[
+  {
+    "rule_id": "frame-tested",
+    "reason": "Fires only for a genuinely cross-origin iframe (checked live: same-port/host iframes never trigger it). The corpus harness (tests/detection_corpus_test.rs) serves each case from a single local origin with no second origin available to embed, so this rule cannot be exercised without adding cross-origin serving infrastructure to the harness itself."
+  },
+  {
+    "rule_id": "aria-valid-attr",
+    "reason": "Checked live: Chrome's AX tree exposes no controls/owns/activedescendant property at all when the aria-controls/owns/activedescendant value is empty or references a non-existent id (all three attributes tested) — the exact case this rule exists to catch is unreachable via any AX-tree-based check. Tracked as a bug in #567 (would need a DOM-based rewrite, out of scope for corpus population itself)."
+  }
+]

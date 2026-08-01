@@ -1,0 +1,12 @@
+{
+  "case": "forms_extended",
+  "expectations": [
+    { "rule_id": "input-error-message", "verdict": "violation" },
+    { "rule_id": "aria-invalid-without-describedby", "verdict": "violation" },
+    { "rule_id": "input-no-context-change", "verdict": "violation" },
+    { "rule_id": "focus-no-context-change", "verdict": "violation" },
+    { "rule_id": "label-title-only", "verdict": "violation" },
+    { "rule_id": "redundant-entry", "verdict": "needs_review" },
+    { "rule_id": "td-headers-attr", "verdict": "violation" }
+  ]
+}

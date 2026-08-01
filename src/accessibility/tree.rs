@@ -280,9 +280,19 @@ impl AXNode {
         self.get_property_bool("required").unwrap_or(false)
     }
 
-    /// Get the invalid property (for form validation)
+    /// Get the invalid property (for form validation).
+    ///
+    /// `aria-invalid` is an ARIA *token* attribute ("false" / "true" /
+    /// "grammar" / "spelling"), not a boolean one — confirmed live, real CDP
+    /// traffic carries it as `AXValue::String`, never `AXValue::Bool`, so
+    /// `get_property_bool("invalid")` always returned `None` and this always
+    /// reported `false` regardless of the actual attribute (#566). Any value
+    /// other than the explicit "false" (or the property being absent, i.e.
+    /// aria-invalid never set) counts as invalid.
     pub fn is_invalid(&self) -> bool {
-        self.get_property_bool("invalid").unwrap_or(false)
+        self.get_property_str("invalid")
+            .map(|v| v != "false")
+            .unwrap_or(false)
     }
 }
 

@@ -89,13 +89,23 @@ fn convert_json_node(json: &serde_json::Value) -> Result<AXNode> {
     // Extract name
     let name = json["name"]["value"].as_str().map(String::from);
 
-    // Extract name source
+    // Extract name source.
+    //
+    // CDP never emits a top-level `type: "title"` source — confirmed live: a
+    // title-derived name arrives as `type: "attribute"` with a nested
+    // `attribute: "title"` field (the same top-level `type` a real
+    // `aria-label` source also uses), so matching only on the top-level
+    // `type` string made `NameSource::Title` permanently unreachable and
+    // broke `label_title_only.rs`'s detection (#566). Disambiguate the two
+    // "attribute" cases by that nested field before falling back to the
+    // generic `Attribute` source.
     let name_source = json["name"]["sources"].as_array().and_then(|sources| {
         sources.iter().find_map(|s| {
             if s["value"].is_null() {
                 return None;
             }
             match s["type"].as_str()? {
+                "attribute" if s["attribute"].as_str() == Some("title") => Some(NameSource::Title),
                 "attribute" => Some(NameSource::Attribute),
                 "relatedElement" => Some(NameSource::RelatedElement),
                 "contents" => Some(NameSource::Contents),
@@ -254,5 +264,29 @@ mod tests {
 
         let node = convert_json_node(&json).unwrap();
         assert_eq!(node.name_source, Some(NameSource::Attribute));
+    }
+
+    #[test]
+    fn test_title_derived_name_source_is_distinguished_from_generic_attribute() {
+        // Real CDP traffic (confirmed live, #566): a title-derived name's
+        // winning source has top-level `type: "attribute"`, same as
+        // aria-label — the nested `attribute: "title"` field is the only
+        // signal distinguishing the two.
+        let json = serde_json::json!({
+            "nodeId": "1",
+            "ignored": false,
+            "name": {
+                "value": "Search the site",
+                "sources": [
+                    {"type": "relatedElement", "value": null, "attribute": "aria-labelledby"},
+                    {"type": "attribute", "value": null, "attribute": "aria-label"},
+                    {"type": "relatedElement", "value": null, "nativeSource": "label"},
+                    {"type": "attribute", "value": "Search the site", "attribute": "title"},
+                ],
+            },
+        });
+
+        let node = convert_json_node(&json).unwrap();
+        assert_eq!(node.name_source, Some(NameSource::Title));
     }
 }

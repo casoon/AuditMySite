@@ -1,0 +1,40 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <title>Extended form checks corpus case</title>
+</head>
+<body>
+    <main>
+        <h1>Error messages, context changes, labels, redundant entry, table headers</h1>
+
+        <input type="text" aria-invalid="true" aria-label="Email">
+
+        <select aria-label="Navigate to page" onchange="location.href=this.value">
+            <option value="/a">Page A</option>
+            <option value="/b">Page B</option>
+        </select>
+
+        <div onfocus="this.style.color='red'" tabindex="0">Non-interactive element with an onfocus handler</div>
+
+        <input type="text" title="Search the site">
+
+        <form>
+            <label for="email1">Email</label>
+            <input id="email1" name="email" type="email">
+            <label for="billing-email">Billing Email</label>
+            <input id="billing-email" name="billing_email" type="email">
+            <button type="submit">Submit</button>
+        </form>
+
+        <table>
+            <thead>
+                <tr><th id="col-name">Name</th></tr>
+            </thead>
+            <tbody>
+                <tr><td headers="does-not-exist">Alice</td></tr>
+            </tbody>
+        </table>
+    </main>
+</body>
+</html>

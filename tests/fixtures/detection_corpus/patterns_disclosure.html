@@ -1,0 +1,20 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <title>Disclosure/accordion pattern and focus order corpus case</title>
+</head>
+<body>
+    <main>
+        <h1>Accordion, disclosure menu, and focus order</h1>
+
+        <span role="link" aria-expanded="true">Non-button accordion trigger</span>
+
+        <button aria-expanded="true">Accordion trigger without controls</button>
+
+        <span role="link" tabindex="0">Main Menu <button tabindex="0">Item</button></span>
+
+        <button tabindex="5">Out of order button</button>
+    </main>
+</body>
+</html>

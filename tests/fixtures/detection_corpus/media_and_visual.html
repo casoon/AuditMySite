@@ -1,0 +1,30 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <title>Background audio, contrast, spacing, reflow, and obscured focus corpus case</title>
+</head>
+<body>
+    <main>
+        <h1>Background audio, non-text contrast, text spacing, reflow, obscured focus</h1>
+
+        <audio autoplay src="/bg.mp3"></audio>
+
+        <label>
+            Subscribe
+            <input type="checkbox" style="appearance: none; -webkit-appearance: none; width: 20px; height: 20px; background: #ffffff; border: 1px solid #f6f6f6;">
+        </label>
+
+        <div style="width: 200px; height: 80px; overflow: hidden; font-size: 16px; line-height: 1.2;">
+            This line of text just barely fits inside the box at normal spacing but not at wider spacing
+        </div>
+
+        <div style="width: 900px; white-space: nowrap;">
+            This is a very long line of unbroken text forced into a fixed nine-hundred-pixel wide container that will not wrap and therefore forces horizontal scrolling once the viewport narrows to three hundred twenty pixels.
+        </div>
+
+        <a href="/contact" style="position: fixed; bottom: 10px; left: 10px;">Contact us</a>
+        <div style="position: fixed; bottom: 0; left: 0; width: 100%; height: 60px; background: #333;"></div>
+    </main>
+</body>
+</html>

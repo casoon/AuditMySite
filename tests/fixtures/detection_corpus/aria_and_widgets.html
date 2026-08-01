@@ -1,0 +1,24 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <title>ARIA and widget corpus case</title>
+</head>
+<body>
+    <main>
+        <h1>ARIA relationships, widget state, and tab semantics</h1>
+
+        <button aria-label=""><svg aria-hidden="true" width="10" height="10"></svg></button>
+
+        <div role="alert" aria-live="polite">A critical error occurred</div>
+
+        <div role="slider" aria-label="Volume" tabindex="0"></div>
+
+        <div role="tablist">
+            <div role="tab" id="tab1" aria-controls="panel1">First tab (missing aria-selected)</div>
+            <div role="tab" id="tab2" aria-selected="false" aria-controls="panel1">Second tab</div>
+        </div>
+        <div role="tabpanel" id="panel1">Panel content</div>
+    </main>
+</body>
+</html>

@@ -45,6 +45,15 @@ pub fn check_focus_visible(tree: &AXTree) -> WcagResults {
             continue;
         }
 
+        // The document root itself always carries `focusable: true` in real
+        // CDP output (confirmed live) — it's Chrome's own fallback focus
+        // target, not a real interactive element a keyboard user would tab
+        // to, so counting it made this "page has zero focusable elements"
+        // check permanently unreachable for every real page (#568).
+        if node.role.as_deref() == Some("RootWebArea") {
+            continue;
+        }
+
         // Check focusable interactive elements
         if !node.is_interactive() && !node.is_focusable() {
             continue;
@@ -133,5 +142,41 @@ mod tests {
         ]);
         let results = check_focus_visible(&tree);
         assert_eq!(results.violations.len(), 0);
+    }
+
+    fn non_interactive_node(id: &str, role: &str) -> AXNode {
+        AXNode {
+            node_id: id.to_string(),
+            ignored: false,
+            ignored_reasons: vec![],
+            role: Some(role.to_string()),
+            name: Some("Test".to_string()),
+            name_source: None,
+            description: None,
+            value: None,
+            properties: vec![],
+            child_ids: vec![],
+            parent_id: None,
+            backend_dom_node_id: None,
+        }
+    }
+
+    /// #568: the document root always carries `focusable: true` in real CDP
+    /// output — it must not itself count as "the page has a focusable
+    /// element", or this check can never fire for any real page.
+    #[test]
+    fn test_root_web_area_focusable_does_not_count_as_a_focusable_element() {
+        let mut root = interactive_node("1", "RootWebArea", None);
+        root.role = Some("RootWebArea".to_string());
+        let tree = AXTree::from_nodes(vec![
+            root,
+            non_interactive_node("2", "heading"),
+            non_interactive_node("3", "paragraph"),
+            non_interactive_node("4", "paragraph"),
+            non_interactive_node("5", "generic"),
+            non_interactive_node("6", "generic"),
+        ]);
+        let results = check_focus_visible(&tree);
+        assert_eq!(results.violations.len(), 1);
     }
 }

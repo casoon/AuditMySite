@@ -377,8 +377,10 @@ mod tests {
     fn make_node_invalid(id: &str, role: &str) -> AXNode {
         let mut node = make_node(id, role, Some("Field"), None);
         node.properties.push(AXProperty {
+            // Real CDP traffic carries aria-invalid as an AXValue::String
+            // token ("true"/"false"/"grammar"/"spelling"), never a Bool (#566).
             name: "invalid".to_string(),
-            value: AXValue::Bool(true),
+            value: AXValue::String("true".to_string()),
         });
         node
     }
