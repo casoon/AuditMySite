@@ -2,6 +2,7 @@
   "case": "media_and_motion",
   "expectations": [
     { "rule_id": "media-alt", "verdict": "needs_review" },
+    { "rule_id": "video-caption", "verdict": "needs_review" },
     { "rule_id": "css-orientation-lock", "verdict": "needs_review" },
     { "rule_id": "prefers-reduced-motion", "verdict": "needs_review" },
     { "rule_id": "focus-visible-outline-none", "verdict": "violation" }

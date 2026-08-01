@@ -80,6 +80,18 @@ pub fn check_media_rules(tree: &AXTree) -> WcagResults {
                 video_element_count += 1;
                 check_application_has_name(node, &mut results);
             }
+            // A real <video> element's actual Chrome AX role (confirmed live
+            // — capitalized "Video", not "video"/"VideoElement" as
+            // media_alternative.rs's own role list assumes; that check
+            // appears to have the same latent mismatch, not fixed here).
+            // Never "application" (that's reserved for custom canvas-based
+            // players wrapped in an app-like container). Only counted toward
+            // the manual-review caption notice below;
+            // check_application_has_name's accessible-name requirement is
+            // specific to the custom-player case (#564).
+            "Video" => {
+                video_element_count += 1;
+            }
             "img" => {
                 // SVG images and other img-role elements
                 check_img_role_has_name(node, &mut results);
@@ -521,6 +533,34 @@ mod tests {
         let tree = AXTree::from_nodes(nodes);
         let results = check_media_rules(&tree);
         assert!(results
+            .violations
+            .iter()
+            .any(|v| v.message.contains("Video element may lack")));
+    }
+
+    #[test]
+    fn test_real_video_element_triggers_caption_review_notice() {
+        let nodes = vec![make_node("1", "Video", None)];
+        let tree = AXTree::from_nodes(nodes);
+        let results = check_media_rules(&tree);
+        assert!(
+            results
+                .not_testables
+                .iter()
+                .any(|v| v.message.contains("media element") && v.message.contains("caption")),
+            "expected a manual-review caption notice for a role=\"video\" element: {:?}",
+            results.not_testables
+        );
+    }
+
+    #[test]
+    fn test_real_video_element_does_not_require_its_own_accessible_name() {
+        // check_application_has_name is specific to custom role="application"
+        // players — a native <video> shouldn't be forced through it (#564).
+        let nodes = vec![make_node("1", "Video", None)];
+        let tree = AXTree::from_nodes(nodes);
+        let results = check_media_rules(&tree);
+        assert!(!results
             .violations
             .iter()
             .any(|v| v.message.contains("Video element may lack")));
