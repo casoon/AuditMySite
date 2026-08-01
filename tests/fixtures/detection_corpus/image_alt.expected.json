@@ -1,0 +1,6 @@
+{
+  "case": "image_alt",
+  "expectations": [
+    { "rule_id": "image-alt", "verdict": "violation" }
+  ]
+}
