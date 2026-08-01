@@ -1,0 +1,6 @@
+{
+  "case": "svg_no_title",
+  "expectations": [
+    { "rule_id": "image-alt", "verdict": "violation" }
+  ]
+}

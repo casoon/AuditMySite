@@ -1,0 +1,6 @@
+{
+  "case": "table_missing_caption",
+  "expectations": [
+    { "rule_id": "table-duplicate-name", "verdict": "violation" }
+  ]
+}

@@ -1,0 +1,6 @@
+{
+  "case": "meta_refresh_present",
+  "expectations": [
+    { "rule_id": "meta-refresh", "verdict": "violation" }
+  ]
+}
