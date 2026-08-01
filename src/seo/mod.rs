@@ -25,7 +25,7 @@ pub use headings::{analyze_heading_structure, HeadingInfo, HeadingIssue, Heading
 pub use image_efficiency::{analyze_image_efficiency, ImageEfficiencyAnalysis, OversizedImage};
 pub use meta::{extract_meta_tags, MetaTags, MetaValidation};
 pub use page_health::{
-    analyze_page_health, HtmlValidationIssue, PageHealthAnalysis, PageHealthIssue,
+    analyze_page_health, collect_issues, HtmlValidationIssue, PageHealthAnalysis, PageHealthIssue,
     UrlCanonicalizationCheck, WwwConsolidation,
 };
 pub use profile::{build_content_profile, SeoContentProfile};
@@ -111,7 +111,14 @@ pub async fn analyze_seo(page: &Page, url: &str) -> Result<SeoAnalysis> {
 
     // Page health analysis — HTTP probes + DOM inspection
     let page_health = match analyze_page_health(page, url).await {
-        Ok(ph) => Some(ph),
+        Ok(mut ph) => {
+            // Copy in the declared <meta charset> so charset-consistency
+            // checking (#543) stays a pure function of PageHealthAnalysis
+            // without page_health.rs depending on the meta module.
+            ph.declared_charset = meta.charset.clone();
+            ph.issues = collect_issues(&ph, true);
+            Some(ph)
+        }
         Err(e) => {
             warn!("Page health analysis failed: {}", e);
             None

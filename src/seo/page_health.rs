@@ -134,6 +134,14 @@ pub struct PageHealthAnalysis {
     /// Raw Cache-Control header value from the main page response
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub cache_control: Option<String>,
+    /// charset declared in the HTTP Content-Type header, lowercased (#543)
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub charset_header: Option<String>,
+    /// charset declared via `<meta charset>`, as extracted by the SEO meta
+    /// module — copied in by `analyze_seo` so this struct alone can compare
+    /// the two without a cross-module dependency.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub declared_charset: Option<String>,
     /// True when Cache-Control includes a positive max-age or s-maxage
     pub has_efficient_cache: bool,
     /// Static-resource cache policy audit.
@@ -925,7 +933,9 @@ async fn run_http_probes(url: &str, a: &mut PageHealthAnalysis) {
     a.redirect_chain = hops;
 
     // HTTP headers
-    if let Some((uses_http2, compression, cache_control, server_timing_count)) = header_result {
+    if let Some((uses_http2, compression, cache_control, server_timing_count, charset_header)) =
+        header_result
+    {
         a.uses_http2 = uses_http2;
         a.has_compression = compression || document_timing_indicates_compression(a);
         a.has_efficient_cache = cache_control
@@ -934,6 +944,7 @@ async fn run_http_probes(url: &str, a: &mut PageHealthAnalysis) {
             .unwrap_or(false);
         a.cache_control = cache_control;
         a.server_timing_count = server_timing_count;
+        a.charset_header = charset_header;
     }
     if document_timing_indicates_compression(a) {
         a.has_compression = true;
@@ -941,8 +952,8 @@ async fn run_http_probes(url: &str, a: &mut PageHealthAnalysis) {
     a.resource_cache = resource_cache;
 }
 
-/// Probe main page headers: HTTP version, compression, Cache-Control, Server-Timing.
-async fn probe_headers(url: &str) -> Option<(bool, bool, Option<String>, u32)> {
+/// Probe main page headers: HTTP version, compression, Cache-Control, Server-Timing, charset.
+async fn probe_headers(url: &str) -> Option<(bool, bool, Option<String>, u32, Option<String>)> {
     let client = reqwest::Client::builder()
         .redirect(reqwest::redirect::Policy::limited(5))
         .timeout(std::time::Duration::from_secs(10))
@@ -974,7 +985,23 @@ async fn probe_headers(url: &str) -> Option<(bool, bool, Option<String>, u32)> {
         .map(|v| v.split(',').count() as u32)
         .unwrap_or(0);
 
-    Some((uses_http2, compression, cache_control, server_timing_count))
+    let charset_header = headers
+        .get("content-type")
+        .and_then(|v| v.to_str().ok())
+        .and_then(|v| {
+            v.split(';')
+                .skip(1)
+                .find_map(|part| part.trim().strip_prefix("charset="))
+                .map(|c| c.trim_matches('"').to_ascii_lowercase())
+        });
+
+    Some((
+        uses_http2,
+        compression,
+        cache_control,
+        server_timing_count,
+        charset_header,
+    ))
 }
 
 /// Follow redirect chain manually, returning (status, url) pairs for each hop.
@@ -1946,6 +1973,29 @@ pub fn collect_issues(a: &PageHealthAnalysis, en: bool) -> Vec<PageHealthIssue> 
         });
     }
 
+    // Charset consistency between the HTTP Content-Type header and the
+    // declared <meta charset> (#543). Only meaningful when both are present —
+    // a page missing one or the other is covered by its own separate check
+    // elsewhere (meta validation), not here.
+    if let (Some(header), Some(declared)) = (&a.charset_header, &a.declared_charset) {
+        let declared_normalized = declared.to_ascii_lowercase();
+        if header != &declared_normalized {
+            issues.push(PageHealthIssue {
+                issue_type: "charset_mismatch".to_string(),
+                message: if en {
+                    format!(
+                        "Charset mismatch: HTTP header declares \"{header}\", <meta charset> declares \"{declared}\""
+                    )
+                } else {
+                    format!(
+                        "Charset-Konflikt: HTTP-Header deklariert \"{header}\", <meta charset> deklariert \"{declared}\""
+                    )
+                },
+                severity: "medium".to_string(),
+            });
+        }
+    }
+
     if a.hreflang_invalid_count > 0 {
         issues.push(PageHealthIssue {
             issue_type: "hreflang_invalid".to_string(),
@@ -2418,6 +2468,39 @@ mod tests {
     }
 
     #[test]
+    fn test_collect_issues_charset_mismatch() {
+        let a = PageHealthAnalysis {
+            charset_header: Some("iso-8859-1".to_string()),
+            declared_charset: Some("UTF-8".to_string()),
+            ..Default::default()
+        };
+        let issues = collect_issues(&a, false);
+        assert!(issues.iter().any(|i| i.issue_type == "charset_mismatch"));
+    }
+
+    #[test]
+    fn test_collect_issues_charset_match_is_case_insensitive_and_silent() {
+        let a = PageHealthAnalysis {
+            charset_header: Some("utf-8".to_string()),
+            declared_charset: Some("UTF-8".to_string()),
+            ..Default::default()
+        };
+        let issues = collect_issues(&a, false);
+        assert!(!issues.iter().any(|i| i.issue_type == "charset_mismatch"));
+    }
+
+    #[test]
+    fn test_collect_issues_charset_missing_one_side_is_silent() {
+        let a = PageHealthAnalysis {
+            charset_header: Some("utf-8".to_string()),
+            declared_charset: None,
+            ..Default::default()
+        };
+        let issues = collect_issues(&a, false);
+        assert!(!issues.iter().any(|i| i.issue_type == "charset_mismatch"));
+    }
+
+    #[test]
     fn collect_issues_english_messages_have_no_german_characters() {
         let a = PageHealthAnalysis {
             has_doctype: false,
@@ -2493,6 +2576,8 @@ mod tests {
                 http_status: Some(200),
                 http_to_https_missing: true,
             }),
+            charset_header: Some("iso-8859-1".to_string()),
+            declared_charset: Some("UTF-8".to_string()),
             custom_404: Some(Custom404Check {
                 probe_url: "https://example.com/auditmysite-404-probe-xyz123".to_string(),
                 status: 200,
