@@ -113,6 +113,10 @@ pub struct PageHealthAnalysis {
     pub gif_images: u32,
     /// Count of `@font-face` rules with missing or blocking `font-display`
     pub font_display_issues: u32,
+    /// Number of distinct web fonts loaded via `@font-face` (#533)
+    pub font_face_count: u32,
+    /// Web fonts with no matching `<link rel="preload" as="font">` (#533)
+    pub fonts_without_preload_count: u32,
     /// Number of `<link rel="preload">` hints
     pub preload_hints: u32,
     /// Number of `<link rel="prefetch">` hints
@@ -507,14 +511,21 @@ async fn run_dom_inspection(page: &Page, url: &str, a: &mut PageHealthAnalysis) 
         r.gifImages = Array.from(document.querySelectorAll('img[src]'))
             .filter(img => (img.getAttribute('src') || '').match(/\.gif(\?|$)/i)).length;
 
-        // Font-display issues in @font-face rules
+        // Font-display issues in @font-face rules, and each rule's resolved
+        // font file URL (for the preload-coverage check below, #533).
         let fontDisplayIssues = 0;
+        const fontFaceUrls = new Set();
         for (const sheet of document.styleSheets) {
             try {
                 for (const rule of sheet.cssRules) {
                     if (rule.type === CSSRule.FONT_FACE_RULE) {
                         const display = rule.style.getPropertyValue('font-display');
                         if (!display || display === 'block' || display === 'auto') fontDisplayIssues++;
+                        const src = rule.style.getPropertyValue('src') || '';
+                        const match = src.match(/url\(["']?([^"')]+)["']?\)/);
+                        if (match) {
+                            try { fontFaceUrls.add(new URL(match[1], document.baseURI).href); } catch(e) {}
+                        }
                     }
                 }
             } catch(e) {}
@@ -536,6 +547,10 @@ async fn run_dom_inspection(page: &Page, url: &str, a: &mut PageHealthAnalysis) 
         // Orphaned preloads: preloaded but not in Resource Timing
         const loadedResources = new Set(performance.getEntriesByType('resource').map(e => e.name));
         r.orphanedPreloadCount = [...preloadHrefs].filter(href => href && !loadedResources.has(href)).length;
+
+        // Web fonts with no matching <link rel="preload" as="font"> (#533)
+        r.fontFaceCount = fontFaceUrls.size;
+        r.fontsWithoutPreloadCount = [...fontFaceUrls].filter(u => !preloadHrefs.has(u)).length;
 
         const nav = performance.getEntriesByType('navigation')[0];
         r.documentDecodedBytes = nav ? Math.round(nav.decodedBodySize || 0) : 0;
@@ -698,6 +713,8 @@ async fn run_dom_inspection(page: &Page, url: &str, a: &mut PageHealthAnalysis) 
     a.oversized_images = parsed["oversizedImages"].as_u64().unwrap_or(0) as u32;
     a.gif_images = parsed["gifImages"].as_u64().unwrap_or(0) as u32;
     a.font_display_issues = parsed["fontDisplayIssues"].as_u64().unwrap_or(0) as u32;
+    a.font_face_count = parsed["fontFaceCount"].as_u64().unwrap_or(0) as u32;
+    a.fonts_without_preload_count = parsed["fontsWithoutPreloadCount"].as_u64().unwrap_or(0) as u32;
     a.preload_hints = parsed["preloadHints"].as_u64().unwrap_or(0) as u32;
     a.prefetch_hints = parsed["prefetchHints"].as_u64().unwrap_or(0) as u32;
     a.dns_prefetch_hints = parsed["dnsPrefetchHints"].as_u64().unwrap_or(0) as u32;
@@ -1739,6 +1756,28 @@ pub fn collect_issues(a: &PageHealthAnalysis, en: bool) -> Vec<PageHealthIssue> 
         });
     }
 
+    if a.fonts_without_preload_count > 0 {
+        issues.push(PageHealthIssue {
+            issue_type: "fonts_not_preloaded".to_string(),
+            message: if en {
+                format!(
+                    "{} of {} web font{} not preloaded via <link rel=\"preload\" as=\"font\"> — delays first text render",
+                    a.fonts_without_preload_count,
+                    a.font_face_count,
+                    if a.font_face_count == 1 { "" } else { "s" }
+                )
+            } else {
+                format!(
+                    "{} von {} Web-Font{} nicht per <link rel=\"preload\" as=\"font\"> vorgeladen — verzögert ersten Textaufbau",
+                    a.fonts_without_preload_count,
+                    a.font_face_count,
+                    if a.font_face_count == 1 { "" } else { "s" }
+                )
+            },
+            severity: "low".to_string(),
+        });
+    }
+
     if a.orphaned_preload_count > 0 {
         issues.push(PageHealthIssue {
             issue_type: "orphaned_preload".to_string(),
@@ -2501,6 +2540,28 @@ mod tests {
     }
 
     #[test]
+    fn test_collect_issues_fonts_not_preloaded() {
+        let a = PageHealthAnalysis {
+            font_face_count: 2,
+            fonts_without_preload_count: 1,
+            ..Default::default()
+        };
+        let issues = collect_issues(&a, false);
+        assert!(issues.iter().any(|i| i.issue_type == "fonts_not_preloaded"));
+    }
+
+    #[test]
+    fn test_collect_issues_all_fonts_preloaded_is_silent() {
+        let a = PageHealthAnalysis {
+            font_face_count: 2,
+            fonts_without_preload_count: 0,
+            ..Default::default()
+        };
+        let issues = collect_issues(&a, false);
+        assert!(!issues.iter().any(|i| i.issue_type == "fonts_not_preloaded"));
+    }
+
+    #[test]
     fn collect_issues_english_messages_have_no_german_characters() {
         let a = PageHealthAnalysis {
             has_doctype: false,
@@ -2521,6 +2582,8 @@ mod tests {
             oversized_images: 3,
             gif_images: 2,
             font_display_issues: 3,
+            font_face_count: 2,
+            fonts_without_preload_count: 1,
             orphaned_preload_count: 1,
             lcp_image_lazy_loaded: true,
             lcp_image_without_preload: true,
