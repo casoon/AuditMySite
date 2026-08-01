@@ -1,0 +1,6 @@
+{
+  "case": "missing_main_landmark",
+  "expectations": [
+    { "rule_id": "landmark-main-present", "verdict": "violation" }
+  ]
+}

@@ -1,0 +1,6 @@
+{
+  "case": "missing_label",
+  "expectations": [
+    { "rule_id": "label", "verdict": "violation" }
+  ]
+}

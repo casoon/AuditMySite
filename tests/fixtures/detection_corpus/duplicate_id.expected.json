@@ -1,0 +1,6 @@
+{
+  "case": "duplicate_id",
+  "expectations": [
+    { "rule_id": "duplicate-id", "verdict": "violation" }
+  ]
+}

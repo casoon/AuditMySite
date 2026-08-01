@@ -1,0 +1,6 @@
+{
+  "case": "restrictive_viewport",
+  "expectations": [
+    { "rule_id": "meta-viewport", "verdict": "violation" }
+  ]
+}

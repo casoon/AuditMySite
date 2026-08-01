@@ -1,0 +1,6 @@
+{
+  "case": "frame_missing_title",
+  "expectations": [
+    { "rule_id": "frame-title", "verdict": "violation" }
+  ]
+}

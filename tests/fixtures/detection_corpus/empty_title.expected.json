@@ -1,0 +1,6 @@
+{
+  "case": "empty_title",
+  "expectations": [
+    { "rule_id": "document-title", "verdict": "violation" }
+  ]
+}
