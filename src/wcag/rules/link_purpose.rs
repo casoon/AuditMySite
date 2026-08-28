@@ -20,6 +20,24 @@ pub const LINK_PURPOSE_RULE: RuleMetadata = RuleMetadata {
     tags: &["wcag2a", "wcag244", "cat.links"],
 };
 
+/// Rule metadata for the "generic link text with detected context" sub-case.
+/// Same WCAG criterion as `LINK_PURPOSE_RULE` but a distinct `axe_id` — this
+/// lets `output::explanations::get_explanation` resolve a customer-facing
+/// explanation that acknowledges WCAG 2.4.4's context allowance ("verify
+/// manually") instead of falling back to `LINK_PURPOSE_RULE`'s generic text,
+/// which is written for the no-context case and reads as an unconditional
+/// rewrite instruction (#571).
+pub const LINK_PURPOSE_CONTEXT_RULE: RuleMetadata = RuleMetadata {
+    id: "2.4.4",
+    name: "Link Purpose (In Context)",
+    level: WcagLevel::A,
+    severity: Severity::Medium,
+    description: "The purpose of each link can be determined from the link text or context",
+    help_url: "https://www.w3.org/WAI/WCAG21/Understanding/link-purpose-in-context.html",
+    axe_id: "link-name-context",
+    tags: &["wcag2a", "wcag244", "cat.links"],
+};
+
 /// Check for link purpose issues
 pub fn check_link_purpose(tree: &AXTree) -> WcagResults {
     let mut results = WcagResults::new();
@@ -48,6 +66,12 @@ pub fn check_link_purpose(tree: &AXTree) -> WcagResults {
         // Warning — a review hint, not a confirmed violation. With no detectable
         // context, the automated match remains a confident Violation.
         if is_generic_link_text(link_text) {
+            let has_context = has_link_context(node, tree);
+            let axe_id = if has_context {
+                LINK_PURPOSE_CONTEXT_RULE.axe_id
+            } else {
+                LINK_PURPOSE_RULE.axe_id
+            };
             let violation = Violation::new(
                 LINK_PURPOSE_RULE.id,
                 LINK_PURPOSE_RULE.name,
@@ -60,9 +84,9 @@ pub fn check_link_purpose(tree: &AXTree) -> WcagResults {
             .with_name(node.name.clone())
             .with_fix("Use descriptive link text that explains where the link goes")
             .with_help_url(LINK_PURPOSE_RULE.help_url)
-            .with_rule_id(LINK_PURPOSE_RULE.axe_id);
+            .with_rule_id(axe_id);
 
-            if has_link_context(node, tree) {
+            if has_context {
                 results.add_violation(violation.as_warning());
             } else {
                 results.add_violation(violation);
@@ -509,12 +533,19 @@ mod tests {
         };
         let tree = AXTree::from_nodes(vec![parent, text_node, link_node]);
         let results = check_link_purpose(&tree);
-        assert!(
-            results
-                .warnings
-                .iter()
-                .any(|v| v.message.contains("generic text")),
-            "expected a warning-kind finding for generic text with context"
+        let warning = results
+            .warnings
+            .iter()
+            .find(|v| v.message.contains("generic text"))
+            .expect("expected a warning-kind finding for generic text with context");
+        // Regression for #571: this finding must carry the distinct
+        // "link-name-context" rule_id, not the shared "link-name" id, so
+        // `output::explanations::get_explanation` resolves the context-
+        // verification explanation instead of LINK_PURPOSE_RULE's generic
+        // unconditional-rewrite text.
+        assert_eq!(
+            warning.rule_id.as_deref(),
+            Some(LINK_PURPOSE_CONTEXT_RULE.axe_id)
         );
         assert!(
             !results

@@ -19,6 +19,24 @@ pub const KEYBOARD_RULE: RuleMetadata = RuleMetadata {
     tags: &["wcag2a", "wcag211", "cat.keyboard"],
 };
 
+/// Rule metadata for the "focusable without interactive role" sub-check.
+/// Same WCAG criterion as `KEYBOARD_RULE` but a distinct `axe_id` — this lets
+/// `output::explanations::get_explanation` resolve a customer-facing
+/// explanation specific to this case instead of falling back to
+/// `KEYBOARD_RULE`'s generic 2.1.1 text, which is written around "add
+/// tabindex + a keydown handler" and does not fit here: the element is
+/// already focusable, what it lacks is a role (#571).
+pub const FOCUSABLE_NO_ROLE_RULE: RuleMetadata = RuleMetadata {
+    id: "2.1.1",
+    name: "Keyboard",
+    level: WcagLevel::A,
+    severity: Severity::Critical,
+    description: "All functionality must be operable through a keyboard interface",
+    help_url: "https://www.w3.org/WAI/WCAG21/Understanding/keyboard.html",
+    axe_id: "focusable-no-role",
+    tags: &["wcag2a", "wcag211", "cat.keyboard"],
+};
+
 /// Rule metadata for 2.1.2
 pub const NO_KEYBOARD_TRAP_RULE: RuleMetadata = RuleMetadata {
     id: "2.1.2",
@@ -66,7 +84,7 @@ pub fn check_keyboard(tree: &AXTree) -> WcagResults {
             .with_name(node.name.clone())
             .with_fix("Add an appropriate ARIA role or use a native interactive element")
             .with_help_url(KEYBOARD_RULE.help_url)
-            .with_rule_id(KEYBOARD_RULE.axe_id)
+            .with_rule_id(FOCUSABLE_NO_ROLE_RULE.axe_id)
             .as_warning();
 
             results.add_violation(violation);
@@ -321,6 +339,14 @@ mod tests {
             })
             .expect("expected a warning-kind finding");
         assert_eq!(finding.kind, FindingKind::Warning);
+        // Regression for #571: this finding must carry the distinct
+        // "focusable-no-role" rule_id, not the shared "keyboard" id, so
+        // `output::explanations::get_explanation` resolves the role-specific
+        // explanation instead of KEYBOARD_RULE's generic tabindex+keydown text.
+        assert_eq!(
+            finding.rule_id.as_deref(),
+            Some(FOCUSABLE_NO_ROLE_RULE.axe_id)
+        );
         assert!(!results.violations.iter().any(|v| v
             .message
             .contains("Focusable element without interactive role")));

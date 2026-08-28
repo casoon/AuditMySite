@@ -241,6 +241,65 @@ static EXPLANATIONS: &[(&str, RuleExplanation)] = &[
             example_decorative: None,
         },
     ),
+    // Rule-specific override for `region.rs` findings (axe_id "region").
+    // The WCAG 1.3.1 fallback above is written for tables/lists/forms and
+    // doesn't fit this check — it flags content (often a link) that sits
+    // outside every landmark region, not missing table/list/fieldset markup
+    // (#571).
+    (
+        "region",
+        RuleExplanation {
+            customer_title: "Inhalt außerhalb einer Landmark-Region",
+            customer_title_en: "Content outside a landmark region",
+            customer_description:
+                "Ein Element mit sichtbarem Inhalt — häufig ein Link — liegt außerhalb aller \
+                 Landmark-Bereiche der Seite (main, nav, header, footer, aside). Screenreader-\
+                 Nutzer, die per Landmark zwischen Seitenbereichen springen, finden dieses \
+                 Element dabei nicht.",
+            customer_description_en:
+                "An element with visible content — often a link — sits outside every landmark \
+                 region of the page (main, nav, header, footer, aside). Screen reader users who \
+                 jump between page regions via landmark navigation will not encounter this \
+                 element.",
+            user_impact:
+                "Screenreader-Nutzer, die per Landmark-Navigation zwischen Hauptinhalt, \
+                 Navigation und Fußzeile wechseln, überspringen dieses Element unbemerkt — \
+                 es erscheint in keiner der angesteuerten Regionen.",
+            user_impact_en:
+                "Screen reader users who switch between main content, navigation, and footer \
+                 via landmark navigation skip over this element without noticing — it does not \
+                 appear in any of the regions they navigate to.",
+            typical_cause:
+                "Markup, das per JavaScript nachträglich außerhalb des Haupt-Layouts \
+                 eingefügt wird, Reste von Drittanbieter-Widgets, oder Inhalte, die vor dem \
+                 ersten Landmark stehen, ohne selbst in main/nav/header/footer eingebettet zu sein.",
+            typical_cause_en:
+                "Markup inserted outside the main layout via JavaScript, leftover third-party \
+                 widget content, or content placed before the first landmark without being \
+                 embedded inside main/nav/header/footer itself.",
+            recommendation:
+                "Das Element in die passende Landmark-Region verschieben (z. B. einen Link in \
+                 <nav> oder <main>). Passt keine bestehende Region, einen zusätzlichen Bereich \
+                 mit role=\"region\" und einem beschreibenden aria-label anlegen.",
+            recommendation_en:
+                "Move the element into the appropriate landmark region (e.g. a link into <nav> \
+                 or <main>). If no existing region fits, add an additional region with \
+                 role=\"region\" and a descriptive aria-label.",
+            technical_note:
+                "HTML5-Landmarks konsequent nutzen: <header>, <nav>, <main>, <aside>, <footer>. \
+                 Skip-Links vor dem ersten Landmark sind bewusst ausgenommen. Für Bereiche ohne \
+                 passendes semantisches Element role=\"region\" plus aria-label verwenden.",
+            technical_note_en:
+                "Use HTML5 landmarks consistently: <header>, <nav>, <main>, <aside>, <footer>. \
+                 Skip links placed before the first landmark are deliberately exempt. For areas \
+                 without a matching semantic element, use role=\"region\" plus aria-label.",
+            responsible_role: Role::Development,
+            effort_estimate: Effort::Medium,
+            example_bad: Some("<body><nav>...</nav><a href=\"/kontakt\">Kontakt</a><main>...</main></body>"),
+            example_good: Some("<body><nav><a href=\"/kontakt\">Kontakt</a></nav><main>...</main></body>"),
+            example_decorative: None,
+        },
+    ),
     // Rule-specific override for presentation-semantic-children violations.
     // The WCAG 1.3.1 fallback is too generic (tables/lists/forms) for this case —
     // the actual issue is an ARIA role conflict in navigation markup.
@@ -712,6 +771,70 @@ static EXPLANATIONS: &[(&str, RuleExplanation)] = &[
             example_decorative: None,
         },
     ),
+    // Rule-specific override for `keyboard.rs`'s "focusable without
+    // interactive role" check (axe_id "focusable-no-role"). The 2.1.1
+    // fallback above is written for elements that are NOT reachable by
+    // keyboard at all ("add tabindex + a keydown handler") — this check
+    // detects the opposite: the element is already focusable, but has no
+    // role telling assistive technology what it does. Suggesting extra
+    // focusability/keydown handling here would be wrong and can worsen
+    // focus order (#571).
+    (
+        "focusable-no-role",
+        RuleExplanation {
+            customer_title: "Fokussierbares Element ohne interaktive Rolle",
+            customer_title_en: "Focusable element without an interactive role",
+            customer_description:
+                "Ein Element kann per Tastatur fokussiert werden, trägt aber keine (oder eine \
+                 nicht-interaktive) ARIA-Rolle. Assistive Technologien wissen dadurch nicht, \
+                 was beim Fokussieren dieses Elements möglich ist.",
+            customer_description_en:
+                "An element can receive keyboard focus, but carries no (or a non-interactive) \
+                 ARIA role. Assistive technologies therefore cannot tell what is possible once \
+                 the element receives focus.",
+            user_impact:
+                "Screenreader-Nutzer hören beim Fokussieren keine oder eine irreführende \
+                 Rollenangabe (z. B. \"Bereich\" statt \"Dialog\" oder \"Schaltfläche\") und \
+                 können nicht einschätzen, welche Interaktion erwartet wird.",
+            user_impact_en:
+                "Screen reader users hear no role, or a misleading one (e.g. \"region\" \
+                 instead of \"dialog\" or \"button\"), when the element receives focus, and \
+                 cannot tell what interaction is expected.",
+            typical_cause:
+                "Ein Container — etwa ein Consent-Banner oder ein Drittanbieter-Widget — \
+                 erhält technisch bedingt Tastaturfokus, ohne dass ihm eine passende ARIA-Rolle \
+                 oder ein natives interaktives Element zugrunde liegt.",
+            typical_cause_en:
+                "A container — such as a consent banner or a third-party widget — technically \
+                 receives keyboard focus, without a matching ARIA role or native interactive \
+                 element behind it.",
+            recommendation:
+                "Dem Element eine passende ARIA-Rolle geben, die seine tatsächliche Funktion \
+                 beschreibt, oder es durch ein natives interaktives HTML-Element ersetzen. \
+                 Ein Element lediglich fokussierbar zu machen, ohne seine Funktion für \
+                 Screenreader erkennbar zu machen, behebt das Problem nicht.",
+            recommendation_en:
+                "Give the element an ARIA role that matches its actual function, or replace it \
+                 with a native interactive HTML element. Making an element merely focusable \
+                 without exposing its function to screen readers does not fix the underlying \
+                 issue.",
+            technical_note:
+                "Prüfen, warum das Element fokussierbar ist (tabindex, Drittanbieter-Skript). \
+                 Ist es tatsächlich interaktiv: passende Rolle (z. B. role=\"dialog\", \
+                 role=\"button\") und zugänglichen Namen ergänzen. Hat es keine eigene \
+                 Interaktion: Fokussierbarkeit entfernen (tabindex=\"-1\" oder tabindex-Attribut löschen).",
+            technical_note_en:
+                "Check why the element is focusable (tabindex, third-party script). If it is \
+                 genuinely interactive: add a matching role (e.g. role=\"dialog\", \
+                 role=\"button\") and an accessible name. If it has no interaction of its own: \
+                 remove focusability (tabindex=\"-1\" or delete the tabindex attribute).",
+            responsible_role: Role::Development,
+            effort_estimate: Effort::Quick,
+            example_bad: Some("<div tabindex=\"0\">...</div>"),
+            example_good: Some("<div tabindex=\"0\" role=\"dialog\" aria-label=\"Cookie-Einstellungen\">...</div>"),
+            example_decorative: None,
+        },
+    ),
     (
         "2.1.2",
         RuleExplanation {
@@ -935,6 +1058,74 @@ static EXPLANATIONS: &[(&str, RuleExplanation)] = &[
             effort_estimate: Effort::Quick,
             example_bad: Some("<a href=\"/leistungen\">mehr erfahren</a>"),
             example_good: Some("<a href=\"/leistungen\">Unsere Leistungen im Bereich Webentwicklung</a>"),
+            example_decorative: None,
+        },
+    ),
+    // Rule-specific override for `link_purpose.rs`'s "generic link text with
+    // detected context" case (axe_id "link-name-context"). This branch is
+    // demoted to a Warning (#569) because WCAG 2.4.4 explicitly allows a
+    // link's purpose to be derived from its context, not just its own text —
+    // the 2.4.4 fallback above is written for the no-context case and reads
+    // as an unconditional rewrite instruction, which overclaims what an
+    // automated check can confirm here (#571).
+    (
+        "link-name-context",
+        RuleExplanation {
+            customer_title: "Generischer Linktext mit möglichem Kontextbezug",
+            customer_title_en: "Generic link text with possible contextual meaning",
+            customer_description:
+                "Der Linktext allein ist unspezifisch (z. B. \"Start\", \"weiter\"), steht \
+                 aber neben beschreibendem Text, der den Linkzweck erklären könnte. WCAG 2.4.4 \
+                 erlaubt es ausdrücklich, den Linkzweck aus dem Linktext zusammen mit seinem \
+                 Kontext abzuleiten — ob das hier zutrifft, kann nur eine manuelle Prüfung \
+                 bestätigen.",
+            customer_description_en:
+                "The link text alone is unspecific (e.g. \"Start\", \"next\"), but sits next \
+                 to descriptive text that may explain the link's purpose. WCAG 2.4.4 \
+                 explicitly allows a link's purpose to be derived from its text together with \
+                 its context — whether that is the case here can only be confirmed by manual \
+                 review.",
+            user_impact:
+                "Ob der Linkzweck für Screenreader-Nutzer verständlich ist, hängt davon ab, ob \
+                 der umgebende Text tatsächlich vorgelesen wird, bevor der Link erreicht wird, \
+                 und ob die Verbindung eindeutig ist. Ohne manuelle Prüfung ist unklar, ob \
+                 Nutzer davon betroffen sind.",
+            user_impact_en:
+                "Whether the link's purpose is understandable to screen reader users depends \
+                 on whether the surrounding text is actually read out before the link is \
+                 reached, and whether the connection is unambiguous. Without manual review it \
+                 is unclear whether users are actually affected.",
+            typical_cause:
+                "Teaser- oder Karten-Komponenten, in denen ein generischer Button- oder \
+                 Linktext (\"Start\", \"weiter\") direkt auf eine Überschrift oder einen \
+                 Beschreibungstext folgt.",
+            typical_cause_en:
+                "Teaser or card components where a generic button or link text (\"Start\", \
+                 \"next\") directly follows a heading or description text.",
+            recommendation:
+                "Manuell prüfen, ob der umgebende Text den Linkzweck visuell und für \
+                 Screenreader eindeutig macht. Ist das der Fall, ist keine Änderung nötig. \
+                 Andernfalls den Linktext selbst aussagekräftig formulieren oder per \
+                 aria-label/aria-labelledby ergänzen.",
+            recommendation_en:
+                "Manually verify whether the surrounding text makes the link's purpose \
+                 unambiguous both visually and for screen readers. If so, no change is \
+                 needed. Otherwise, phrase the link text itself descriptively, or supplement \
+                 it via aria-label/aria-labelledby.",
+            technical_note:
+                "Kontext zählt nur, wenn er programmatisch mit dem Link verknüpft ist oder ihm \
+                 unmittelbar vorausgeht (gleicher Satz, gleiche Listenzelle, gleiche \
+                 Überschrift). Bei Unsicherheit aria-labelledby auf das Kontext-Element setzen, \
+                 um die Verbindung eindeutig zu machen.",
+            technical_note_en:
+                "Context only counts if it is programmatically associated with the link or \
+                 immediately precedes it (same sentence, same list cell, same heading). When \
+                 in doubt, use aria-labelledby pointing at the context element to make the \
+                 association explicit.",
+            responsible_role: Role::Editorial,
+            effort_estimate: Effort::Quick,
+            example_bad: None,
+            example_good: None,
             example_decorative: None,
         },
     ),
@@ -1840,5 +2031,66 @@ mod tests {
                 );
             }
         }
+    }
+
+    /// Regression for #571 (example 1): a `region.rs` finding (axe_id
+    /// "region", content outside a landmark) must resolve to its own
+    /// landmark-specific explanation, not the generic 1.3.1 fallback written
+    /// for tables/lists/fieldsets.
+    #[test]
+    fn region_finding_gets_landmark_explanation_not_table_fallback() {
+        let expl = get_explanation("region").expect("missing explanation for 'region'");
+        let de = expl.recommendation_for("de");
+        let en = expl.recommendation_for("en");
+        assert!(
+            de.contains("Landmark") || de.contains("landmark"),
+            "region explanation should mention landmarks: {de}"
+        );
+        for text in [de, en] {
+            assert!(
+                !text.contains("<table>") && !text.contains("<fieldset>"),
+                "region explanation still reads like the generic table/list/form fallback: {text}"
+            );
+        }
+    }
+
+    /// Regression for #571 (example 2): `keyboard.rs`'s "focusable without
+    /// interactive role" finding (axe_id "focusable-no-role") must resolve
+    /// to an explanation recommending an appropriate role, not the generic
+    /// 2.1.1 fallback that suggests adding tabindex + a keydown handler to
+    /// an arbitrary container.
+    #[test]
+    fn focusable_no_role_finding_recommends_a_role_not_tabindex_keydown() {
+        let expl = get_explanation("focusable-no-role")
+            .expect("missing explanation for 'focusable-no-role'");
+        let de = expl.recommendation_for("de");
+        let en = expl.recommendation_for("en");
+        assert!(
+            de.contains("Rolle") && en.contains("role"),
+            "focusable-no-role explanation should recommend adding a role: de={de} en={en}"
+        );
+        for text in [de, en] {
+            assert!(
+                !text.to_lowercase().contains("keydown"),
+                "focusable-no-role explanation should not unconditionally push keydown handling: {text}"
+            );
+        }
+    }
+
+    /// Regression for #571 (example 3): `link_purpose.rs`'s generic-link-text-
+    /// with-context finding (axe_id "link-name-context") must resolve to an
+    /// explanation that asks for manual verification (WCAG 2.4.4's context
+    /// allowance), not the generic 2.4.4 fallback's unconditional rewrite
+    /// instruction.
+    #[test]
+    fn link_purpose_context_finding_asks_for_verification() {
+        let expl = get_explanation("link-name-context")
+            .expect("missing explanation for 'link-name-context'");
+        let de = expl.recommendation_for("de");
+        let en = expl.recommendation_for("en");
+        assert!(
+            de.contains("prüfen") && en.to_lowercase().contains("verify"),
+            "link-name-context explanation should ask for manual verification: de={de} en={en}"
+        );
     }
 }

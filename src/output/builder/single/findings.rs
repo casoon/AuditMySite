@@ -13,11 +13,22 @@ pub(super) fn finding_group_from_normalized(
     f: &crate::audit::normalized::NormalizedFinding,
 ) -> FindingGroup {
     let locale = i18n.locale();
-    // Try the taxonomy rule_id first (e.g. "a11y.aria_hidden_focus.invalid"),
-    // then fall back to the WCAG criterion. Some rules carry their localized
-    // explanation under the taxonomy key, not the WCAG number — looking up by
-    // wcag_criterion alone left those findings with the raw English fix (#357).
-    let explanation = get_explanation(&f.rule_id).or_else(|| get_explanation(&f.wcag_criterion));
+    // Try the finding's own axe/rule id first (e.g. "region",
+    // "focusable-no-role") — several distinct checks share one taxonomy
+    // rule_id or WCAG criterion (e.g. many "1.3.1" checks: landmarks, lists,
+    // tables, form groups), so looking up by taxonomy id or WCAG criterion
+    // alone can silently return an explanation written for a *different*
+    // check that happens to share the same bucket (#571). Then fall back to
+    // the taxonomy rule_id (e.g. "a11y.aria_hidden_focus.invalid"), then the
+    // WCAG criterion. Some rules carry their localized explanation under the
+    // taxonomy key, not the WCAG number — looking up by wcag_criterion alone
+    // left those findings with the raw English fix (#357).
+    let explanation = f
+        .axe_id
+        .as_deref()
+        .and_then(get_explanation)
+        .or_else(|| get_explanation(&f.rule_id))
+        .or_else(|| get_explanation(&f.wcag_criterion));
 
     let (
         title,
@@ -284,6 +295,45 @@ mod fallback_tests {
         assert_eq!(
             group.customer_description,
             "Fehlendes Refresh- oder Timeout-Handling im Script/Markup."
+        );
+    }
+
+    /// A `region.rs` finding (WCAG 1.3.1, taxonomy id "a11y.structure.missing",
+    /// axe_id "region"). Several unrelated 1.3.1 checks (tables, lists, form
+    /// groups) share that same taxonomy id, so `rule_id` alone would resolve
+    /// to a generic table/list/fieldset explanation — only the `axe_id` is
+    /// specific enough to identify this as a landmark/region finding (#571).
+    fn region_finding() -> NormalizedFinding {
+        NormalizedFinding {
+            rule_id: "a11y.structure.missing".into(),
+            wcag_criterion: "1.3.1".into(),
+            axe_id: Some("region".into()),
+            title: "Region".into(),
+            description: "Element with role 'link' is not contained within a landmark region"
+                .into(),
+            ..uncovered_rule_finding()
+        }
+    }
+
+    /// Regression for #571 (example 1): `finding_group_from_normalized` must
+    /// use the `axe_id`-specific "region" explanation for a region.rs
+    /// finding, not the generic WCAG-1.3.1 fallback (which is written for
+    /// tables/lists/fieldsets and would show a `<table>` code example for a
+    /// finding about a link outside a landmark).
+    #[test]
+    fn region_finding_gets_landmark_example_not_table_fallback() {
+        let i18n = I18n::new("de").expect("test locale should load");
+        let finding = region_finding();
+        let group = finding_group_from_normalized(&i18n, &finding);
+
+        assert!(
+            group.recommendation.contains("Landmark"),
+            "expected the landmark-specific recommendation, got: {}",
+            group.recommendation
+        );
+        assert!(
+            !group.examples.iter().any(|ex| ex.bad.contains("<table>")),
+            "region finding must not show the generic table example"
         );
     }
 
