@@ -1,15 +1,20 @@
 //! WCAG 2.4.1 / 1.3.1 - Landmark Presence
 //!
 //! Checks that pages contain the expected landmark regions (main, navigation,
-//! banner, contentinfo).
+//! contentinfo).
 //!
 //! Taxonomy split (see issue #242):
 //! - Missing `main` → WCAG 2.4.1 (axe `landmark-one-main` convention — main
 //!   is the canonical skip target).
-//! - Missing nav / banner / contentinfo → WCAG 1.3.1 (structural).
+//! - Missing nav / contentinfo → WCAG 1.3.1 (structural), via the generic
+//!   `missing_landmark_violation` helper.
 //!
 //! Duplicate / nested / unique-name checks live in `landmark_granular.rs`
 //! under WCAG 1.3.1; the skip-link check lives there under WCAG 2.4.1.
+//! Missing banner also lives there (`check_landmark_banner_present`, axe_id
+//! `landmark-banner-present`) — it used to additionally be checked here via
+//! the generic helper, which produced a duplicate 1.3.1 finding; removed
+//! in #565 in favor of the granular check's real rule_id and tiny-tree guard.
 
 use crate::accessibility::AXTree;
 use crate::cli::WcagLevel;
@@ -47,7 +52,6 @@ pub fn check_landmarks(tree: &AXTree) -> WcagResults {
 
     let main_nodes = tree.nodes_with_role("main");
     let nav_nodes = tree.nodes_with_role("navigation");
-    let banner_nodes = tree.nodes_with_role("banner");
     let contentinfo_nodes = tree.nodes_with_role("contentinfo");
 
     // --- Missing main landmark — WCAG 2.4.1 (axe `landmark-one-main`) ---
@@ -70,22 +74,15 @@ pub fn check_landmarks(tree: &AXTree) -> WcagResults {
         results.passes += 1;
     }
 
-    // --- Missing nav / banner / contentinfo — WCAG 1.3.1 (structural) ---
+    // --- Missing nav / contentinfo — WCAG 1.3.1 (structural) ---
+    // Missing banner is not checked here — `landmark_granular::check_landmark_banner_present`
+    // (axe_id `landmark-banner-present`) already covers it with a real rule_id and a
+    // tiny-tree guard; checking it here too produced a duplicate finding (#565).
     if nav_nodes.is_empty() {
         results.add_violation(missing_landmark_violation(
             "navigation",
             "Page has no navigation landmark",
             "Add a <nav> element or an element with role=\"navigation\"",
-        ));
-    } else {
-        results.passes += 1;
-    }
-
-    if banner_nodes.is_empty() {
-        results.add_violation(missing_landmark_violation(
-            "banner",
-            "Page has no banner landmark",
-            "Add a <header> element at the top level or role=\"banner\"",
         ));
     } else {
         results.passes += 1;
@@ -231,13 +228,13 @@ mod tests {
     }
 
     #[test]
-    fn missing_nav_banner_contentinfo_filed_under_131() {
+    fn missing_nav_contentinfo_filed_under_131() {
         let tree = AXTree::from_nodes(vec![
             make_node("1", "WebArea", Some("Test")),
             make_node("2", "main", Some("Content")),
         ]);
         let results = check_landmarks(&tree);
-        for needle in ["no navigation", "no banner", "no contentinfo"] {
+        for needle in ["no navigation", "no contentinfo"] {
             let v = results
                 .violations
                 .iter()
@@ -249,6 +246,27 @@ mod tests {
                  not aggregated under 2.4.1 (issue #242)"
             );
         }
+    }
+
+    #[test]
+    fn missing_banner_not_flagged_here() {
+        // Missing banner is exclusively covered by
+        // `landmark_granular::check_landmark_banner_present` under WCAG 1.3.1
+        // (real rule_id + tiny-tree guard). Checking it here too produced a
+        // duplicate finding (#565).
+        let tree = AXTree::from_nodes(vec![
+            make_node("1", "WebArea", Some("Test")),
+            make_node("2", "main", Some("Content")),
+        ]);
+        let results = check_landmarks(&tree);
+        assert!(
+            !results
+                .violations
+                .iter()
+                .any(|v| v.message.contains("no banner")),
+            "check_landmarks must not flag missing banner — \
+             it is covered by check_landmark_banner_present (#565)"
+        );
     }
 
     #[test]
