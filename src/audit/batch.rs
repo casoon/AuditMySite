@@ -6,7 +6,7 @@
 //! - URL file processing
 //! - Progress reporting
 
-use std::collections::{HashSet, VecDeque};
+use std::collections::{BTreeMap, HashMap, HashSet, VecDeque};
 use std::sync::atomic::{AtomicUsize, Ordering};
 use std::sync::Arc;
 use std::time::{Duration, Instant};
@@ -18,8 +18,8 @@ use url::Url;
 
 use super::pipeline::{audit_page, PipelineConfig};
 use super::report::{
-    AuditReport, BatchError, BatchReport, RobotsSitemapConflict, SitemapDiagnostics,
-    SitemapHttpIssue,
+    AuditReport, BatchError, BatchReport, CrawlDepthDiagnostics, CrawlDepthEntry,
+    RobotsSitemapConflict, SitemapDiagnostics, SitemapHttpIssue,
 };
 use crate::browser::{BrowserOptions, BrowserPool, PoolConfig};
 use crate::cli::{Args, RequestMode};
@@ -301,12 +301,15 @@ pub async fn analyze_sitemap_diagnostics(
         .map(|robots| find_robots_sitemap_conflicts(sitemap_urls, robots))
         .unwrap_or_default();
 
+    let crawl_depths = build_crawl_depth_diagnostics(sitemap_urls, reports);
+
     SitemapDiagnostics {
         checked_urls: sitemap_urls.len(),
         http_issues,
         orphan_sitemap_urls,
         linked_not_in_sitemap,
         robots_conflicts,
+        crawl_depths,
     }
 }
 
@@ -477,19 +480,173 @@ fn collect_internal_link_targets(reports: &[AuditReport]) -> HashSet<String> {
             continue;
         };
         for target in &seo.technical.internal_link_targets {
-            let resolved = if target.starts_with("http://") || target.starts_with("https://") {
-                target.to_string()
-            } else {
-                base.join(target)
-                    .map(|url| url.to_string())
-                    .unwrap_or_else(|_| target.to_string())
-            };
-            if let Some(normalized) = normalize_url(&resolved) {
+            if let Some(normalized) = resolve_link_target(&base, target) {
                 targets.insert(normalized);
             }
         }
     }
     targets
+}
+
+/// Resolve one raw internal-link-target string (as extracted from a page —
+/// may be relative) against that page's own URL, then normalize it the same
+/// way as every other URL comparison in this module. Shared by the sitemap
+/// link-graph diff (`collect_internal_link_targets`) and crawl-depth BFS
+/// (`compute_crawl_depths`) so both resolve/normalize identically.
+fn resolve_link_target(base: &Url, target: &str) -> Option<String> {
+    let resolved = if target.starts_with("http://") || target.starts_with("https://") {
+        target.to_string()
+    } else {
+        base.join(target)
+            .map(|url| url.to_string())
+            .unwrap_or_else(|_| target.to_string())
+    };
+    normalize_url(&resolved)
+}
+
+/// Cap on per-list entries surfaced for crawl-depth diagnostics (deepest /
+/// unreachable pages). Mirrors the existing 20-row PDF truncation for
+/// orphan/linked sitemap URLs — a full per-page dump isn't decision-useful
+/// for a large batch (#548).
+const MAX_CRAWL_DEPTH_LIST: usize = 20;
+
+/// Build crawl-depth diagnostics for a sitemap-driven batch (#548), or
+/// `None` when no reasonable start-page candidate was actually audited.
+fn build_crawl_depth_diagnostics(
+    sitemap_urls: &[String],
+    reports: &[AuditReport],
+) -> Option<CrawlDepthDiagnostics> {
+    let start_url = choose_crawl_start_url(sitemap_urls, reports)?;
+    let depths = compute_crawl_depths(&start_url, reports);
+
+    let mut depth_histogram: BTreeMap<usize, usize> = BTreeMap::new();
+    for depth in depths.values() {
+        *depth_histogram.entry(*depth).or_insert(0) += 1;
+    }
+
+    let mut deepest_pages: Vec<CrawlDepthEntry> = depths
+        .iter()
+        .map(|(url, depth)| CrawlDepthEntry {
+            url: url.clone(),
+            depth: *depth,
+        })
+        .collect();
+    deepest_pages.sort_by(|a, b| b.depth.cmp(&a.depth).then_with(|| a.url.cmp(&b.url)));
+    deepest_pages.truncate(MAX_CRAWL_DEPTH_LIST);
+
+    let unreachable_set: HashSet<String> = reports
+        .iter()
+        .filter_map(|r| normalize_url(&r.url))
+        .filter(|url| !depths.contains_key(url))
+        .collect();
+    let mut unreachable_pages: Vec<String> = unreachable_set.into_iter().collect();
+    unreachable_pages.sort();
+    unreachable_pages.truncate(MAX_CRAWL_DEPTH_LIST);
+
+    // A batch smaller than the full discovered sitemap — whether via
+    // `--max-pages` sampling or per-page audit failures — means some pages'
+    // outbound links are unknown, so depth/reachability here is only a
+    // partial view of the real site-wide graph. Surfaced as an explicit
+    // report caveat rather than silently presenting a partial graph as
+    // complete (#548's own acceptance criterion).
+    let partial_batch = reports.len() < sitemap_urls.len();
+
+    Some(CrawlDepthDiagnostics {
+        start_url,
+        depth_histogram,
+        deepest_pages,
+        unreachable_pages,
+        partial_batch,
+    })
+}
+
+/// Heuristic start page for crawl-depth BFS: the shortest-path sitemap URL
+/// (root `/` naturally wins ties), restricted to URLs that were actually
+/// audited — a candidate whose own outbound links were never extracted
+/// can't seed a BFS. Ties broken alphabetically for determinism. Returns
+/// `None` when every sitemap URL fell outside the audited/sampled set.
+fn choose_crawl_start_url(sitemap_urls: &[String], reports: &[AuditReport]) -> Option<String> {
+    let audited_urls: HashSet<String> = reports
+        .iter()
+        .filter_map(|r| normalize_url(&r.url))
+        .collect();
+
+    sitemap_urls
+        .iter()
+        .filter(|url| {
+            normalize_url(url).is_some_and(|normalized| audited_urls.contains(&normalized))
+        })
+        .min_by_key(|url| {
+            let path_len = Url::parse(url)
+                .map(|u| u.path().len())
+                .unwrap_or(usize::MAX);
+            (path_len, (*url).clone())
+        })
+        .cloned()
+}
+
+/// BFS distance (in clicks) from `start_url` to every page in `reports`,
+/// following each page's internal link targets — scoped to *this batch
+/// run's* link graph, not a true site-wide crawl (#548).
+///
+/// A link only extends the graph when its target is itself one of the
+/// audited `reports`: a link to a page outside the batch isn't itself
+/// audited, so its own outbound links are unknown and it can't be used to
+/// reach anything beyond it. The returned map only ever contains audited
+/// page URLs; a page present in `reports` but absent from the returned map
+/// was never reached from `start_url` within this batch — a distinct state
+/// from "very deep", not a default/fallback depth.
+fn compute_crawl_depths(start_url: &str, reports: &[AuditReport]) -> HashMap<String, usize> {
+    let Some(start) = normalize_url(start_url) else {
+        return HashMap::new();
+    };
+
+    let audited_urls: HashSet<String> = reports
+        .iter()
+        .filter_map(|r| normalize_url(&r.url))
+        .collect();
+    if !audited_urls.contains(&start) {
+        return HashMap::new();
+    }
+
+    let mut adjacency: HashMap<String, Vec<String>> = HashMap::new();
+    for report in reports {
+        let Some(source) = normalize_url(&report.url) else {
+            continue;
+        };
+        let Some(base) = Url::parse(&report.url).ok() else {
+            continue;
+        };
+        let Some(seo) = &report.discoverability.seo else {
+            continue;
+        };
+        let neighbors = adjacency.entry(source).or_default();
+        for target in &seo.technical.internal_link_targets {
+            if let Some(normalized) = resolve_link_target(&base, target) {
+                if audited_urls.contains(&normalized) {
+                    neighbors.push(normalized);
+                }
+            }
+        }
+    }
+
+    let mut depths: HashMap<String, usize> = HashMap::new();
+    depths.insert(start.clone(), 0);
+    let mut queue: VecDeque<String> = VecDeque::new();
+    queue.push_back(start);
+    while let Some(current) = queue.pop_front() {
+        let current_depth = depths[&current];
+        let Some(neighbors) = adjacency.get(&current) else {
+            continue;
+        };
+        for neighbor in neighbors {
+            if !depths.contains_key(neighbor) {
+                depths.insert(neighbor.clone(), current_depth + 1);
+                queue.push_back(neighbor.clone());
+            }
+        }
+    }
+    depths
 }
 
 fn resolve_url(base: &str, location: &str) -> Option<String> {
@@ -1044,5 +1201,129 @@ mod tests {
         let sitemap_urls = vec!["https://example.com/products/page".to_string()];
         let conflicts = find_robots_sitemap_conflicts(&sitemap_urls, &robots);
         assert!(conflicts.is_empty());
+    }
+
+    /// Build a minimal audited report at `url` whose page links to `targets`
+    /// (relative or absolute), matching how `internal_link_targets` is
+    /// populated by the real SEO technical-analysis pass.
+    fn report_with_links(url: &str, targets: &[&str]) -> AuditReport {
+        let mut report = AuditReport::new(
+            url.to_string(),
+            crate::cli::WcagLevel::AA,
+            crate::wcag::WcagResults::new(),
+            10,
+        );
+        let mut seo = crate::seo::SeoAnalysis::default();
+        seo.technical.internal_link_targets = targets.iter().map(|t| t.to_string()).collect();
+        report.discoverability.seo = Some(seo);
+        report
+    }
+
+    #[test]
+    fn compute_crawl_depths_simple_chain() {
+        let reports = vec![
+            report_with_links("https://example.com/", &["/a"]),
+            report_with_links("https://example.com/a", &["/b"]),
+            report_with_links("https://example.com/b", &[]),
+        ];
+        let depths = compute_crawl_depths("https://example.com/", &reports);
+        assert_eq!(depths.get("https://example.com/"), Some(&0));
+        assert_eq!(depths.get("https://example.com/a"), Some(&1));
+        assert_eq!(depths.get("https://example.com/b"), Some(&2));
+    }
+
+    #[test]
+    fn compute_crawl_depths_shorter_path_wins() {
+        // home -> a -> c (2 hops) AND home -> c directly (1 hop): the
+        // shorter path must win.
+        let reports = vec![
+            report_with_links("https://example.com/", &["/a", "/c"]),
+            report_with_links("https://example.com/a", &["/c"]),
+            report_with_links("https://example.com/c", &[]),
+        ];
+        let depths = compute_crawl_depths("https://example.com/", &reports);
+        assert_eq!(depths.get("https://example.com/c"), Some(&1));
+    }
+
+    #[test]
+    fn compute_crawl_depths_unreached_page_is_absent_not_defaulted() {
+        // `/d` is audited but nothing in the batch links to it.
+        let reports = vec![
+            report_with_links("https://example.com/", &["/a"]),
+            report_with_links("https://example.com/a", &[]),
+            report_with_links("https://example.com/d", &[]),
+        ];
+        let depths = compute_crawl_depths("https://example.com/", &reports);
+        assert_eq!(depths.get("https://example.com/a"), Some(&1));
+        assert_eq!(depths.get("https://example.com/d"), None);
+        assert_eq!(depths.len(), 2);
+    }
+
+    #[test]
+    fn compute_crawl_depths_single_page_batch() {
+        let reports = vec![report_with_links("https://example.com/", &[])];
+        let depths = compute_crawl_depths("https://example.com/", &reports);
+        assert_eq!(depths.len(), 1);
+        assert_eq!(depths.get("https://example.com/"), Some(&0));
+    }
+
+    #[test]
+    fn compute_crawl_depths_empty_input() {
+        let depths = compute_crawl_depths("https://example.com/", &[]);
+        assert!(depths.is_empty());
+    }
+
+    #[test]
+    fn choose_crawl_start_url_prefers_shortest_path_among_audited() {
+        let reports = vec![
+            report_with_links("https://example.com/", &[]),
+            report_with_links("https://example.com/about", &[]),
+        ];
+        let sitemap_urls = vec![
+            "https://example.com/about".to_string(),
+            "https://example.com/".to_string(),
+        ];
+        let start = choose_crawl_start_url(&sitemap_urls, &reports);
+        assert_eq!(start, Some("https://example.com/".to_string()));
+    }
+
+    #[test]
+    fn choose_crawl_start_url_none_when_no_sitemap_url_was_audited() {
+        let reports = vec![report_with_links("https://example.com/only-audited", &[])];
+        let sitemap_urls = vec!["https://example.com/".to_string()];
+        assert_eq!(choose_crawl_start_url(&sitemap_urls, &reports), None);
+    }
+
+    #[test]
+    fn build_crawl_depth_diagnostics_flags_partial_batch_on_sample() {
+        let reports = vec![
+            report_with_links("https://example.com/", &["/a"]),
+            report_with_links("https://example.com/a", &[]),
+        ];
+        // Full sitemap has more URLs than were actually audited.
+        let sitemap_urls = vec![
+            "https://example.com/".to_string(),
+            "https://example.com/a".to_string(),
+            "https://example.com/b".to_string(),
+        ];
+        let diag = build_crawl_depth_diagnostics(&sitemap_urls, &reports).unwrap();
+        assert_eq!(diag.start_url, "https://example.com/");
+        assert!(diag.partial_batch);
+        assert_eq!(diag.depth_histogram.get(&0), Some(&1));
+        assert_eq!(diag.depth_histogram.get(&1), Some(&1));
+    }
+
+    #[test]
+    fn build_crawl_depth_diagnostics_no_partial_flag_on_full_coverage() {
+        let reports = vec![
+            report_with_links("https://example.com/", &["/a"]),
+            report_with_links("https://example.com/a", &[]),
+        ];
+        let sitemap_urls = vec![
+            "https://example.com/".to_string(),
+            "https://example.com/a".to_string(),
+        ];
+        let diag = build_crawl_depth_diagnostics(&sitemap_urls, &reports).unwrap();
+        assert!(!diag.partial_batch);
     }
 }

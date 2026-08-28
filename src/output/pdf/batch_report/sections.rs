@@ -2842,6 +2842,63 @@ pub(super) fn render_batch_seo_section(
         builder = builder.add_component(table);
     }
 
+    // Crawl depth: BFS click-distance from a heuristic start page through
+    // this batch's already-extracted internal link graph (#548). Purely
+    // informational — no scoring path reads this.
+    if let Some(diag) = &pres.portfolio_summary.crawl_depth_diagnostics {
+        let histogram_summary = diag
+            .depth_histogram
+            .iter()
+            .map(|(depth, count)| {
+                i18n.t_args(
+                    "batch-crawl-depth-histogram-entry",
+                    &[("depth", depth.to_string()), ("count", count.to_string())],
+                )
+            })
+            .collect::<Vec<_>>()
+            .join(" · ");
+        let intro = i18n.t_args(
+            "batch-crawl-depth-intro",
+            &[
+                ("start_url", truncate_url(&diag.start_url, 50)),
+                ("histogram", histogram_summary),
+            ],
+        );
+
+        builder = builder
+            .add_component(Section::new(i18n.t("batch-crawl-depth-section")).with_level(1))
+            .add_component(TextBlock::new(intro));
+
+        if diag.partial_batch {
+            builder = builder.add_component(Callout::info(i18n.t("batch-crawl-depth-caveat")));
+        }
+
+        if !diag.deepest_pages.is_empty() || !diag.unreachable_pages.is_empty() {
+            let mut table = AuditTable::new(vec![
+                TableColumn::new(i18n.t("batch-col-dup-type")),
+                TableColumn::new(i18n.t("batch-col-page-a")),
+                TableColumn::new(i18n.t("batch-col-crawl-depth")),
+            ])
+            .with_title(i18n.t("batch-crawl-depth-title"));
+
+            for entry in &diag.deepest_pages {
+                table = table.add_row(vec![
+                    i18n.t("batch-crawl-depth-kind-deepest"),
+                    truncate_url(&entry.url, 50),
+                    entry.depth.to_string(),
+                ]);
+            }
+            for url in &diag.unreachable_pages {
+                table = table.add_row(vec![
+                    i18n.t("batch-crawl-depth-kind-unreachable"),
+                    truncate_url(url, 50),
+                    "—".to_string(),
+                ]);
+            }
+            builder = builder.add_component(table);
+        }
+    }
+
     // Page type distribution
     if !pres.portfolio_summary.page_type_distribution.is_empty() {
         let high_label = i18n.t("batch-relevance-high");

@@ -281,6 +281,12 @@ pub struct UnifiedSummary {
     /// budget/TTFB, not a correctness issue.
     #[serde(skip_serializing_if = "Vec::is_empty")]
     pub redirect_chain_issues: Vec<crate::output::report_model::RedirectChainIssue>,
+    /// Crawl-depth diagnostics (batch only, #548): BFS click-distance from
+    /// a heuristic start page through this batch run's internal link
+    /// graph. Scoped to the audited pages only — see
+    /// `CrawlDepthDiagnostics::partial_batch` when the run is a sample.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub crawl_depth_diagnostics: Option<crate::audit::CrawlDepthDiagnostics>,
     /// Site-wide commerce roll-up (batch only): union of mandatory/trust-page
     /// links across the audited shop pages.
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -989,6 +995,10 @@ impl UnifiedReport {
                 .minification_inconsistencies
                 .clone(),
             redirect_chain_issues: presentation.portfolio_summary.redirect_chain_issues.clone(),
+            crawl_depth_diagnostics: presentation
+                .portfolio_summary
+                .crawl_depth_diagnostics
+                .clone(),
             commerce: crate::commerce::aggregate_site_commerce(
                 batch_report
                     .reports
@@ -1172,6 +1182,7 @@ impl UnifiedReport {
             robots_conflicts: Vec::new(),
             minification_inconsistencies: Vec::new(),
             redirect_chain_issues: Vec::new(),
+            crawl_depth_diagnostics: None,
             commerce: None,
         };
 
@@ -1266,6 +1277,7 @@ impl UnifiedReport {
             robots_conflicts: Vec::new(),
             minification_inconsistencies: Vec::new(),
             redirect_chain_issues: Vec::new(),
+            crawl_depth_diagnostics: None,
             commerce: None,
         };
 

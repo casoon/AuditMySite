@@ -2,6 +2,8 @@
 //!
 //! Contains the complete results of an accessibility audit.
 
+use std::collections::BTreeMap;
+
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 
@@ -720,6 +722,54 @@ pub struct SitemapDiagnostics {
     /// membership) that crawlers following `robots.txt` will not fetch (#549).
     #[serde(skip_serializing_if = "Vec::is_empty")]
     pub robots_conflicts: Vec<RobotsSitemapConflict>,
+    /// Crawl-depth (BFS click-distance from a heuristic start page) through
+    /// this batch run's internal link graph (#548). `None` when no
+    /// reasonable start-page candidate was audited.
+    #[serde(skip_serializing_if = "Option::is_none", default)]
+    pub crawl_depths: Option<CrawlDepthDiagnostics>,
+}
+
+/// Crawl-depth diagnostics for a sitemap-driven batch (#548): BFS distance
+/// (in clicks) from a heuristically-chosen start page to every other
+/// audited page, following each page's already-extracted internal link
+/// targets.
+///
+/// Deliberately scoped to *this batch run's* link graph, not the true
+/// site-wide graph: a link to a page outside the audited set can't be
+/// followed further (that page's own outbound links are unknown), so depth
+/// here is a lower bound within the audited pages, not a guarantee about
+/// the real site. `partial_batch` flags when the audited set is smaller
+/// than the full discovered sitemap (a `--max-pages` sample, or pages that
+/// failed to audit), which makes that gap more likely to matter — the
+/// report surfaces this as an explicit caveat rather than silently
+/// presenting a partial graph as complete.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct CrawlDepthDiagnostics {
+    /// The page BFS started from (heuristic: shortest-path sitemap URL,
+    /// root `/` naturally wins).
+    pub start_url: String,
+    /// Depth (in clicks) -> number of audited pages at that depth. 0 is the
+    /// start page itself.
+    pub depth_histogram: BTreeMap<usize, usize>,
+    /// The most-clicks-away pages, capped and sorted deepest-first —
+    /// intentionally not a full per-page dump (see #548).
+    pub deepest_pages: Vec<CrawlDepthEntry>,
+    /// Audited pages never reached by following internal links from
+    /// `start_url` within this batch, capped — distinct from "very deep",
+    /// not a default/fallback depth.
+    pub unreachable_pages: Vec<String>,
+    /// True when the audited set is smaller than the full discovered
+    /// sitemap (sampling via `--max-pages`, or per-page audit failures) —
+    /// depth and reachability are then only a partial view of the real
+    /// site-wide link graph.
+    pub partial_batch: bool,
+}
+
+/// One page's BFS click-distance from the crawl-depth start page.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct CrawlDepthEntry {
+    pub url: String,
+    pub depth: usize,
 }
 
 /// One sitemap URL blocked by a `robots.txt` `Disallow` rule under

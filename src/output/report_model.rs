@@ -1189,6 +1189,10 @@ pub struct PortfolioSummary {
     /// Audited URLs whose own navigation involved a long (≥3 hop) or
     /// cyclical redirect chain (#546)
     pub redirect_chain_issues: Vec<RedirectChainIssue>,
+    /// Crawl-depth diagnostics (BFS click-distance from a heuristic start
+    /// page through this batch's internal link graph, #548). `None` when
+    /// no reasonable start-page candidate was audited.
+    pub crawl_depth_diagnostics: Option<crate::audit::CrawlDepthDiagnostics>,
 }
 
 pub struct CrawlLinkSummary {

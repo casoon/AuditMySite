@@ -43,12 +43,12 @@ pub use report::{
     compute_recurring_rules, compute_worst_risk, AccessibilitySection, AuditExecution,
     AuditQuality, AuditQualityStatus, AuditReport, AuditScope, AuditedContentState, BatchError,
     BatchReport, BatchSummary, BrokenLink, BrokenLinkSeverity, ConsentAuditState,
-    ConsentCookieSignal, ConsentPrivacySnapshot, CrawlDiagnostics, DiscoverabilitySection,
-    DualViewportResults, ExecutionEnvironment, ExecutionStatus, ExperienceSection, ModuleRun,
-    NavigationSnapshot, PageScreenshots, PerformanceResults, RecurringRule, RedirectChain,
-    RobotsSitemapConflict, SampleMetadata, ScreenshotStatus, SitemapDiagnostics, SitemapHttpIssue,
-    SubcheckRun, ThrottledPerfResult, ViewportAuditData, ViewportDefinition, ViewportScoreSet,
-    ViewportScores, ViewportScreenshot,
+    ConsentCookieSignal, ConsentPrivacySnapshot, CrawlDepthDiagnostics, CrawlDepthEntry,
+    CrawlDiagnostics, DiscoverabilitySection, DualViewportResults, ExecutionEnvironment,
+    ExecutionStatus, ExperienceSection, ModuleRun, NavigationSnapshot, PageScreenshots,
+    PerformanceResults, RecurringRule, RedirectChain, RobotsSitemapConflict, SampleMetadata,
+    ScreenshotStatus, SitemapDiagnostics, SitemapHttpIssue, SubcheckRun, ThrottledPerfResult,
+    ViewportAuditData, ViewportDefinition, ViewportScoreSet, ViewportScores, ViewportScreenshot,
 };
 pub use scoring::{AccessibilityScorer, CoverageRatio, PrincipleCoverage, ViolationStatistics};
 pub use template_dedup::{detect_template_clusters, TemplateCluster};

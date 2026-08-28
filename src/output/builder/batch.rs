@@ -447,7 +447,13 @@ pub fn build_batch_presentation_with_normalized(
     // Redirect-chain/loop detection across audited URLs (#546)
     let redirect_chain_issues = build_redirect_chain_issues(&batch.reports);
 
-    let (sitemap_http_issues, orphan_sitemap_urls, linked_not_in_sitemap, robots_conflicts) = batch
+    let (
+        sitemap_http_issues,
+        orphan_sitemap_urls,
+        linked_not_in_sitemap,
+        robots_conflicts,
+        crawl_depth_diagnostics,
+    ) = batch
         .sitemap_diagnostics
         .as_ref()
         .map(|diagnostics| {
@@ -456,6 +462,7 @@ pub fn build_batch_presentation_with_normalized(
                 diagnostics.orphan_sitemap_urls.clone(),
                 diagnostics.linked_not_in_sitemap.clone(),
                 diagnostics.robots_conflicts.clone(),
+                diagnostics.crawl_depths.clone(),
             )
         })
         .unwrap_or_default();
@@ -799,6 +806,7 @@ pub fn build_batch_presentation_with_normalized(
             robots_conflicts,
             minification_inconsistencies,
             redirect_chain_issues,
+            crawl_depth_diagnostics,
         },
         top_issues: top_issues.into_iter().take(10).collect(),
         issue_frequency,
