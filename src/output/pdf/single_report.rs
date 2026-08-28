@@ -440,6 +440,19 @@ pub(super) fn render_management_page(
 
     // 1. Scannable severity counters — the 20-second top line
     builder = builder.add_component(build_severity_counter_strip(vm, i18n));
+    // Short definition right at first use, so a reader doesn't have to reach
+    // the methodology appendix to learn "Vorkommen" ≠ "distinct rule" — the
+    // full breakdown (finding groups vs. occurrences, all categories) still
+    // lives only in the appendix, this is just the one-line pointer (#572).
+    builder = builder.add_component(
+        Label::new(if en {
+            "Occurrences = individual affected elements, not the number of distinct rules — see the appendix for the full breakdown."
+        } else {
+            "Vorkommen = einzelne betroffene Elemente, nicht die Anzahl unterschiedlicher Regeln — vollständige Aufschlüsselung im Anhang."
+        })
+        .with_size("8.5pt")
+        .with_color(design::tokens::MUTED),
+    );
 
     // 2. Overall verdict (the single core sentence)
     builder = builder.add_component(Callout::info(&vm.summary.verdict).with_title(if en {
@@ -447,6 +460,26 @@ pub(super) fn render_management_page(
     } else {
         "Gesamturteil"
     }));
+    // For a clean automated run (no findings), state the automated-scope
+    // caveat directly alongside the headline verdict — not only in the
+    // appendix — so "0 findings" doesn't read as a full WCAG conformance
+    // claim (#572).
+    if !vm.severity.has_issues {
+        let (automated, total) = crate::wcag::coverage::coverage_stats();
+        builder = builder.add_component(
+            Label::new(if en {
+                format!(
+                    "This result applies to the automated audit scope only ({automated} of ~{total} testable WCAG 2.1 AA criteria); criteria requiring manual review are listed in the appendix."
+                )
+            } else {
+                format!(
+                    "Diese Einschätzung bezieht sich ausschließlich auf den automatisierten Prüfumfang ({automated} von ca. {total} testbaren WCAG-2.1-AA-Kriterien); Kriterien mit manuellem Prüfbedarf sind im Anhang aufgeführt."
+                )
+            })
+            .with_size("9pt")
+            .with_color(design::tokens::MUTED),
+        );
+    }
 
     // 2b. Quality profile radar — balance across all dimensions at a glance.
     let radar_data: Vec<(String, f64)> = vm

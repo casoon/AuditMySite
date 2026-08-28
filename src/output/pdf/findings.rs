@@ -266,9 +266,18 @@ pub(super) fn render_finding_technical(
     let color = super::design::severity_color(group.severity);
 
     let header = if !group.wcag_criterion.is_empty() {
+        // Flag WCAG 2.2-only criteria (e.g. 2.5.8) inline — they're outside
+        // this report's WCAG-2.1-scoped "N of ~50" audit-scope ratio, so a
+        // finding tagged just "AA" would otherwise misrepresent its scope
+        // (#572).
+        let wcag22_suffix = if crate::wcag::coverage::is_wcag22_only(&group.wcag_criterion) {
+            ", WCAG 2.2"
+        } else {
+            ""
+        };
         format!(
-            "{}{} — WCAG {} ({})",
-            severity_prefix, group.title, group.wcag_criterion, group.wcag_level
+            "{}{} — WCAG {} ({}{})",
+            severity_prefix, group.title, group.wcag_criterion, group.wcag_level, wcag22_suffix
         )
     } else if group.title.is_empty() {
         // Raw internal rule ids (e.g. "seo.headings.multiple_h1") are never

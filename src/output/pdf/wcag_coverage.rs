@@ -46,15 +46,42 @@ pub(super) fn render_wcag_coverage_section(
             .add(p_rob, fmt_ratio(&coverage.robust)),
     );
     let (automated, total) = coverage_stats();
+    // Criteria this tool checks automatically that are WCAG 2.2-only (didn't
+    // exist in WCAG 2.1) — counted separately from `automated`/`total`, which
+    // stay scoped to WCAG 2.1's 50 A/AA criteria (#572). Stating this
+    // explicitly here, rather than leaving those criteria to appear as
+    // undifferentiated "AA" entries, commits the report to its actual scope
+    // decision: WCAG 2.1 AA, plus a small set of additional WCAG 2.2 AA
+    // criteria this tool happens to already check.
+    let wcag22_criteria: Vec<&str> = automated_criteria()
+        .iter()
+        .filter(|(id, _)| crate::wcag::coverage::is_wcag22_only(id))
+        .map(|(id, _)| *id)
+        .collect();
     let title = if en { "Audit scope" } else { "Prüfumfang" };
-    let intro = if en {
-        format!(
-            "This audit covers {automated} of ~{total} testable WCAG 2.1 AA criteria automatically. The criteria listed below require manual review."
-        )
+    let intro = if wcag22_criteria.is_empty() {
+        if en {
+            format!(
+                "This audit covers {automated} of ~{total} testable WCAG 2.1 AA criteria automatically. The criteria listed below require manual review."
+            )
+        } else {
+            format!(
+                "Dieses Audit prüft {automated} von ca. {total} WCAG-2.1-AA-Kriterien automatisch. Die unten aufgeführten Kriterien benötigen manuelle Prüfung."
+            )
+        }
     } else {
-        format!(
-            "Dieses Audit prüft {automated} von ca. {total} WCAG-2.1-AA-Kriterien automatisch. Die unten aufgeführten Kriterien benötigen manuelle Prüfung."
-        )
+        let wcag22_list = wcag22_criteria.join(", ");
+        if en {
+            format!(
+                "This audit covers {automated} of ~{total} testable WCAG 2.1 AA criteria automatically, plus {} selected WCAG 2.2 AA criteria ({wcag22_list}, marked \"WCAG 2.2\" below and on individual findings) that are outside the WCAG 2.1-scoped ratio above. The criteria listed below require manual review.",
+                wcag22_criteria.len()
+            )
+        } else {
+            format!(
+                "Dieses Audit prüft {automated} von ca. {total} WCAG-2.1-AA-Kriterien automatisch, ergänzt um {} ausgewählte WCAG-2.2-AA-Kriterien ({wcag22_list}, unten und bei einzelnen Befunden mit „WCAG 2.2\" gekennzeichnet), die außerhalb der oben genannten WCAG-2.1-Quote liegen. Die unten aufgeführten Kriterien benötigen manuelle Prüfung.",
+                wcag22_criteria.len()
+            )
+        }
     };
 
     builder = builder.add_component(SectionHeaderSplit::new(title, &intro).with_level(2));
@@ -66,7 +93,12 @@ pub(super) fn render_wcag_coverage_section(
     };
     let mut tag_cloud = TagCloud::new().with_title(&automated_title).with_gap("5pt");
     for (c, l) in automated_criteria().iter() {
-        tag_cloud = tag_cloud.add(format!("WCAG {} ({})", c, l), "good");
+        let tag = if crate::wcag::coverage::is_wcag22_only(c) {
+            format!("WCAG {} ({}, WCAG 2.2)", c, l)
+        } else {
+            format!("WCAG {} ({})", c, l)
+        };
+        tag_cloud = tag_cloud.add(tag, "good");
     }
     builder = builder.add_component(tag_cloud);
 
@@ -83,7 +115,12 @@ pub(super) fn render_wcag_coverage_section(
     };
     let mut manual_cloud = TagCloud::new().with_title(&manual_title).with_gap("5pt");
     for (c, l, name) in manual_review_criteria().iter() {
-        manual_cloud = manual_cloud.add(format!("{c} ({l}) – {name}"), "info");
+        let localized_name = if en {
+            *name
+        } else {
+            crate::wcag::coverage::manual_review_criterion_name_de(c, name)
+        };
+        manual_cloud = manual_cloud.add(format!("{c} ({l}) – {localized_name}"), "info");
     }
     builder = builder.add_component(manual_cloud);
 

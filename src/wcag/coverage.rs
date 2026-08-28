@@ -100,3 +100,64 @@ pub fn coverage_stats() -> (usize, usize) {
         .count();
     (aa_count, WCAG_AA_TOTAL)
 }
+
+/// True if `id` is a WCAG 2.2-only success criterion (didn't exist in WCAG
+/// 2.1) — lets output layers flag an automated criterion or a finding as
+/// falling outside the WCAG-2.1-scoped `coverage_stats()` ratio, instead of
+/// presenting it as an undifferentiated "AA" criterion (#572).
+pub fn is_wcag22_only(id: &str) -> bool {
+    WCAG_22_ONLY_CRITERIA.contains(&id)
+}
+
+/// German title for a manual-review criterion, reused from the canonical
+/// BIK/DIAS WCAG 2.1 translation table (`en301549::EN301549_WEB_CLAUSES`)
+/// instead of maintaining a second, independently drifting translation
+/// (#572). Falls back to `fallback_en` if a criterion id is ever missing
+/// from that table — shouldn't happen, since every `MANUAL_REVIEW_CRITERIA_RAW`
+/// id is a WCAG 2.1 A/AA criterion, which that table covers in full.
+pub fn manual_review_criterion_name_de(id: &str, fallback_en: &'static str) -> &'static str {
+    crate::wcag::en301549::EN301549_WEB_CLAUSES
+        .iter()
+        .find(|c| c.wcag == id)
+        .map(|c| c.title_de)
+        .unwrap_or(fallback_en)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn manual_review_criterion_name_de_has_a_real_translation_for_every_current_entry() {
+        // #572 guard: the PDF's manual-review tag cloud used to render the
+        // English criterion name unconditionally (no locale branching at
+        // all). Every currently-listed manual-review criterion must resolve
+        // to a German name distinct from its English fallback — this fails
+        // loudly (instead of silently falling back to English) if a future
+        // `MANUAL_REVIEW_CRITERIA_RAW` entry's id is missing from
+        // `en301549::EN301549_WEB_CLAUSES`.
+        for (id, _level, name_en) in manual_review_criteria() {
+            let name_de = manual_review_criterion_name_de(id, name_en);
+            assert_ne!(
+                name_de, *name_en,
+                "expected a German translation for WCAG {id}, got the English fallback"
+            );
+        }
+    }
+
+    #[test]
+    fn manual_review_criterion_name_de_matches_known_translation() {
+        assert_eq!(
+            manual_review_criterion_name_de("1.2.1", "Audio-only and Video-only (Prerecorded)"),
+            "Nur Audio oder nur Video (aufgezeichnet)"
+        );
+    }
+
+    #[test]
+    fn manual_review_criterion_name_de_falls_back_for_unknown_id() {
+        assert_eq!(
+            manual_review_criterion_name_de("9.9.9", "Unknown Criterion"),
+            "Unknown Criterion"
+        );
+    }
+}
