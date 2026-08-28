@@ -217,6 +217,21 @@ pub struct Args {
     #[arg(long)]
     pub isolate_third_party_impact: bool,
 
+    /// Detect SSR/hydration content gaps by reloading the page a second
+    /// time with JavaScript execution disabled (CDP
+    /// `Emulation.setScriptExecutionDisabled`) and comparing visible
+    /// content length against the normal, JavaScript-enabled load (#534).
+    ///
+    /// Relevant for hybrid/partial-hydration frameworks (e.g. Astro
+    /// Islands) where essential content may only appear client-side —
+    /// search crawlers and assistive tools that do not execute JavaScript
+    /// would see substantially less content. Opt-in and costly (one extra
+    /// full page reload per audited page) — requires SEO checking
+    /// (`--full` or `--seo`) to also be active, and only runs in
+    /// single-URL mode.
+    #[arg(long)]
+    pub check_ssr_content: bool,
+
     /// Attempt to dismiss cookie consent banners before auditing.
     ///
     /// Injects known CMP consent cookies before navigation and clicks
@@ -778,6 +793,7 @@ mod tests {
             ai_transparency: false,
             dns_check: false,
             isolate_third_party_impact: false,
+            check_ssr_content: false,
             stack: false,
             reuse_cache: false,
             force_refresh: false,

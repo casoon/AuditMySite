@@ -20,6 +20,7 @@
 //! [`content_visibility_signal_text`] in the run language.
 
 pub mod module;
+pub mod ssr_gap;
 pub use module::ContentVisibilityModule;
 
 use serde::{Deserialize, Serialize};
@@ -139,6 +140,9 @@ pub enum ContentVisibilitySignalKind {
     ContentTypeSchema,
     StructuredContentSections,
     TrueTopicalAuthorityNotTestable,
+    // SSR/hydration content gap (#534)
+    SsrContentGapDetected,
+    SsrContentComplete,
 }
 
 /// The interpolated values a content-visibility signal text may reference.
@@ -680,6 +684,41 @@ pub fn content_visibility_signal_text(
              können automatisiert nicht bewertet werden."
                 .into(),
         ),
+        // ── SSR/hydration content gap (#534) ─────────────────────────────
+        (SsrContentGapDetected, true) => (
+            "SSR/hydration content gap".into(),
+            format!(
+                "Only {count} characters of visible content render without JavaScript, \
+                 compared to {text} with JavaScript enabled (~{score}% retained) — search \
+                 crawlers and assistive tools that do not execute JavaScript may see \
+                 substantially less content than users do."
+            ),
+        ),
+        (SsrContentGapDetected, false) => (
+            "SSR-/Hydration-Lücke bei Inhalten".into(),
+            format!(
+                "Ohne JavaScript sind nur {count} Zeichen sichtbaren Inhalts vorhanden, \
+                 gegenüber {text} Zeichen mit aktiviertem JavaScript (~{score}% erhalten) — \
+                 Suchcrawler und Hilfstechnologien ohne JavaScript-Ausführung sehen \
+                 möglicherweise deutlich weniger Inhalt als Nutzer."
+            ),
+        ),
+        (SsrContentComplete, true) => (
+            "SSR content complete".into(),
+            format!(
+                "Visible content is essentially unchanged without JavaScript ({count} of \
+                 {text} characters, ~{score}%) — the page's essential content is already \
+                 present in the initial server-rendered HTML."
+            ),
+        ),
+        (SsrContentComplete, false) => (
+            "SSR-Inhalt vollständig".into(),
+            format!(
+                "Sichtbarer Inhalt bleibt ohne JavaScript nahezu unverändert ({count} von \
+                 {text} Zeichen, ~{score}%) — die wesentlichen Inhalte der Seite liegen \
+                 bereits im initialen serverseitig gerenderten HTML vor."
+            ),
+        ),
     }
 }
 
@@ -721,6 +760,57 @@ pub fn analyze_content_visibility(report: &AuditReport) -> ContentVisibilityAnal
     }
 
     out.finish()
+}
+
+/// Append the SSR/hydration content-gap signal (#534, opt-in via
+/// `--check-ssr-content`) to an already-derived [`ContentVisibilityAnalysis`].
+///
+/// Runs separately from [`analyze_content_visibility`] because the
+/// underlying CDP measurement ([`ssr_gap::measure_ssr_content_gap`]) needs an
+/// extra page reload with JavaScript disabled — the same reason
+/// `performance::isolate_third_party_impact` runs after `audit_page` returns
+/// rather than during the normal collection passes (#531). By the time this
+/// is called, `analysis.finish()` has already run once, so `signal_count`/
+/// `problem_count` are updated incrementally here instead.
+pub fn append_ssr_content_gap_signal(
+    analysis: &mut ContentVisibilityAnalysis,
+    gap: &ssr_gap::SsrContentGap,
+) {
+    use ContentVisibilitySignalKind::*;
+
+    let values = ContentSignalValues {
+        count: Some(gap.without_js_content_chars),
+        score: Some((gap.ratio * 100.0).round() as u32),
+        text: Some(gap.with_js_content_chars.to_string()),
+    };
+
+    let sig = if gap.has_gap {
+        signal(
+            ContentArea::Seo,
+            AssessmentLevel::Warning,
+            EvidenceConfidence::High,
+            SsrContentGapDetected,
+            values,
+        )
+    } else {
+        signal(
+            ContentArea::Seo,
+            AssessmentLevel::Pass,
+            EvidenceConfidence::High,
+            SsrContentComplete,
+            values,
+        )
+    }
+    .with_evidence(
+        ContentEvidence::new(EvidenceSource::Computed, EvidenceConfidence::High)
+            .with_field("ssr_content_gap"),
+    );
+
+    if sig.level.is_problem() {
+        analysis.problem_count += 1;
+    }
+    analysis.signal_count += 1;
+    analysis.content_depth.push(sig);
 }
 
 // ─── Area builders ───────────────────────────────────────────────────────────
@@ -2065,5 +2155,65 @@ mod tests {
         );
         assert_eq!(title_en, "Little content");
         assert!(detail_en.contains("words"));
+    }
+
+    #[test]
+    fn ssr_content_gap_signal_text_is_localized_and_canonical_english_has_no_german_leaks() {
+        let values = ContentSignalValues {
+            count: Some(200),
+            score: Some(10),
+            text: Some("2000".to_string()),
+        };
+        for kind in [
+            ContentVisibilitySignalKind::SsrContentGapDetected,
+            ContentVisibilitySignalKind::SsrContentComplete,
+        ] {
+            let (title_en, detail_en) = content_visibility_signal_text(kind, &values, true);
+            let combined = format!("{title_en}{detail_en}");
+            assert!(
+                !combined.contains(['ä', 'ö', 'ü', 'Ä', 'Ö', 'Ü', 'ß']),
+                "German characters in canonical English SSR text: {combined:?}"
+            );
+
+            let (title_de, _detail_de) = content_visibility_signal_text(kind, &values, false);
+            assert_ne!(title_de, title_en);
+        }
+    }
+
+    #[test]
+    fn append_ssr_content_gap_signal_adds_a_warning_when_gap_detected() {
+        let mut analysis = ContentVisibilityAnalysis::default();
+        let gap = ssr_gap::compute_ssr_content_gap(2000, 200);
+        assert!(gap.has_gap);
+
+        append_ssr_content_gap_signal(&mut analysis, &gap);
+
+        assert_eq!(analysis.signal_count, 1);
+        assert_eq!(analysis.problem_count, 1);
+        assert_eq!(analysis.content_depth.len(), 1);
+        let sig = &analysis.content_depth[0];
+        assert_eq!(sig.level, AssessmentLevel::Warning);
+        assert_eq!(
+            sig.cv_kind,
+            Some(ContentVisibilitySignalKind::SsrContentGapDetected)
+        );
+    }
+
+    #[test]
+    fn append_ssr_content_gap_signal_adds_a_pass_when_no_gap() {
+        let mut analysis = ContentVisibilityAnalysis::default();
+        let gap = ssr_gap::compute_ssr_content_gap(2000, 1800);
+        assert!(!gap.has_gap);
+
+        append_ssr_content_gap_signal(&mut analysis, &gap);
+
+        assert_eq!(analysis.signal_count, 1);
+        assert_eq!(analysis.problem_count, 0);
+        let sig = &analysis.content_depth[0];
+        assert_eq!(sig.level, AssessmentLevel::Pass);
+        assert_eq!(
+            sig.cv_kind,
+            Some(ContentVisibilitySignalKind::SsrContentComplete)
+        );
     }
 }

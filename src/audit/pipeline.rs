@@ -294,6 +294,16 @@ pub struct PipelineConfig {
     /// batch's `audit_page` path never does (same precedent as the
     /// throttled-performance multi-pass).
     pub check_isolate_third_party_impact: bool,
+    /// Run the opt-in SSR/hydration content-gap check (#534): reload the
+    /// page once with JavaScript execution disabled via CDP
+    /// `Emulation.setScriptExecutionDisabled` and compare visible content
+    /// length against the normal, JavaScript-enabled load. Requires
+    /// `check_seo` to also be true — the resulting finding is attached to
+    /// `content_visibility`, which itself is only derived when SEO checking
+    /// is active. Costly like the other opt-in extra-reload passes: one
+    /// extra full page reload. Structurally single-URL only, same precedent
+    /// as `check_isolate_third_party_impact`.
+    pub check_ssr_content: bool,
     /// Run tech stack detection and stack-specific audits
     pub check_stack: bool,
     /// `[rules] disabled`/`enabled_only` from `auditmysite.toml`, by axe_id.
@@ -357,14 +367,15 @@ impl PipelineConfig {
         // 13 for the ai_transparency module field, 14 for rule_filter (#560
         // — disabled/enabled_only now actually change which findings run),
         // 15 for the network_dns module field (#545), 16 for the isolated
-        // third-party impact field (#531).
-        const CACHE_FMT: u8 = 16;
+        // third-party impact field (#531), 17 for the SSR/hydration
+        // content-gap check field (#534).
+        const CACHE_FMT: u8 = 17;
         let mut disabled = self.rule_filter.disabled_rules.clone();
         disabled.sort();
         let mut enabled_only = self.rule_filter.enabled_only_rules.clone();
         enabled_only.sort();
         format!(
-            "v={};fmt={};level={};perf={};seo={};sec={};mobile={};dark={};design_quality={};ai_transparency={};dns={};isolate_tp_impact={};stack={};consent={};interactive={:?};journey_budget_ms={};lang={};disabled={};enabled_only={}",
+            "v={};fmt={};level={};perf={};seo={};sec={};mobile={};dark={};design_quality={};ai_transparency={};dns={};isolate_tp_impact={};ssr_content={};stack={};consent={};interactive={:?};journey_budget_ms={};lang={};disabled={};enabled_only={}",
             env!("CARGO_PKG_VERSION"),
             CACHE_FMT,
             self.wcag_level,
@@ -377,6 +388,7 @@ impl PipelineConfig {
             self.check_ai_transparency as u8,
             self.check_dns as u8,
             self.check_isolate_third_party_impact as u8,
+            self.check_ssr_content as u8,
             self.check_stack as u8,
             self.dismiss_consent as u8,
             self.interactive,
@@ -472,6 +484,10 @@ impl PipelineConfig {
             check_isolate_third_party_impact: args.isolate_third_party_impact
                 && (full_audit || args.performance)
                 && !args.skip_performance,
+            // Requires SEO checking itself active — the resulting finding
+            // is attached to `content_visibility`, which is only derived
+            // when `check_seo` is true (see `ContentVisibilityModule::is_enabled`).
+            check_ssr_content: args.check_ssr_content && (full_audit || args.seo),
             check_stack: full_audit || args.stack,
             rule_filter,
             persist_artifacts: true,
@@ -536,6 +552,25 @@ pub async fn run_single_audit(
                     );
                 }
             }
+        }
+    }
+
+    // SSR/hydration content-gap check (#534). Runs after the third-party
+    // isolation pass (if any) and before the throttled-performance passes,
+    // same reasoning as #531: it needs one more full reload of the same
+    // `page`, and `report.discoverability.content_visibility` (populated by
+    // the catalog's derive phase inside `audit_page`) must already exist so
+    // the finding can be appended to it.
+    if config.check_ssr_content {
+        if let Some(gap) =
+            crate::content_visibility::ssr_gap::measure_ssr_content_gap(&page, browser, url).await
+        {
+            if let Some(cv) = report.discoverability.content_visibility.as_mut() {
+                crate::content_visibility::append_ssr_content_gap_signal(cv, &gap);
+            }
+        }
+        if let Err(e) = settle(&page).await {
+            warn!("Browser settle failed after SSR content-gap check: {}", e);
         }
     }
 
@@ -2230,6 +2265,7 @@ mod tests {
             ai_transparency: false,
             dns_check: false,
             isolate_third_party_impact: false,
+            check_ssr_content: false,
             stack: false,
             reuse_cache: false,
             force_refresh: false,
@@ -2318,6 +2354,7 @@ mod tests {
             check_ai_transparency: false,
             check_dns: false,
             check_isolate_third_party_impact: false,
+            check_ssr_content: false,
             check_stack: false,
             rule_filter: crate::wcag::RuleFilterConfig::default(),
             persist_artifacts: true,
