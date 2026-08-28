@@ -25,7 +25,7 @@ use super::detail_modules::{
 use super::diagnosis::render_diagnosis_section;
 use super::en301549::render_en301549_annex;
 use super::findings::render_finding_technical;
-use super::helpers::map_severity;
+use super::helpers::{map_severity, priority_label_i18n, role_label_i18n};
 use super::wcag_coverage::render_wcag_coverage_section;
 use crate::audit::AuditReport;
 use crate::cli::{AnnexKind, ReportLevel};
@@ -871,6 +871,93 @@ fn render_findings_section(
             ])
             .compact(),
         );
+
+        // Findings matrix (#570): a single compact table listing every finding
+        // group across all four buckets, sorted worst-first, so a reader can
+        // prioritize and locate a specific finding without paging through the
+        // full set of detail cards that follow below. Purely additive — does
+        // not replace or alter the per-category cards rendered afterward.
+        const FINDINGS_MATRIX_MAX_ROWS: usize = 30;
+
+        let mut matrix_findings: Vec<&FindingGroup> = all_findings.iter().collect();
+        matrix_findings.sort_by(|a, b| {
+            b.priority
+                .cmp(&a.priority)
+                .then_with(|| b.occurrence_count.cmp(&a.occurrence_count))
+        });
+
+        if !matrix_findings.is_empty() {
+            let (matrix_title, matrix_intro) = if en {
+                (
+                    "Findings Matrix",
+                    "One row per finding group, sorted by priority — an overview to prioritize by before the detail cards below expand on each row.",
+                )
+            } else {
+                (
+                    "Befundmatrix",
+                    "Eine Zeile je Befundgruppe, sortiert nach Priorität – als Überblick zur Priorisierung, bevor die Detailkarten unten jede Zeile vertiefen.",
+                )
+            };
+            builder = builder.add_component(Label::new(matrix_intro).with_size("10.5pt"));
+
+            let mut table = AuditTable::new(vec![
+                TableColumn::new(if en { "Priority" } else { "Priorität" }).with_width("10%"),
+                TableColumn::new("WCAG").with_width("10%"),
+                TableColumn::new(if en { "Finding" } else { "Befund" }).with_width("28%"),
+                TableColumn::new(if en { "Scope" } else { "Umfang" }).with_width("14%"),
+                TableColumn::new(if en { "Responsible" } else { "Zuständig" }).with_width("14%"),
+                TableColumn::new(if en { "Action" } else { "Maßnahme" }).with_width("24%"),
+            ])
+            .with_title(matrix_title);
+
+            for group in matrix_findings.iter().take(FINDINGS_MATRIX_MAX_ROWS) {
+                let wcag = if group.wcag_criterion.is_empty() {
+                    "n/a".to_string()
+                } else if group.wcag_level.is_empty() {
+                    group.wcag_criterion.clone()
+                } else {
+                    format!("{} ({})", group.wcag_criterion, group.wcag_level)
+                };
+                let scope = if group.is_component_issue {
+                    if en {
+                        format!("Systemic · {}", group.occurrence_count)
+                    } else {
+                        format!("Systemisch · {}", group.occurrence_count)
+                    }
+                } else if en {
+                    format!("Local · {}", group.occurrence_count)
+                } else {
+                    format!("Lokal · {}", group.occurrence_count)
+                };
+                table = table.add_row(vec![
+                    priority_label_i18n(group.priority, i18n),
+                    wcag,
+                    truncate_title(&group.title, 48),
+                    scope,
+                    role_label_i18n(group.responsible_role, i18n),
+                    truncate_title(&group.recommendation, 72),
+                ]);
+            }
+            builder = builder.add_component(table);
+
+            let remaining = matrix_findings
+                .len()
+                .saturating_sub(FINDINGS_MATRIX_MAX_ROWS);
+            if remaining > 0 {
+                let note = if en {
+                    format!("{remaining} further findings are listed in the detail cards below.")
+                } else {
+                    format!(
+                        "{remaining} weitere Befunde sind in den Detailkarten unten aufgeführt."
+                    )
+                };
+                builder = builder.add_component(
+                    Label::new(note)
+                        .with_size("9pt")
+                        .with_color(design::tokens::NEUTRAL),
+                );
+            }
+        }
 
         // The first rendered category flows directly under the classification
         // header; only later categories start on a fresh page.
