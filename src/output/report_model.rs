@@ -1105,6 +1105,25 @@ pub struct MinificationInconsistency {
     pub total_pages_with_asset: usize,
 }
 
+/// A batch-audited URL whose own navigation involved a long (≥3 hop) or
+/// cyclical HTTP redirect chain before reaching its final destination (#546).
+/// Reuses the per-page redirect chain already tracked by
+/// `seo::page_health::PageHealthAnalysis.redirect_chain` — this is purely a
+/// cross-page re-aggregation of that existing signal, not a new detection
+/// mechanism, and score-neutral (no scoring path reads this field).
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+pub struct RedirectChainIssue {
+    /// The originally-requested (audited) URL.
+    pub url: String,
+    /// Number of redirect hops observed before the final response.
+    pub hop_count: usize,
+    /// True when the same URL appears more than once in `chain` — a real
+    /// cyclical redirect, distinct from a long-but-terminating chain.
+    pub is_loop: bool,
+    /// URLs in the chain, in order (capped at 10 entries).
+    pub chain: Vec<String>,
+}
+
 pub struct PortfolioSummary {
     pub total_urls: usize,
     pub passed: usize,
@@ -1167,6 +1186,9 @@ pub struct PortfolioSummary {
     pub robots_conflicts: Vec<crate::audit::RobotsSitemapConflict>,
     /// Asset URLs served minified on some pages and unminified on others (#537)
     pub minification_inconsistencies: Vec<MinificationInconsistency>,
+    /// Audited URLs whose own navigation involved a long (≥3 hop) or
+    /// cyclical redirect chain (#546)
+    pub redirect_chain_issues: Vec<RedirectChainIssue>,
 }
 
 pub struct CrawlLinkSummary {

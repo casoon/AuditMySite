@@ -943,6 +943,7 @@ fn test_collection_errors_serialized_when_present() {
             linked_not_in_sitemap: vec![],
             robots_conflicts: vec![],
             minification_inconsistencies: vec![],
+            redirect_chain_issues: vec![],
             commerce: None,
         },
         sample: None,

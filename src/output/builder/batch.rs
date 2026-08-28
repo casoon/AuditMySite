@@ -444,6 +444,9 @@ pub fn build_batch_presentation_with_normalized(
     // Cross-page minification consistency (#537)
     let minification_inconsistencies = build_minification_inconsistencies(&batch.reports);
 
+    // Redirect-chain/loop detection across audited URLs (#546)
+    let redirect_chain_issues = build_redirect_chain_issues(&batch.reports);
+
     let (sitemap_http_issues, orphan_sitemap_urls, linked_not_in_sitemap, robots_conflicts) = batch
         .sitemap_diagnostics
         .as_ref()
@@ -795,6 +798,7 @@ pub fn build_batch_presentation_with_normalized(
             linked_not_in_sitemap,
             robots_conflicts,
             minification_inconsistencies,
+            redirect_chain_issues,
         },
         top_issues: top_issues.into_iter().take(10).collect(),
         issue_frequency,
@@ -1296,6 +1300,72 @@ fn build_minification_inconsistencies(
     out.sort_by(|a, b| {
         b.unminified_on_count
             .cmp(&a.unminified_on_count)
+            .then_with(|| a.url.cmp(&b.url))
+    });
+    out.truncate(30);
+    out
+}
+
+/// Cross-page redirect-chain/loop detection (#546): flags audited URLs whose
+/// own navigation passed through a long (≥3 hop) or cyclical HTTP redirect
+/// chain before reaching a final page — wasted crawl budget/TTFB, not a
+/// correctness issue. Purely a re-aggregation of the per-page redirect chain
+/// already tracked by `seo::page_health::PageHealthAnalysis.redirect_chain`
+/// (`follow_redirect_chain`, capped at 10 hops there) — no new redirect
+/// detection, and score-neutral (the existing per-page `multiple_redirects`
+/// SEO finding is untouched; this just re-groups the same underlying data
+/// across pages).
+fn build_redirect_chain_issues(reports: &[crate::audit::AuditReport]) -> Vec<RedirectChainIssue> {
+    use std::collections::HashSet;
+
+    let mut out = Vec::new();
+
+    for r in reports {
+        let Some(seo) = &r.discoverability.seo else {
+            continue;
+        };
+        let Some(page_health) = &seo.page_health else {
+            continue;
+        };
+        let hop_count = page_health.redirect_chain.len();
+        if hop_count == 0 {
+            continue;
+        }
+
+        let mut seen: HashSet<&str> = HashSet::new();
+        let is_loop = page_health
+            .redirect_chain
+            .iter()
+            .any(|hop| !seen.insert(hop.url.as_str()));
+
+        if hop_count < 3 && !is_loop {
+            continue;
+        }
+
+        let mut chain: Vec<String> = page_health
+            .redirect_chain
+            .iter()
+            .map(|hop| hop.url.clone())
+            .collect();
+        if let Some(final_url) = &page_health.own_final_url {
+            if chain.last().map(String::as_str) != Some(final_url.as_str()) {
+                chain.push(final_url.clone());
+            }
+        }
+        chain.truncate(10);
+
+        out.push(RedirectChainIssue {
+            url: r.url.clone(),
+            hop_count,
+            is_loop,
+            chain,
+        });
+    }
+
+    // Deterministic order: worst (most hops) first, then by url.
+    out.sort_by(|a, b| {
+        b.hop_count
+            .cmp(&a.hop_count)
             .then_with(|| a.url.cmp(&b.url))
     });
     out.truncate(30);
@@ -2084,5 +2154,106 @@ mod minification_inconsistency_tests {
     #[test]
     fn empty_input_yields_empty_output() {
         assert!(build_minification_inconsistencies(&[]).is_empty());
+    }
+}
+
+#[cfg(test)]
+mod redirect_chain_issue_tests {
+    use super::*;
+    use crate::audit::AuditReport;
+    use crate::cli::WcagLevel;
+    use crate::seo::page_health::{PageHealthAnalysis, RedirectHop};
+    use crate::seo::SeoAnalysis;
+    use crate::wcag::WcagResults;
+
+    fn report_with_chain(url: &str, hops: &[(u16, &str)], final_url: Option<&str>) -> AuditReport {
+        let redirect_chain: Vec<RedirectHop> = hops
+            .iter()
+            .map(|(status, hop_url)| RedirectHop {
+                status: *status,
+                url: hop_url.to_string(),
+            })
+            .collect();
+        let seo = SeoAnalysis {
+            page_health: Some(PageHealthAnalysis {
+                redirect_count: redirect_chain.len() as u32,
+                redirect_chain,
+                own_final_url: final_url.map(str::to_string),
+                ..Default::default()
+            }),
+            ..Default::default()
+        };
+        AuditReport::new(url.to_string(), WcagLevel::AA, WcagResults::new(), 100).with_seo(seo)
+    }
+
+    #[test]
+    fn four_hop_chain_is_flagged_as_long_chain_not_loop() {
+        let reports = vec![report_with_chain(
+            "https://x.test/a",
+            &[
+                (301, "https://x.test/a"),
+                (301, "https://x.test/b"),
+                (302, "https://x.test/c"),
+                (301, "https://x.test/d"),
+            ],
+            Some("https://x.test/final"),
+        )];
+
+        let issues = build_redirect_chain_issues(&reports);
+
+        assert_eq!(issues.len(), 1);
+        assert_eq!(issues[0].hop_count, 4);
+        assert!(!issues[0].is_loop);
+        assert_eq!(
+            issues[0].chain,
+            vec![
+                "https://x.test/a",
+                "https://x.test/b",
+                "https://x.test/c",
+                "https://x.test/d",
+                "https://x.test/final",
+            ]
+        );
+    }
+
+    #[test]
+    fn chain_revisiting_a_url_is_flagged_as_a_loop() {
+        let reports = vec![report_with_chain(
+            "https://x.test/a",
+            &[
+                (301, "https://x.test/a"),
+                (302, "https://x.test/b"),
+                (301, "https://x.test/a"),
+            ],
+            None,
+        )];
+
+        let issues = build_redirect_chain_issues(&reports);
+
+        assert_eq!(issues.len(), 1);
+        assert!(issues[0].is_loop);
+    }
+
+    #[test]
+    fn two_hop_chain_below_threshold_is_not_flagged() {
+        let reports = vec![report_with_chain(
+            "https://x.test/a",
+            &[(301, "https://x.test/a"), (302, "https://x.test/b")],
+            Some("https://x.test/final"),
+        )];
+
+        assert!(build_redirect_chain_issues(&reports).is_empty());
+    }
+
+    #[test]
+    fn no_redirects_is_not_flagged() {
+        let reports = vec![report_with_chain("https://x.test/a", &[], None)];
+
+        assert!(build_redirect_chain_issues(&reports).is_empty());
+    }
+
+    #[test]
+    fn empty_batch_yields_empty_output() {
+        assert!(build_redirect_chain_issues(&[]).is_empty());
     }
 }

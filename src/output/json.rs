@@ -276,6 +276,11 @@ pub struct UnifiedSummary {
     /// templates/routes rather than an isolated per-page issue.
     #[serde(skip_serializing_if = "Vec::is_empty")]
     pub minification_inconsistencies: Vec<crate::output::report_model::MinificationInconsistency>,
+    /// Audited URLs whose own navigation involved a long (≥3 hop) or
+    /// cyclical HTTP redirect chain (batch only, #546) — wasted crawl
+    /// budget/TTFB, not a correctness issue.
+    #[serde(skip_serializing_if = "Vec::is_empty")]
+    pub redirect_chain_issues: Vec<crate::output::report_model::RedirectChainIssue>,
     /// Site-wide commerce roll-up (batch only): union of mandatory/trust-page
     /// links across the audited shop pages.
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -983,6 +988,7 @@ impl UnifiedReport {
                 .portfolio_summary
                 .minification_inconsistencies
                 .clone(),
+            redirect_chain_issues: presentation.portfolio_summary.redirect_chain_issues.clone(),
             commerce: crate::commerce::aggregate_site_commerce(
                 batch_report
                     .reports
@@ -1165,6 +1171,7 @@ impl UnifiedReport {
             linked_not_in_sitemap: Vec::new(),
             robots_conflicts: Vec::new(),
             minification_inconsistencies: Vec::new(),
+            redirect_chain_issues: Vec::new(),
             commerce: None,
         };
 
@@ -1258,6 +1265,7 @@ impl UnifiedReport {
             linked_not_in_sitemap: Vec::new(),
             robots_conflicts: Vec::new(),
             minification_inconsistencies: Vec::new(),
+            redirect_chain_issues: Vec::new(),
             commerce: None,
         };
 

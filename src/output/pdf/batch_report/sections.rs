@@ -2275,6 +2275,44 @@ pub(super) fn render_batch_action_plan_section(
             .add_component(table);
     }
 
+    // Redirect chains and loops across audited URLs (#546)
+    if !pres.portfolio_summary.redirect_chain_issues.is_empty() {
+        let mut table = AuditTable::new(vec![
+            TableColumn::new(i18n.t("batch-col-redirect-url")),
+            TableColumn::new(i18n.t("batch-col-redirect-hops")),
+            TableColumn::new(i18n.t("batch-col-redirect-type")),
+            TableColumn::new(i18n.t("batch-col-redirect-chain")),
+        ])
+        .with_title(i18n.t("batch-redirect-chain-issues-title"));
+
+        for entry in &pres.portfolio_summary.redirect_chain_issues {
+            let type_label = if entry.is_loop {
+                i18n.t("batch-redirect-chain-type-loop")
+            } else {
+                i18n.t("batch-redirect-chain-type-long")
+            };
+            let chain_str = entry
+                .chain
+                .iter()
+                .map(|u| truncate_url(u, 20))
+                .collect::<Vec<_>>()
+                .join(" → ");
+            table = table.add_row(vec![
+                truncate_url(&entry.url, 35),
+                entry.hop_count.to_string(),
+                type_label,
+                chain_str,
+            ]);
+        }
+        let redirect_intro = i18n.t("batch-redirect-chain-issues-intro");
+        builder = builder
+            .add_component(
+                Section::new(i18n.t("batch-redirect-chain-issues-section")).with_level(1),
+            )
+            .add_component(TextBlock::new(redirect_intro))
+            .add_component(table);
+    }
+
     // Performance budgets
     if !pres.portfolio_summary.budget_summary.is_empty() {
         let pages_col = i18n.t("batch-budget-pages-col");
