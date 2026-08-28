@@ -26,15 +26,15 @@ use crate::wcag::Violation;
 
 use super::{
     check_abbreviations_with_page, check_aria_allowed_attr_with_page, check_aria_hidden_focus,
-    check_aria_prohibited_attr_with_page, check_aria_valid_attr_value_with_page,
-    check_background_audio_with_page, check_checked_state_with_page,
-    check_content_on_hover_with_page, check_focus_not_obscured_enhanced_with_page,
-    check_focus_not_obscured_minimum_with_page, check_focus_visible_css_with_page,
-    check_form_no_submit_with_page, check_frame_tested_with_page, check_frame_title_with_page,
-    check_identify_purpose_with_page, check_image_input_rules_with_page,
-    check_invalid_aria_attribute_name_with_page, check_invalid_role_with_page,
-    check_label_in_name_with_page, check_landmarks_with_page, check_language_extended_with_page,
-    check_language_of_parts_with_page, check_location_with_page,
+    check_aria_prohibited_attr_with_page, check_aria_relationships_with_page,
+    check_aria_valid_attr_value_with_page, check_background_audio_with_page,
+    check_checked_state_with_page, check_content_on_hover_with_page,
+    check_focus_not_obscured_enhanced_with_page, check_focus_not_obscured_minimum_with_page,
+    check_focus_visible_css_with_page, check_form_no_submit_with_page,
+    check_frame_tested_with_page, check_frame_title_with_page, check_identify_purpose_with_page,
+    check_image_input_rules_with_page, check_invalid_aria_attribute_name_with_page,
+    check_invalid_role_with_page, check_label_in_name_with_page, check_landmarks_with_page,
+    check_language_extended_with_page, check_language_of_parts_with_page, check_location_with_page,
     check_meaningful_sequence_with_page, check_meta_viewport_large_with_page,
     check_modern_attributes_with_page, check_motion_actuation_with_page,
     check_no_interruptions_with_page, check_no_timing_with_page,
@@ -82,6 +82,12 @@ pub const PAGE_RULES: &[PageRuleEntry] = &[
         name: "aria-prohibited-attr",
         min_level: WcagLevel::A,
         check_fn: |p| Box::pin(check_aria_prohibited_attr_with_page(p)),
+    },
+    PageRuleEntry {
+        rule_id: "4.1.2/aria-valid-attr",
+        name: "aria-valid-attr",
+        min_level: WcagLevel::A,
+        check_fn: |p| Box::pin(check_aria_relationships_with_page(p)),
     },
     PageRuleEntry {
         rule_id: "2.4.1/frame-title",
@@ -452,7 +458,8 @@ mod tests {
         // + redundant-entry (3.3.7, WCAG 2.2 A) = 32
         // + meaningful-sequence (1.3.2, WCAG 2.1 A) = 33
         // + pause-stop-hide (2.2.2, WCAG 2.1 A) = 34
-        assert_eq!(count, 34);
+        // + aria-valid-attr DOM supplement (#567) = 35
+        assert_eq!(count, 35);
     }
 
     #[test]
@@ -469,7 +476,8 @@ mod tests {
         // + focus-not-obscured-minimum (2.4.11, WCAG 2.2 AA) = 43.
         // + pause-stop-hide (2.2.2, WCAG 2.1 A, counted here too since AA >= A) = 44.
         // + conservative language-of-parts heuristic (3.1.2) = 45.
-        assert_eq!(count, 45);
+        // + aria-valid-attr DOM supplement (#567, Level A, counted here too since AA >= A) = 46.
+        assert_eq!(count, 46);
     }
 
     #[test]
