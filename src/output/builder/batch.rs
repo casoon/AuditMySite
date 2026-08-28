@@ -429,8 +429,11 @@ pub fn build_batch_presentation_with_normalized(
         Vec::new()
     };
 
-    // Cross-page duplicate content (identical title / meta description / H1)
+    // Cross-page duplicate content (identical title / meta description / H1 / og:image)
     let duplicate_content = build_duplicate_content(&batch.reports);
+
+    // Cross-page missing-tag prevalence (meta description / canonical / og:image / og:title)
+    let missing_tag_prevalence = build_missing_tag_prevalence(&batch.reports);
 
     // Per-page canonical conflicts (noindex / og:url mismatch)
     let canonical_issues = build_canonical_issues(&batch.reports);
@@ -780,6 +783,7 @@ pub fn build_batch_presentation_with_normalized(
             schema_distribution,
             pages_without_schema,
             duplicate_content,
+            missing_tag_prevalence,
             canonical_issues,
             hreflang_issues,
             sitemap_http_issues,
@@ -933,10 +937,16 @@ fn build_duplicate_content(reports: &[crate::audit::AuditReport]) -> Vec<Duplica
         let Some(seo) = &r.discoverability.seo else {
             continue;
         };
-        let candidates: [(&'static str, Option<&str>); 3] = [
+        let og_image = seo
+            .social
+            .open_graph
+            .as_ref()
+            .and_then(|og| og.image.as_deref());
+        let candidates: [(&'static str, Option<&str>); 4] = [
             ("title", seo.meta.title.as_deref()),
             ("meta_description", seo.meta.description.as_deref()),
             ("h1", seo.headings.h1_text.as_deref()),
+            ("og_image", og_image),
         ];
         for (kind, raw) in candidates {
             let Some(value) = raw.map(str::trim).filter(|s| !s.is_empty()) else {
@@ -968,6 +978,89 @@ fn build_duplicate_content(reports: &[crate::audit::AuditReport]) -> Vec<Duplica
             .cmp(&a.urls.len())
             .then_with(|| a.kind.cmp(&b.kind))
             .then_with(|| a.value.cmp(&b.value))
+    });
+    out
+}
+
+/// Aggregate how often each SEO/social tag is missing across the audited set
+/// (#536) — the systematic-gap counterpart to `build_duplicate_content`'s
+/// duplicate-value detection. Only tags missing on ≥2 pages are surfaced
+/// (same signal-vs-noise threshold as duplicate content): a single missing
+/// tag is a page-specific issue already visible in that page's own SEO
+/// findings, not a cross-page pattern worth a batch-level table.
+fn build_missing_tag_prevalence(
+    reports: &[crate::audit::AuditReport],
+) -> Vec<MissingTagPrevalence> {
+    let mut missing_counts: HashMap<&'static str, usize> = HashMap::new();
+    let mut total = 0usize;
+
+    for r in reports {
+        let Some(seo) = &r.discoverability.seo else {
+            continue;
+        };
+        total += 1;
+
+        let og = seo.social.open_graph.as_ref();
+        let candidates: [(&'static str, bool); 4] = [
+            (
+                "meta_description",
+                seo.meta
+                    .description
+                    .as_deref()
+                    .map(str::trim)
+                    .unwrap_or_default()
+                    .is_empty(),
+            ),
+            (
+                "canonical",
+                seo.technical
+                    .canonical_url
+                    .as_deref()
+                    .map(str::trim)
+                    .unwrap_or_default()
+                    .is_empty(),
+            ),
+            (
+                "og_image",
+                og.and_then(|o| o.image.as_deref())
+                    .map(str::trim)
+                    .unwrap_or_default()
+                    .is_empty(),
+            ),
+            (
+                "og_title",
+                og.and_then(|o| o.title.as_deref())
+                    .map(str::trim)
+                    .unwrap_or_default()
+                    .is_empty(),
+            ),
+        ];
+        for (kind, is_missing) in candidates {
+            if is_missing {
+                *missing_counts.entry(kind).or_insert(0) += 1;
+            }
+        }
+    }
+
+    if total == 0 {
+        return Vec::new();
+    }
+
+    let mut out: Vec<MissingTagPrevalence> = missing_counts
+        .into_iter()
+        .filter(|(_, missing_count)| *missing_count >= 2)
+        .map(|(kind, missing_count)| MissingTagPrevalence {
+            kind: kind.to_string(),
+            missing_count,
+            total_count: total,
+        })
+        .collect();
+
+    // Deterministic order: worst prevalence first, then by kind.
+    out.sort_by(|a, b| {
+        b.missing_count
+            .cmp(&a.missing_count)
+            .then_with(|| a.kind.cmp(&b.kind))
     });
     out
 }
@@ -1402,6 +1495,138 @@ mod duplicate_content_tests {
             report_with("https://x.test/b", "Two", "B"),
         ];
         assert!(build_duplicate_content(&reports).is_empty());
+    }
+
+    fn report_with_og_image(url: &str, og_image: Option<&str>) -> AuditReport {
+        use crate::seo::{OpenGraph, SocialTags};
+        let seo = SeoAnalysis {
+            social: SocialTags {
+                open_graph: og_image.map(|img| OpenGraph {
+                    image: Some(img.to_string()),
+                    ..Default::default()
+                }),
+                ..Default::default()
+            },
+            ..Default::default()
+        };
+        AuditReport::new(url.to_string(), WcagLevel::AA, WcagResults::new(), 100).with_seo(seo)
+    }
+
+    #[test]
+    fn groups_identical_og_images() {
+        let reports = vec![
+            report_with_og_image("https://x.test/a", Some("https://x.test/shared.jpg")),
+            report_with_og_image("https://x.test/b", Some("https://x.test/shared.jpg")),
+            report_with_og_image("https://x.test/c", Some("https://x.test/unique.jpg")),
+        ];
+
+        let groups = build_duplicate_content(&reports);
+
+        let og_group = groups
+            .iter()
+            .find(|g| g.kind == "og_image")
+            .expect("duplicate og_image group");
+        assert_eq!(og_group.value, "https://x.test/shared.jpg");
+        assert_eq!(og_group.urls.len(), 2);
+    }
+
+    fn report_with_tags(
+        url: &str,
+        description: Option<&str>,
+        canonical: Option<&str>,
+        og_image: Option<&str>,
+        og_title: Option<&str>,
+    ) -> AuditReport {
+        use crate::seo::{MetaTags, OpenGraph, SocialTags, TechnicalSeo};
+        let seo = SeoAnalysis {
+            meta: MetaTags {
+                description: description.map(str::to_string),
+                ..Default::default()
+            },
+            technical: TechnicalSeo {
+                canonical_url: canonical.map(str::to_string),
+                ..Default::default()
+            },
+            social: SocialTags {
+                open_graph: Some(OpenGraph {
+                    image: og_image.map(str::to_string),
+                    title: og_title.map(str::to_string),
+                    ..Default::default()
+                }),
+                ..Default::default()
+            },
+            ..Default::default()
+        };
+        AuditReport::new(url.to_string(), WcagLevel::AA, WcagResults::new(), 100).with_seo(seo)
+    }
+
+    #[test]
+    fn flags_tags_missing_on_at_least_two_pages() {
+        let reports = vec![
+            report_with_tags(
+                "https://x.test/a",
+                None,
+                Some("https://x.test/a"),
+                None,
+                Some("A"),
+            ),
+            report_with_tags(
+                "https://x.test/b",
+                None,
+                Some("https://x.test/b"),
+                None,
+                Some("B"),
+            ),
+            report_with_tags(
+                "https://x.test/c",
+                Some("Has a description"),
+                None,
+                Some("https://x.test/c.jpg"),
+                Some("C"),
+            ),
+        ];
+
+        let prevalence = build_missing_tag_prevalence(&reports);
+
+        let description_gap = prevalence
+            .iter()
+            .find(|p| p.kind == "meta_description")
+            .expect("meta_description prevalence entry");
+        assert_eq!(description_gap.missing_count, 2);
+        assert_eq!(description_gap.total_count, 3);
+
+        let og_image_gap = prevalence
+            .iter()
+            .find(|p| p.kind == "og_image")
+            .expect("og_image prevalence entry");
+        assert_eq!(og_image_gap.missing_count, 2);
+
+        // canonical is missing on exactly one page → below the ≥2 signal
+        // threshold, must not be surfaced.
+        assert!(!prevalence.iter().any(|p| p.kind == "canonical"));
+        // og_title is present on all three pages → no entry at all.
+        assert!(!prevalence.iter().any(|p| p.kind == "og_title"));
+    }
+
+    #[test]
+    fn no_prevalence_entries_when_all_tags_present() {
+        let reports = vec![
+            report_with_tags(
+                "https://x.test/a",
+                Some("Desc A"),
+                Some("https://x.test/a"),
+                Some("https://x.test/a.jpg"),
+                Some("A"),
+            ),
+            report_with_tags(
+                "https://x.test/b",
+                Some("Desc B"),
+                Some("https://x.test/b"),
+                Some("https://x.test/b.jpg"),
+                Some("B"),
+            ),
+        ];
+        assert!(build_missing_tag_prevalence(&reports).is_empty());
     }
 
     fn report_with_canonical(

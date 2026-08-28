@@ -2604,6 +2604,7 @@ pub(super) fn render_batch_seo_section(
                 "title" => i18n.t("batch-dup-kind-title"),
                 "meta_description" => i18n.t("batch-dup-kind-description"),
                 "h1" => i18n.t("batch-dup-kind-h1"),
+                "og_image" => i18n.t("batch-dup-kind-og-image"),
                 other => other.to_string(),
             };
             let examples = group
@@ -2618,6 +2619,32 @@ pub(super) fn render_batch_seo_section(
                 group.value.clone(),
                 group.urls.len().to_string(),
                 examples,
+            ]);
+        }
+        builder = builder.add_component(table);
+    }
+
+    // Cross-page missing-tag prevalence (meta description / canonical / og:image / og:title)
+    if !pres.portfolio_summary.missing_tag_prevalence.is_empty() {
+        let mut table = AuditTable::new(vec![
+            TableColumn::new(i18n.t("batch-col-dup-type")),
+            TableColumn::new(i18n.t("batch-col-missing-count")),
+            TableColumn::new(i18n.t("batch-col-missing-total")),
+        ])
+        .with_title(i18n.t("batch-seo-missing-tags-title"));
+
+        for entry in &pres.portfolio_summary.missing_tag_prevalence {
+            let kind_label = match entry.kind.as_str() {
+                "meta_description" => i18n.t("batch-dup-kind-description"),
+                "canonical" => i18n.t("batch-missing-kind-canonical"),
+                "og_image" => i18n.t("batch-missing-kind-og-image"),
+                "og_title" => i18n.t("batch-missing-kind-og-title"),
+                other => other.to_string(),
+            };
+            table = table.add_row(vec![
+                kind_label,
+                entry.missing_count.to_string(),
+                entry.total_count.to_string(),
             ]);
         }
         builder = builder.add_component(table);

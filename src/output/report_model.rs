@@ -1043,13 +1043,26 @@ pub struct ActionPlan {
 /// A group of pages that share an identical SEO content value across the site.
 ///
 /// `kind` is a canonical, language-neutral key (`"title"`, `"meta_description"`,
-/// or `"h1"`); the PDF layer derives the localized label at render time (#406).
-/// `value` is the verbatim shared content (truncated for display).
+/// `"h1"`, or `"og_image"`); the PDF layer derives the localized label at
+/// render time (#406). `value` is the verbatim shared content (truncated for
+/// display).
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 pub struct DuplicateContentGroup {
     pub kind: String,
     pub value: String,
     pub urls: Vec<String>,
+}
+
+/// How often one SEO/social tag is missing across the audited set (#536) —
+/// the systematic-gap counterpart to [`DuplicateContentGroup`]'s duplicate-
+/// value detection. `kind` is a canonical, language-neutral key
+/// (`"meta_description"`, `"canonical"`, `"og_image"`, or `"og_title"`); the
+/// PDF layer derives the localized label at render time (#406).
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+pub struct MissingTagPrevalence {
+    pub kind: String,
+    pub missing_count: usize,
+    pub total_count: usize,
 }
 
 /// A canonical-tag conflict found on a single page (#423).
@@ -1118,8 +1131,10 @@ pub struct PortfolioSummary {
     pub schema_distribution: Vec<(String, usize)>,
     /// Number of pages with no structured data at all
     pub pages_without_schema: usize,
-    /// Cross-page duplicate content groups (identical title / meta description / H1)
+    /// Cross-page duplicate content groups (identical title / meta description / H1 / og:image)
     pub duplicate_content: Vec<DuplicateContentGroup>,
+    /// Cross-page tag-missing prevalence (meta description / canonical / og:image / og:title)
+    pub missing_tag_prevalence: Vec<MissingTagPrevalence>,
     /// Per-page canonical-tag conflicts aggregated across the site
     pub canonical_issues: Vec<CanonicalIssue>,
     /// Non-reciprocal hreflang relationships between audited pages

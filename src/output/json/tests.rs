@@ -935,6 +935,7 @@ fn test_collection_errors_serialized_when_present() {
             management_risks: vec![],
             top_actions: vec![],
             duplicate_content: vec![],
+            missing_tag_prevalence: vec![],
             canonical_issues: vec![],
             hreflang_issues: vec![],
             sitemap_http_issues: vec![],

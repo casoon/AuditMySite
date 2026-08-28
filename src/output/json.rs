@@ -242,9 +242,13 @@ pub struct UnifiedSummary {
     /// Decision-oriented top actions combining risk, impact, complexity, and reach.
     pub top_actions: Vec<DecisionAction>,
     /// Cross-page duplicate content groups (batch only): identical title,
-    /// meta description, or H1 shared across multiple pages (#423).
+    /// meta description, H1, or og:image shared across multiple pages (#423, #536).
     #[serde(skip_serializing_if = "Vec::is_empty")]
     pub duplicate_content: Vec<crate::output::report_model::DuplicateContentGroup>,
+    /// Cross-page tag-missing prevalence (batch only): how many pages are
+    /// missing meta description / canonical / og:image / og:title (#536).
+    #[serde(skip_serializing_if = "Vec::is_empty")]
+    pub missing_tag_prevalence: Vec<crate::output::report_model::MissingTagPrevalence>,
     /// Per-page canonical conflicts (batch only): noindex conflict or og:url
     /// mismatch (#423).
     #[serde(skip_serializing_if = "Vec::is_empty")]
@@ -953,6 +957,10 @@ impl UnifiedReport {
             management_risks: build_management_risks(&normalized_reports),
             top_actions: build_decision_actions(&normalized_reports),
             duplicate_content: presentation.portfolio_summary.duplicate_content.clone(),
+            missing_tag_prevalence: presentation
+                .portfolio_summary
+                .missing_tag_prevalence
+                .clone(),
             canonical_issues: presentation.portfolio_summary.canonical_issues.clone(),
             hreflang_issues: presentation.portfolio_summary.hreflang_issues.clone(),
             sitemap_http_issues: presentation.portfolio_summary.sitemap_http_issues.clone(),
@@ -1132,6 +1140,7 @@ impl UnifiedReport {
             management_risks: build_management_risks(std::slice::from_ref(&ctx.normalized)),
             top_actions: build_decision_actions(std::slice::from_ref(&ctx.normalized)),
             duplicate_content: Vec::new(),
+            missing_tag_prevalence: Vec::new(),
             canonical_issues: Vec::new(),
             hreflang_issues: Vec::new(),
             sitemap_http_issues: Vec::new(),
@@ -1222,6 +1231,7 @@ impl UnifiedReport {
             management_risks: build_management_risks(std::slice::from_ref(normalized)),
             top_actions: build_decision_actions(std::slice::from_ref(normalized)),
             duplicate_content: Vec::new(),
+            missing_tag_prevalence: Vec::new(),
             canonical_issues: Vec::new(),
             hreflang_issues: Vec::new(),
             sitemap_http_issues: Vec::new(),
