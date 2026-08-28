@@ -1464,6 +1464,96 @@ mod tests {
     }
 
     #[test]
+    fn test_management_summary_risks_and_strengths_split_for_mixed_report() {
+        // #576: the management summary must no longer render a fixed
+        // "Die 5 wichtigsten Risiken" block with all 5 dimensions — only
+        // the ones that are actually a risk. `pdf_fixture_report_rich` has
+        // no performance/SEO/mobile module data, so those three dimensions
+        // default to "good" (score 100) while usability/legal/business are
+        // driven into "bad" by the critical/high WCAG violations.
+        let Some(pdftotext) = find_executable("pdftotext") else {
+            return;
+        };
+
+        let report = pdf_fixture_report_rich();
+        let config = ReportConfig {
+            level: ReportLevel::Standard,
+            ..ReportConfig::default()
+        };
+        let pdf = generate_pdf(&report, &config).expect("PDF should render");
+
+        let temp_dir = tempfile::tempdir().expect("temp dir");
+        let pdf_path = temp_dir.path().join("risks-strengths-check.pdf");
+        let txt_path = temp_dir.path().join("risks-strengths-check.txt");
+        std::fs::write(&pdf_path, &pdf).expect("write pdf");
+        Command::new(pdftotext)
+            .arg(&pdf_path)
+            .arg(&txt_path)
+            .status()
+            .expect("pdftotext should run");
+        let text = std::fs::read_to_string(&txt_path).expect("read text");
+
+        assert!(
+            !text.contains("Die 5 wichtigsten Risiken") && !text.contains("5 Key Risks"),
+            "the old fixed-5 risks title must be gone"
+        );
+        assert!(
+            text.contains("Wichtigste Risiken"),
+            "expected the dynamic risks panel title in the PDF text"
+        );
+        assert!(
+            text.contains("Stärken im geprüften Umfang"),
+            "expected a separate strengths panel for the good dimensions"
+        );
+        assert!(
+            text.contains("Sehr gute Auffindbarkeit"),
+            "the positive SEO text must still be present, but only under the strengths panel"
+        );
+    }
+
+    #[test]
+    fn test_management_summary_renders_zero_risk_empty_state_when_all_dimensions_are_good() {
+        // #576: a report with no WCAG violations at all must render the
+        // specific zero-risk empty-state wording instead of an empty/missing
+        // panel or a padded-out fake risk.
+        let Some(pdftotext) = find_executable("pdftotext") else {
+            return;
+        };
+
+        let report = AuditReport::new(
+            "https://example.com".to_string(),
+            WcagLevel::AA,
+            WcagResults::new(),
+            1_000,
+        );
+        let config = ReportConfig {
+            level: ReportLevel::Standard,
+            ..ReportConfig::default()
+        };
+        let pdf = generate_pdf(&report, &config).expect("PDF should render");
+
+        let temp_dir = tempfile::tempdir().expect("temp dir");
+        let pdf_path = temp_dir.path().join("zero-risk-check.pdf");
+        let txt_path = temp_dir.path().join("zero-risk-check.txt");
+        std::fs::write(&pdf_path, &pdf).expect("write pdf");
+        Command::new(pdftotext)
+            .arg(&pdf_path)
+            .arg(&txt_path)
+            .status()
+            .expect("pdftotext should run");
+        let text = std::fs::read_to_string(&txt_path).expect("read text");
+
+        assert!(
+            text.contains("Keine prioritären Risiken im automatisierten Prüfumfang erkannt"),
+            "expected the specific zero-risk empty-state wording"
+        );
+        assert!(
+            !text.contains("Die 5 wichtigsten Risiken") && !text.contains("5 Key Risks"),
+            "the old fixed-5 risks title must be gone"
+        );
+    }
+
+    #[test]
     fn test_pdf_contains_no_raw_typst_syntax() {
         // Regression test for #239: raw Typst source code must never appear in the
         // rendered PDF text (e.g. "block( width: 100%, fill: accent, radius: 8pt )").

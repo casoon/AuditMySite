@@ -184,12 +184,34 @@ fn render_module_split_dashboards(
     builder
 }
 
-pub(super) fn build_top_risks_checklist(vm: &ReportViewModel, i18n: &I18n) -> ChecklistPanel {
-    let en = i18n.locale() == "en";
-    let mut rows = Vec::new();
+/// One of the five fixed report dimensions (Usability / Legal / Business /
+/// SEO / Performance), evaluated to a status ("bad"/"warn"/"good") and a
+/// localized description. Pure data — no rendering, no `ReportViewModel`
+/// dependency — so the bucketing logic below is directly unit-testable.
+struct DimensionRow {
+    label: String,
+    description: String,
+    status: &'static str,
+}
+
+/// Evaluates the five fixed dimensions against their thresholds. Same
+/// thresholds/wording as before #576 — only the presentation (which bucket
+/// each row lands in, how 0..5 rows render) changed, not the scoring model.
+#[allow(clippy::too_many_arguments)]
+fn compute_dimension_rows(
+    severity_critical: u32,
+    severity_high: u32,
+    cover_critical_issues: u32,
+    summary_score: u32,
+    seo_score: u32,
+    perf_score: u32,
+    mobile_score: u32,
+    en: bool,
+) -> Vec<DimensionRow> {
+    let mut rows = Vec::with_capacity(5);
 
     // 1. Usability / Nutzbarkeit
-    let user_desc = if vm.severity.critical > 0 || vm.severity.high > 0 {
+    let user_desc = if severity_critical > 0 || severity_high > 0 {
         if en {
             "Screen reader and keyboard navigation blocked at critical points."
         } else {
@@ -202,21 +224,24 @@ pub(super) fn build_top_risks_checklist(vm: &ReportViewModel, i18n: &I18n) -> Ch
             "Keine wesentlichen Einschränkungen der Nutzbarkeit erkannt."
         }
     };
-    let user_status = if vm.severity.critical > 0 {
+    // Status now completes the tier the description text already implies
+    // ("no major limitations" is a positive result, not a warning) — the
+    // numeric thresholds (critical/high counts) are unchanged (#576).
+    let user_status = if severity_critical > 0 {
         "bad"
-    } else {
+    } else if severity_high > 0 {
         "warn"
+    } else {
+        "good"
     };
-    rows.push(
-        ChecklistRow::new(
-            if en { "1. Usability" } else { "1. Nutzbarkeit" },
-            user_desc,
-        )
-        .with_status(user_status),
-    );
+    rows.push(DimensionRow {
+        label: if en { "Usability" } else { "Nutzbarkeit" }.to_string(),
+        description: user_desc.to_string(),
+        status: user_status,
+    });
 
     // 2. Compliance / Rechtliches
-    let legal_desc = if vm.cover.critical_issues > 0 {
+    let legal_desc = if cover_critical_issues > 0 {
         if en {
             "BFSG-relevant violations found (WCAG Level A/AA) — resolution recommended."
         } else {
@@ -229,31 +254,32 @@ pub(super) fn build_top_risks_checklist(vm: &ReportViewModel, i18n: &I18n) -> Ch
             "Geringes Compliance-Risiko."
         }
     };
-    let legal_status = if vm.cover.critical_issues > 0 {
+    // Two-tier text ("violations found" vs. "low risk") now maps to two
+    // statuses instead of collapsing "low risk" into "warn" (#576).
+    let legal_status = if cover_critical_issues > 0 {
         "bad"
     } else {
-        "warn"
+        "good"
     };
-    rows.push(
-        ChecklistRow::new(
-            if en {
-                "2. Legal Conformance"
-            } else {
-                "2. Rechtliche Konformität (BFSG)"
-            },
-            legal_desc,
-        )
-        .with_status(legal_status),
-    );
+    rows.push(DimensionRow {
+        label: if en {
+            "Legal Conformance"
+        } else {
+            "Rechtliche Konformität (BFSG)"
+        }
+        .to_string(),
+        description: legal_desc.to_string(),
+        status: legal_status,
+    });
 
     // 3. Conversion / Business-Risiko
-    let business_desc = if vm.summary.score < 60 {
+    let business_desc = if summary_score < 60 {
         if en {
             "High risk of process abandonment and conversion loss."
         } else {
             "Hohes Risiko von Prozessabbrüchen und Conversion-Verlusten."
         }
-    } else if vm.summary.score < 80 {
+    } else if summary_score < 80 {
         if en {
             "Usability hurdles may reduce conversion rate."
         } else {
@@ -266,27 +292,28 @@ pub(super) fn build_top_risks_checklist(vm: &ReportViewModel, i18n: &I18n) -> Ch
             "Geringes geschäftliches Risiko, kleine Optimierungen empfohlen."
         }
     };
-    let business_status = if vm.summary.score < 60 { "bad" } else { "warn" };
-    rows.push(
-        ChecklistRow::new(
-            if en {
-                "3. Conversion & Business Risk"
-            } else {
-                "3. Conversion & Business-Risiko"
-            },
-            business_desc,
-        )
-        .with_status(business_status),
-    );
+    // Three-tier text (high risk / hurdles / low risk) now maps to three
+    // statuses instead of collapsing "low risk, minor optimizations" into
+    // "warn" (#576).
+    let business_status = if summary_score < 60 {
+        "bad"
+    } else if summary_score < 80 {
+        "warn"
+    } else {
+        "good"
+    };
+    rows.push(DimensionRow {
+        label: if en {
+            "Conversion & Business Risk"
+        } else {
+            "Conversion & Business-Risiko"
+        }
+        .to_string(),
+        description: business_desc.to_string(),
+        status: business_status,
+    });
 
     // 4. SEO & AI Visibility
-    let seo_score = vm
-        .modules
-        .dashboard
-        .iter()
-        .find(|m| m.name.contains("SEO"))
-        .map(|m| m.score)
-        .unwrap_or(100);
     let seo_desc = if seo_score < 70 {
         if en {
             "Missing metadata or structured schemas reduce search engine and AI crawlability."
@@ -313,33 +340,18 @@ pub(super) fn build_top_risks_checklist(vm: &ReportViewModel, i18n: &I18n) -> Ch
     } else {
         "good"
     };
-    rows.push(
-        ChecklistRow::new(
-            if en {
-                "4. SEO & AI Visibility"
-            } else {
-                "4. SEO & KI-Sichtbarkeit"
-            },
-            seo_desc,
-        )
-        .with_status(seo_status),
-    );
+    rows.push(DimensionRow {
+        label: if en {
+            "SEO & AI Visibility"
+        } else {
+            "SEO & KI-Sichtbarkeit"
+        }
+        .to_string(),
+        description: seo_desc.to_string(),
+        status: seo_status,
+    });
 
     // 5. Loading & Mobile experience
-    let perf_score = vm
-        .modules
-        .dashboard
-        .iter()
-        .find(|m| m.name.contains("Performance") || m.name.contains("Ladezeit"))
-        .map(|m| m.score)
-        .unwrap_or(100);
-    let mobile_score = vm
-        .modules
-        .dashboard
-        .iter()
-        .find(|m| m.name.contains("Mobile") || m.name.contains("Mobilfreundlichkeit"))
-        .map(|m| m.score)
-        .unwrap_or(100);
     let speed_desc = if perf_score < 60 || mobile_score < 60 {
         if en {
             "High loading latency or touch target layout issues frustrate mobile visitors."
@@ -366,23 +378,119 @@ pub(super) fn build_top_risks_checklist(vm: &ReportViewModel, i18n: &I18n) -> Ch
     } else {
         "good"
     };
-    rows.push(
-        ChecklistRow::new(
-            if en {
-                "5. Performance & Mobile"
-            } else {
-                "5. Ladezeit & Mobilfreundlichkeit"
-            },
-            speed_desc,
-        )
-        .with_status(speed_status),
+    rows.push(DimensionRow {
+        label: if en {
+            "Performance & Mobile"
+        } else {
+            "Ladezeit & Mobilfreundlichkeit"
+        }
+        .to_string(),
+        description: speed_desc.to_string(),
+        status: speed_status,
+    });
+
+    rows
+}
+
+/// Renders the risks block (only "bad"/"warn" dimensions, 0..5 rows,
+/// zero-risk empty state when all dimensions are "good") and, directly
+/// below it, a separate strengths block for the "good" dimensions (#576).
+/// Replaces the previous `build_top_risks_checklist`, which unconditionally
+/// rendered all 5 dimensions — including positive ones — under a fixed
+/// "Die 5 wichtigsten Risiken" title.
+pub(super) fn render_risks_and_strengths(
+    mut builder: renderreport::engine::ReportBuilder,
+    vm: &ReportViewModel,
+    i18n: &I18n,
+) -> renderreport::engine::ReportBuilder {
+    let en = i18n.locale() == "en";
+
+    let seo_score = vm
+        .modules
+        .dashboard
+        .iter()
+        .find(|m| m.name.contains("SEO"))
+        .map(|m| m.score)
+        .unwrap_or(100);
+    let perf_score = vm
+        .modules
+        .dashboard
+        .iter()
+        .find(|m| m.name.contains("Performance") || m.name.contains("Ladezeit"))
+        .map(|m| m.score)
+        .unwrap_or(100);
+    let mobile_score = vm
+        .modules
+        .dashboard
+        .iter()
+        .find(|m| m.name.contains("Mobile") || m.name.contains("Mobilfreundlichkeit"))
+        .map(|m| m.score)
+        .unwrap_or(100);
+
+    let dimensions = compute_dimension_rows(
+        vm.severity.critical,
+        vm.severity.high,
+        vm.cover.critical_issues,
+        vm.summary.score,
+        seo_score,
+        perf_score,
+        mobile_score,
+        en,
     );
 
-    ChecklistPanel::new(rows).with_title(if en {
-        "5 Key Risks"
+    let (mut risks, strengths): (Vec<DimensionRow>, Vec<DimensionRow>) =
+        dimensions.into_iter().partition(|d| d.status != "good");
+    // Within the risks block, "bad" outranks "warn" — a low-effort ordering
+    // improvement by user impact without redesigning the dimension model.
+    // `sort_by_key` is stable, so relative dimension order within each group
+    // is preserved.
+    risks.sort_by_key(|d| if d.status == "bad" { 0u8 } else { 1u8 });
+
+    if risks.is_empty() {
+        // Zero-risk empty state (#576) — reuses the same automated-scope
+        // caveat mechanism/wording as the clean-run verdict callout (#572)
+        // instead of inventing new phrasing.
+        let (automated, total) = crate::wcag::coverage::coverage_stats();
+        let empty_state = if en {
+            format!(
+                "No priority risks identified within the automated audit scope. This result applies to the automated audit scope only ({automated} of about {total} testable WCAG 2.1 AA criteria); criteria requiring manual review are listed in the appendix."
+            )
+        } else {
+            format!(
+                "Keine prioritären Risiken im automatisierten Prüfumfang erkannt. Diese Einschätzung bezieht sich ausschließlich auf den automatisierten Prüfumfang ({automated} von ca. {total} testbaren WCAG-2.1-AA-Kriterien); Kriterien mit manuellem Prüfbedarf sind im Anhang aufgeführt."
+            )
+        };
+        builder = builder.add_component(Callout::success(&empty_state).with_title(if en {
+            "Key Risks"
+        } else {
+            "Wichtigste Risiken"
+        }));
     } else {
-        "Die 5 wichtigsten Risiken"
-    })
+        let title = if en {
+            format!("Key Risks ({} identified)", risks.len())
+        } else {
+            format!("Wichtigste Risiken ({} erkannt)", risks.len())
+        };
+        let rows: Vec<ChecklistRow> = risks
+            .into_iter()
+            .map(|d| ChecklistRow::new(d.label, d.description).with_status(d.status))
+            .collect();
+        builder = builder.add_component(ChecklistPanel::new(rows).with_title(title));
+    }
+
+    if !strengths.is_empty() {
+        let rows: Vec<ChecklistRow> = strengths
+            .into_iter()
+            .map(|d| ChecklistRow::new(d.label, d.description).with_status("good"))
+            .collect();
+        builder = builder.add_component(ChecklistPanel::new(rows).with_title(if en {
+            "Strengths within the audited scope"
+        } else {
+            "Stärken im geprüften Umfang"
+        }));
+    }
+
+    builder
 }
 
 pub(super) fn build_top_measures_list(vm: &ReportViewModel, i18n: &I18n) -> List {
@@ -514,8 +622,8 @@ pub(super) fn render_management_page(
     // 3. Strengths vs. priorities as card groups
     builder = render_module_split_dashboards(builder, vm, i18n);
 
-    // 4. Risks
-    builder = builder.add_component(build_top_risks_checklist(vm, i18n));
+    // 4. Risks & strengths
+    builder = render_risks_and_strengths(builder, vm, i18n);
 
     // 5. Measures
     builder = builder.add_component(build_top_measures_list(vm, i18n));
@@ -1852,4 +1960,104 @@ pub(super) fn render_timeframe_roadmap(
     }
 
     builder
+}
+
+#[cfg(test)]
+mod risk_and_strength_tests {
+    use super::*;
+
+    /// #576 acceptance scenario 1: a "critical, mixed" report — some
+    /// dimensions bad/critical, some genuinely good (SEO here mirrors the
+    /// exact cited bug: "Sehr gute Auffindbarkeit..." must never land in the
+    /// risks bucket). Usability/Legal/Business are bad (critical findings,
+    /// BFSG violations, low score); SEO and Performance/Mobile are good.
+    #[test]
+    fn mixed_report_buckets_bad_dimensions_as_risks_and_good_ones_as_strengths() {
+        let dimensions = compute_dimension_rows(
+            /* severity_critical */ 2, /* severity_high */ 1,
+            /* cover_critical_issues */ 2, /* summary_score */ 45,
+            /* seo_score */ 95, /* perf_score */ 95, /* mobile_score */ 95,
+            /* en */ false,
+        );
+        assert_eq!(dimensions.len(), 5);
+
+        let risks: Vec<&DimensionRow> = dimensions.iter().filter(|d| d.status != "good").collect();
+        let strengths: Vec<&DimensionRow> =
+            dimensions.iter().filter(|d| d.status == "good").collect();
+
+        assert_eq!(
+            risks.len(),
+            3,
+            "usability, legal and business should be risks"
+        );
+        assert!(risks.iter().all(|d| d.status == "bad"));
+        assert!(
+            risks.iter().all(|d| d.label != "SEO & KI-Sichtbarkeit"),
+            "SEO must never appear in the risks bucket when its status is good"
+        );
+
+        assert_eq!(
+            strengths.len(),
+            2,
+            "SEO and performance/mobile should be strengths"
+        );
+        let seo_strength = strengths
+            .iter()
+            .find(|d| d.label == "SEO & KI-Sichtbarkeit")
+            .expect("SEO dimension should be a strength");
+        assert!(
+            seo_strength
+                .description
+                .contains("Sehr gute Auffindbarkeit"),
+            "the exact bug cited in #576: positive SEO text must land in strengths, not risks"
+        );
+    }
+
+    /// #576 acceptance scenario 2: a report where genuinely nothing is a
+    /// risk — all 5 dimensions clear their "good" threshold. This must be
+    /// achievable (i.e. every dimension's status derivation must have a
+    /// reachable "good" branch), otherwise the zero-risk empty state could
+    /// never render in practice.
+    #[test]
+    fn clean_report_puts_all_five_dimensions_in_strengths() {
+        let dimensions = compute_dimension_rows(
+            /* severity_critical */ 0, /* severity_high */ 0,
+            /* cover_critical_issues */ 0, /* summary_score */ 95,
+            /* seo_score */ 95, /* perf_score */ 95, /* mobile_score */ 95,
+            /* en */ false,
+        );
+        assert_eq!(dimensions.len(), 5);
+        assert!(
+            dimensions.iter().all(|d| d.status == "good"),
+            "all dimensions should be good, got: {:?}",
+            dimensions
+                .iter()
+                .map(|d| (&d.label, d.status))
+                .collect::<Vec<_>>()
+        );
+    }
+
+    /// Ordering: within the risks bucket, "bad" entries sort before "warn"
+    /// entries, but relative order within each status is preserved (stable
+    /// sort) rather than reshuffled.
+    #[test]
+    fn risks_partition_sorts_bad_before_warn_stably() {
+        let dimensions = compute_dimension_rows(
+            /* severity_critical */ 0, /* severity_high */ 1, // usability -> warn
+            /* cover_critical_issues */ 1, // legal -> bad
+            /* summary_score */ 70, // business -> warn
+            /* seo_score */ 50, // seo -> bad
+            /* perf_score */ 95, /* mobile_score */ 95, /* en */ true,
+        );
+        let (mut risks, _strengths): (Vec<DimensionRow>, Vec<DimensionRow>) =
+            dimensions.into_iter().partition(|d| d.status != "good");
+        risks.sort_by_key(|d| if d.status == "bad" { 0u8 } else { 1u8 });
+
+        let statuses: Vec<&str> = risks.iter().map(|d| d.status).collect();
+        assert_eq!(statuses, vec!["bad", "bad", "warn", "warn"]);
+        // Stable within the "bad" group: Legal Conformance came before SEO
+        // in the fixed dimension order, so it stays first among bads.
+        assert_eq!(risks[0].label, "Legal Conformance");
+        assert_eq!(risks[1].label, "SEO & AI Visibility");
+    }
 }
