@@ -47,21 +47,27 @@ pub fn check_keyboard(tree: &AXTree) -> WcagResults {
 
         results.nodes_checked += 1;
 
-        // Check for non-interactive elements made focusable without proper role
+        // Check for non-interactive elements made focusable without proper role.
+        // Reported as Warning (issue #569): the AX tree only shows a structural
+        // mismatch (focusable, but no interactive role) — whether the element is
+        // actually operable via keyboard depends on JS event handling that this
+        // static check cannot observe, so this is a review hint, not a confirmed
+        // violation.
         if is_focusable_without_interactive_role(node) {
             let violation = Violation::new(
                 KEYBOARD_RULE.id,
                 KEYBOARD_RULE.name,
                 KEYBOARD_RULE.level,
                 Severity::Low,
-                "Focusable element without interactive role",
+                "Focusable element without interactive role — may not be operable via keyboard; verify manually",
                 &node.node_id,
             )
             .with_role(node.role.clone())
             .with_name(node.name.clone())
             .with_fix("Add an appropriate ARIA role or use a native interactive element")
             .with_help_url(KEYBOARD_RULE.help_url)
-            .with_rule_id(KEYBOARD_RULE.axe_id);
+            .with_rule_id(KEYBOARD_RULE.axe_id)
+            .as_warning();
 
             results.add_violation(violation);
         }
@@ -93,21 +99,28 @@ pub fn check_keyboard(tree: &AXTree) -> WcagResults {
             results.add_violation(warning);
         }
 
-        // Check for potential keyboard traps (modal dialogs)
+        // Check for potential keyboard traps (modal dialogs). Reported as Warning
+        // (issue #569): the AX tree only confirms a modal dialog exists — it does
+        // NOT confirm focus is actually trapped, only that a keyboard test is
+        // needed to rule that out. A flat Violation here overclaims what was
+        // measured (compare the sibling `has_interactive_role_but_not_focusable`
+        // check above, which uses the same Warning + reduced-but-not-zeroed
+        // severity treatment for the same reason).
         if is_potential_keyboard_trap(node) {
             let violation = Violation::new(
                 NO_KEYBOARD_TRAP_RULE.id,
                 NO_KEYBOARD_TRAP_RULE.name,
                 NO_KEYBOARD_TRAP_RULE.level,
-                NO_KEYBOARD_TRAP_RULE.severity,
-                "Potential keyboard trap detected (modal dialog)",
+                Severity::High,
+                "Modal dialog detected — verify with keyboard that focus can be moved away (Escape, Tab, Shift+Tab)",
                 &node.node_id,
             )
             .with_role(node.role.clone())
             .with_name(node.name.clone())
             .with_fix("Ensure focus can be moved away using standard keyboard navigation")
             .with_help_url(NO_KEYBOARD_TRAP_RULE.help_url)
-            .with_rule_id(NO_KEYBOARD_TRAP_RULE.axe_id);
+            .with_rule_id(NO_KEYBOARD_TRAP_RULE.axe_id)
+            .as_warning();
 
             results.add_violation(violation);
         }
@@ -290,5 +303,53 @@ mod tests {
             .violations
             .iter()
             .any(|v| v.message.contains("not keyboard-focusable")));
+    }
+
+    #[test]
+    fn test_focusable_without_interactive_role_is_warning() {
+        // Issue #569: structural inference only (focusable + non-interactive
+        // role) — whether the element is actually unusable via keyboard needs
+        // manual verification, so this must be a Warning, not a Violation.
+        let tree = AXTree::from_nodes(vec![create_node_with_focusable("1", "generic", true)]);
+        let results = check_keyboard(&tree);
+        let finding = results
+            .warnings
+            .iter()
+            .find(|v| {
+                v.message
+                    .contains("Focusable element without interactive role")
+            })
+            .expect("expected a warning-kind finding");
+        assert_eq!(finding.kind, FindingKind::Warning);
+        assert!(!results.violations.iter().any(|v| v
+            .message
+            .contains("Focusable element without interactive role")));
+    }
+
+    #[test]
+    fn test_modal_dialog_keyboard_trap_is_warning() {
+        // Issue #569: the AX tree only confirms a modal dialog exists, not that
+        // focus is actually trapped — reclassified from Violation to Warning
+        // (severity kept at High, following the sibling
+        // has_interactive_role_but_not_focusable precedent of not zeroing out
+        // severity just because a finding is a Warning).
+        let mut node = create_test_node("1", "dialog", None);
+        node.properties.push(AXProperty {
+            name: "modal".to_string(),
+            value: AXValue::Bool(true),
+        });
+        let tree = AXTree::from_nodes(vec![node]);
+        let results = check_keyboard(&tree);
+        let finding = results
+            .warnings
+            .iter()
+            .find(|v| v.rule == NO_KEYBOARD_TRAP_RULE.id && v.node_id == "1")
+            .expect("expected a warning-kind finding for the modal dialog");
+        assert_eq!(finding.kind, FindingKind::Warning);
+        assert_eq!(finding.severity, Severity::High);
+        assert!(!results
+            .violations
+            .iter()
+            .any(|v| v.rule == NO_KEYBOARD_TRAP_RULE.id && v.node_id == "1"));
     }
 }

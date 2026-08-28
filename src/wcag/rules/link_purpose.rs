@@ -40,7 +40,13 @@ pub fn check_link_purpose(tree: &AXTree) -> WcagResults {
             continue;
         }
 
-        // Check for generic/ambiguous link text
+        // Check for generic/ambiguous link text.
+        // Issue #569: WCAG 2.4.4 explicitly allows link purpose to be determined
+        // from context (surrounding text), not just the link text alone. A
+        // generic phrase with descriptive context nearby (e.g. "Weiter" right
+        // after "Zum Blogartikel") may still satisfy 2.4.4, so it's demoted to a
+        // Warning — a review hint, not a confirmed violation. With no detectable
+        // context, the automated match remains a confident Violation.
         if is_generic_link_text(link_text) {
             let violation = Violation::new(
                 LINK_PURPOSE_RULE.id,
@@ -56,7 +62,11 @@ pub fn check_link_purpose(tree: &AXTree) -> WcagResults {
             .with_help_url(LINK_PURPOSE_RULE.help_url)
             .with_rule_id(LINK_PURPOSE_RULE.axe_id);
 
-            results.add_violation(violation);
+            if has_link_context(node, tree) {
+                results.add_violation(violation.as_warning());
+            } else {
+                results.add_violation(violation);
+            }
         } else if looks_like_url(link_text) && !has_link_context(node, tree) {
             // Check for URL-only link text
             let violation = Violation::new(
@@ -448,6 +458,71 @@ mod tests {
             .warnings
             .iter()
             .any(|v| v.message.contains("raw URL")));
+    }
+
+    #[test]
+    fn test_generic_link_with_context_is_warning() {
+        // Issue #569: "Weiter" next to descriptive sibling text may satisfy
+        // 2.4.4 via context (WCAG explicitly allows this) — automated check
+        // can't confirm that, so it must be a Warning, not a Violation.
+        let parent = AXNode {
+            node_id: "parent".to_string(),
+            ignored: false,
+            ignored_reasons: vec![],
+            role: Some("paragraph".to_string()),
+            name: None,
+            name_source: None,
+            description: None,
+            value: None,
+            properties: vec![],
+            child_ids: vec!["text1".to_string(), "link1".to_string()],
+            parent_id: None,
+            backend_dom_node_id: None,
+        };
+        let text_node = AXNode {
+            node_id: "text1".to_string(),
+            ignored: false,
+            ignored_reasons: vec![],
+            role: Some("StaticText".to_string()),
+            name: Some("Zum Blogartikel über Barrierefreiheit".to_string()),
+            name_source: None,
+            description: None,
+            value: None,
+            properties: vec![],
+            child_ids: vec![],
+            parent_id: Some("parent".to_string()),
+            backend_dom_node_id: None,
+        };
+        let link_node = AXNode {
+            node_id: "link1".to_string(),
+            ignored: false,
+            ignored_reasons: vec![],
+            role: Some("link".to_string()),
+            name: Some("weiter".to_string()),
+            name_source: None,
+            description: None,
+            value: None,
+            properties: vec![],
+            child_ids: vec![],
+            parent_id: Some("parent".to_string()),
+            backend_dom_node_id: None,
+        };
+        let tree = AXTree::from_nodes(vec![parent, text_node, link_node]);
+        let results = check_link_purpose(&tree);
+        assert!(
+            results
+                .warnings
+                .iter()
+                .any(|v| v.message.contains("generic text")),
+            "expected a warning-kind finding for generic text with context"
+        );
+        assert!(
+            !results
+                .violations
+                .iter()
+                .any(|v| v.message.contains("generic text")),
+            "generic text with context must not be a confirmed violation"
+        );
     }
 
     #[test]
