@@ -1,0 +1,52 @@
+{
+  "schema_version": "2.0",
+  "report_type": "single",
+  "summary": {
+    "accessibility_score": 82,
+    "overall_score": 82,
+    "score": 82,
+    "grade": "B",
+    "certificate": "GUT",
+    "severity_counts": { "critical": 0, "high": 1, "medium": 0, "low": 0, "total": 1 },
+    "violated_rule_count": 1,
+    "occurrence_counts": { "critical": 0, "high": 42, "medium": 0, "low": 0, "total": 42 },
+    "violation_count": 42
+  },
+  "pages": [
+    {
+      "accessibility_score": 82,
+      "overall_score": 82,
+      "grade": "B",
+      "certificate": "GUT",
+      "severity_counts": { "critical": 0, "high": 1, "medium": 0, "low": 0, "total": 1 },
+      "violated_rule_count": 1,
+      "occurrence_counts": { "critical": 0, "high": 42, "medium": 0, "low": 0, "total": 42 },
+      "violation_count": 42,
+      "findings": [
+        {
+          "category": "wcag",
+          "rule_id": "a11y.alt_text.missing",
+          "wcag_criterion": "1.1.1",
+          "occurrence_count": 42
+        }
+      ],
+      "detail": {
+        "modules": {
+          "source_quality": {
+            "substance": {
+              "signals": [
+                {
+                  "kind": "ImageDescriptions",
+                  "present": true,
+                  "weight": 0.15,
+                  "detail": "All images have alternative text",
+                  "values": { "count": 0 }
+                }
+              ]
+            }
+          }
+        }
+      }
+    }
+  ]
+}

@@ -14,6 +14,7 @@ pub fn run_all_checks(report: &Value, findings: &mut Vec<LintFinding>) {
     check_severity_occurrence_sums(report, findings);
     check_metric_context_matches_registry(report, findings);
     check_registry_docs_urls_well_formed(findings);
+    check_source_quality_signals_match_findings(report, findings);
 }
 
 // ─── Score consistency ────────────────────────────────────────────────────
@@ -475,6 +476,105 @@ pub(super) fn check_pdf_certificate_traceability(
     }
 }
 
+// ─── source_quality vs. findings contradiction (#574) ─────────────────────
+
+const CHECK_SOURCE_QUALITY_SIGNAL_CONTRADICTS_FINDINGS: &str =
+    "source_quality_signal_contradicts_findings";
+
+/// `source_quality` signal kinds whose evidence is one or more WCAG rules,
+/// paired with the `wcag_criterion` id(s) that back them. Used to cross-check
+/// a signal's `present` flag against the report's own `findings[]` for the
+/// same rule(s) — see [`check_source_quality_signals_match_findings`].
+const SOURCE_QUALITY_WCAG_BACKED_SIGNALS: &[(&str, &[&str])] = &[
+    ("ImageDescriptions", &["1.1.1"]),
+    ("NamedControls", &["4.1.2", "1.1.1"]),
+];
+
+/// Finds a `source_quality` signal by `kind` across all of its dimension
+/// blocks (`substance`, `consistency`, `authority`).
+fn find_source_quality_signal<'a>(source_quality: &'a Value, kind: &str) -> Option<&'a Value> {
+    ["substance", "consistency", "authority"]
+        .into_iter()
+        .find_map(|dim| {
+            source_quality
+                .pointer(&format!("/{dim}/signals"))
+                .and_then(Value::as_array)
+                .and_then(|signals| {
+                    signals
+                        .iter()
+                        .find(|s| s.get("kind").and_then(Value::as_str) == Some(kind))
+                })
+        })
+}
+
+/// Sums `occurrence_count` across a page's `findings[]` for WCAG-category
+/// entries matching any of `rules`.
+fn wcag_finding_occurrences(page: &Value, rules: &[&str]) -> i64 {
+    page.get("findings")
+        .and_then(Value::as_array)
+        .map(|entries| {
+            entries
+                .iter()
+                .filter(|f| {
+                    f.get("category").and_then(Value::as_str) == Some("wcag")
+                        && f.get("wcag_criterion")
+                            .and_then(Value::as_str)
+                            .is_some_and(|criterion| rules.contains(&criterion))
+                })
+                .filter_map(|f| f.get("occurrence_count").and_then(Value::as_i64))
+                .sum()
+        })
+        .unwrap_or(0)
+}
+
+/// A `source_quality` signal claiming `present: true` (e.g. "all images have
+/// alt text") must never co-occur with a non-zero occurrence count for the
+/// same WCAG rule(s) in the report's own `findings[]` — the two describe the
+/// same underlying fact and independently re-deriving it is exactly what
+/// caused #574 (a report claiming both "42 images without alt" and "all
+/// images have alt text" for the same page).
+fn check_source_quality_signals_match_findings(
+    report: &Value,
+    findings_out: &mut Vec<LintFinding>,
+) {
+    let Some(pages) = report.get("pages").and_then(Value::as_array) else {
+        return;
+    };
+    for (i, page) in pages.iter().enumerate() {
+        let Some(source_quality) = page.pointer("/detail/modules/source_quality") else {
+            continue;
+        };
+        for (kind, rules) in SOURCE_QUALITY_WCAG_BACKED_SIGNALS {
+            let Some(signal) = find_source_quality_signal(source_quality, kind) else {
+                continue;
+            };
+            let present = signal
+                .get("present")
+                .and_then(Value::as_bool)
+                .unwrap_or(false);
+            if !present {
+                continue;
+            }
+            let occurrences = wcag_finding_occurrences(page, rules);
+            if occurrences > 0 {
+                findings_out.push(LintFinding {
+                    check_id: CHECK_SOURCE_QUALITY_SIGNAL_CONTRADICTS_FINDINGS,
+                    evidence_path: format!(
+                        "pages[{i}].detail.modules.source_quality (signal {kind}) vs pages[{i}].findings"
+                    ),
+                    expected: format!(
+                        "signal {kind}.present=false, or 0 occurrences for {rules:?} in findings"
+                    ),
+                    actual: format!(
+                        "signal {kind}.present=true but {occurrences} occurrence(s) of {rules:?} in findings"
+                    ),
+                    severity: Severity::High,
+                });
+            }
+        }
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -746,6 +846,94 @@ mod tests {
         let mut findings = Vec::new();
         check_pdf_certificate_traceability(&report, typst_source, &mut findings);
         assert!(findings.is_empty(), "unexpected findings: {findings:?}");
+    }
+
+    // ─── source_quality vs. findings contradiction (#574) ─────────────────
+
+    fn report_with_image_signal_and_finding(present: bool, occurrence_count: i64) -> Value {
+        let mut report = clean_single_report();
+        report["pages"][0]["detail"] = json!({
+            "modules": {
+                "source_quality": {
+                    "substance": {
+                        "signals": [
+                            {
+                                "kind": "ImageDescriptions",
+                                "present": present,
+                                "weight": 0.15,
+                                "detail": "...",
+                                "values": {"count": if present { 0 } else { occurrence_count }}
+                            }
+                        ]
+                    }
+                }
+            }
+        });
+        report["pages"][0]["findings"] = json!([
+            {
+                "category": "wcag",
+                "rule_id": "a11y.alt_text.missing",
+                "wcag_criterion": "1.1.1",
+                "occurrence_count": occurrence_count
+            }
+        ]);
+        report
+    }
+
+    #[test]
+    fn detects_source_quality_image_signal_contradicting_findings() {
+        // Signal claims "all images have alt text" (present=true) while
+        // findings still list 42 occurrences of the same WCAG rule (#574).
+        let report = report_with_image_signal_and_finding(true, 42);
+        let mut findings = Vec::new();
+        run_all_checks(&report, &mut findings);
+        assert!(findings
+            .iter()
+            .any(|f| f.check_id == CHECK_SOURCE_QUALITY_SIGNAL_CONTRADICTS_FINDINGS));
+    }
+
+    #[test]
+    fn source_quality_image_signal_consistent_with_findings_is_not_flagged() {
+        // Signal correctly reports present=false alongside the same findings.
+        let report = report_with_image_signal_and_finding(false, 42);
+        let mut findings = Vec::new();
+        run_all_checks(&report, &mut findings);
+        assert!(
+            !findings
+                .iter()
+                .any(|f| f.check_id == CHECK_SOURCE_QUALITY_SIGNAL_CONTRADICTS_FINDINGS),
+            "unexpected findings: {findings:?}"
+        );
+    }
+
+    #[test]
+    fn source_quality_image_signal_present_with_no_findings_is_not_flagged() {
+        let mut report = clean_single_report();
+        report["pages"][0]["detail"] = json!({
+            "modules": {
+                "source_quality": {
+                    "substance": {
+                        "signals": [
+                            {
+                                "kind": "ImageDescriptions",
+                                "present": true,
+                                "weight": 0.15,
+                                "detail": "...",
+                                "values": {"count": 0}
+                            }
+                        ]
+                    }
+                }
+            }
+        });
+        let mut findings = Vec::new();
+        run_all_checks(&report, &mut findings);
+        assert!(
+            !findings
+                .iter()
+                .any(|f| f.check_id == CHECK_SOURCE_QUALITY_SIGNAL_CONTRADICTS_FINDINGS),
+            "unexpected findings: {findings:?}"
+        );
     }
 
     #[test]

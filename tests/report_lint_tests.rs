@@ -61,6 +61,16 @@ fn broken_batch_certificate_fails_by_default() {
 }
 
 #[test]
+fn broken_source_quality_image_contradiction_fails_by_default() {
+    let (code, output) = run_report_lint("broken_source_quality_image_contradiction.json", &[]);
+    assert_eq!(code, 3, "output: {output}");
+    assert!(
+        output.contains("source_quality_signal_contradicts_findings"),
+        "output: {output}"
+    );
+}
+
+#[test]
 fn fail_on_critical_tolerates_high_findings() {
     // broken_score_alias.json only produces a High finding (score alias
     // mismatch) — raising the bar to --fail-on critical must pass it.

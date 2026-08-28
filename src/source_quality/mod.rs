@@ -797,14 +797,10 @@ fn evaluate_substance(report: &AuditReport) -> DimensionScore {
         ));
     }
 
-    // 6. Accessibility — image alt text coverage
-    let image_violations = report
-        .accessibility
-        .wcag_results
-        .violations
-        .iter()
-        .filter(|v| v.rule == "1.1.1")
-        .count();
+    // 6. Accessibility — image alt text coverage. Reads the same canonical
+    // WCAG 1.1.1 violation count the report's findings surface elsewhere
+    // (see `WcagResults::count_by_rule`, #574) rather than re-deriving it.
+    let image_violations = report.accessibility.wcag_results.count_by_rule("1.1.1");
     signals.push(QualitySignal::new(
         ImageDescriptions,
         image_violations == 0,
@@ -964,14 +960,11 @@ fn evaluate_single_page_consistency(report: &AuditReport) -> DimensionScore {
         ));
     }
 
-    // 2. All interactive elements named
-    let unnamed_interactive = report
-        .accessibility
-        .wcag_results
-        .violations
-        .iter()
-        .filter(|v| v.rule == "4.1.2" || v.rule == "1.1.1")
-        .count();
+    // 2. All interactive elements named. Uses the same canonical per-rule
+    // count as the image-alt signal above (`WcagResults::count_by_rule`,
+    // #574) instead of a second independent filter over `violations`.
+    let unnamed_interactive = report.accessibility.wcag_results.count_by_rule("4.1.2")
+        + report.accessibility.wcag_results.count_by_rule("1.1.1");
     signals.push(QualitySignal::new(
         NamedControls,
         unnamed_interactive == 0,

@@ -1668,6 +1668,7 @@ fn aggregate_report(
     }
     if let Some(seo) = snapshot.seo.clone() {
         report = report.with_seo(seo);
+        reconcile_image_alt_count(&mut report);
     }
     if let Some(security) = snapshot.security.clone() {
         report = report.with_security(security);
@@ -1712,6 +1713,49 @@ fn aggregate_report(
         consolidate_module_runs(&report.accessibility.execution.module_runs);
 
     report
+}
+
+/// Reconciles `page_health`'s "Bilder ohne alt-Attribut" HTML-validation
+/// entry with the canonical WCAG 1.1.1 violation count (#574).
+///
+/// `page_health::analyze_url` computes `images_without_alt` from a raw DOM
+/// probe (`document.querySelectorAll('img:not([alt])')`) that runs before
+/// the AXTree/WCAG pass exists, so it has no way to know which of those
+/// `<img>` elements the accessibility tree already excludes as legitimately
+/// decorative or AT-ignored (hidden, `aria-hidden`, off-screen carousel
+/// slides not yet rendered, etc.) — the WCAG 1.1.1 rule is the authoritative
+/// check for "does this image have a text alternative" and already accounts
+/// for that. Left alone, the two report sections independently re-derive
+/// "the same" fact and can show contradicting numbers for the same page
+/// (e.g. "42 images without alt" in the SEO/HTML-validation table next to
+/// "all images have alt text" in source_quality). This runs once WCAG
+/// results and SEO/page_health are both attached to `report`, overwriting
+/// `images_without_alt` and its `html_issues` entry with the canonical
+/// `WcagResults::count_by_rule("1.1.1")` value.
+fn reconcile_image_alt_count(report: &mut AuditReport) {
+    let canonical = report.accessibility.wcag_results.count_by_rule("1.1.1") as u32;
+    let Some(page_health) = report
+        .discoverability
+        .seo
+        .as_mut()
+        .and_then(|seo| seo.page_health.as_mut())
+    else {
+        return;
+    };
+    page_health.images_without_alt = canonical;
+    page_health
+        .html_issues
+        .retain(|issue| issue.check != "Bilder ohne alt-Attribut");
+    if canonical > 0 {
+        page_health
+            .html_issues
+            .push(crate::seo::HtmlValidationIssue {
+                check: "Bilder ohne alt-Attribut".to_string(),
+                count: canonical,
+                severity: "high".to_string(),
+                detail: format!("{canonical} <img> ohne alt"),
+            });
+    }
 }
 
 fn attach_performance_subchecks(report: &mut AuditReport) {
@@ -2228,6 +2272,91 @@ pub(crate) fn persist_artifacts(
 mod tests {
     use super::*;
     use clap::Parser;
+
+    #[test]
+    fn reconcile_image_alt_count_overwrites_page_health_with_canonical_wcag_count() {
+        // #574: page_health's raw DOM probe found 42 <img> without an alt
+        // attribute, but only 3 of those actually violate WCAG 1.1.1 (the
+        // rest are AT-ignored/legitimately decorative) -- the reconciled
+        // report must show the canonical WCAG count everywhere, not the raw
+        // DOM count.
+        let mut wcag_results = WcagResults::new();
+        for _ in 0..3 {
+            wcag_results.add_violation(Violation::new(
+                "1.1.1",
+                "Non-text Content",
+                WcagLevel::A,
+                Severity::High,
+                "Image is missing alternative text",
+                "node-1",
+            ));
+        }
+        let mut report = AuditReport::new(
+            "https://example.com".to_string(),
+            WcagLevel::AA,
+            wcag_results,
+            100,
+        );
+        let seo = SeoAnalysis {
+            page_health: Some(crate::seo::page_health::PageHealthAnalysis {
+                images_without_alt: 42,
+                html_issues: vec![crate::seo::HtmlValidationIssue {
+                    check: "Bilder ohne alt-Attribut".to_string(),
+                    count: 42,
+                    severity: "high".to_string(),
+                    detail: "42 <img> ohne alt".to_string(),
+                }],
+                ..Default::default()
+            }),
+            ..Default::default()
+        };
+        report = report.with_seo(seo);
+
+        reconcile_image_alt_count(&mut report);
+
+        let page_health = report.discoverability.seo.unwrap().page_health.unwrap();
+        assert_eq!(page_health.images_without_alt, 3);
+        let issue = page_health
+            .html_issues
+            .iter()
+            .find(|i| i.check == "Bilder ohne alt-Attribut")
+            .expect("html_issues entry should still be present");
+        assert_eq!(issue.count, 3);
+        assert_eq!(issue.detail, "3 <img> ohne alt");
+    }
+
+    #[test]
+    fn reconcile_image_alt_count_removes_entry_when_canonical_count_is_zero() {
+        let report_base = AuditReport::new(
+            "https://example.com".to_string(),
+            WcagLevel::AA,
+            WcagResults::new(),
+            100,
+        );
+        let seo = SeoAnalysis {
+            page_health: Some(crate::seo::page_health::PageHealthAnalysis {
+                images_without_alt: 5,
+                html_issues: vec![crate::seo::HtmlValidationIssue {
+                    check: "Bilder ohne alt-Attribut".to_string(),
+                    count: 5,
+                    severity: "high".to_string(),
+                    detail: "5 <img> ohne alt".to_string(),
+                }],
+                ..Default::default()
+            }),
+            ..Default::default()
+        };
+        let mut report = report_base.with_seo(seo);
+
+        reconcile_image_alt_count(&mut report);
+
+        let page_health = report.discoverability.seo.unwrap().page_health.unwrap();
+        assert_eq!(page_health.images_without_alt, 0);
+        assert!(!page_health
+            .html_issues
+            .iter()
+            .any(|i| i.check == "Bilder ohne alt-Attribut"));
+    }
 
     #[test]
     fn test_pipeline_config_from_args() {

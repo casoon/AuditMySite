@@ -516,6 +516,20 @@ impl WcagResults {
         self.violations.iter().filter(|v| v.level == level).count()
     }
 
+    /// Count violations for a specific WCAG rule (e.g. `"1.1.1"`).
+    ///
+    /// This is the single canonical way to answer "how many violations does
+    /// rule X have" — other modules that need this number (e.g.
+    /// `source_quality`, `page_health`'s HTML-validation display) should call
+    /// this instead of independently re-filtering `violations` or, worse,
+    /// re-deriving the count from a separate raw DOM probe. Two independent
+    /// derivations of "the same" count is exactly what caused #574 (a report
+    /// claiming both "42 images without alt" and "all images have alt text"
+    /// for the same page).
+    pub fn count_by_rule(&self, rule: &str) -> usize {
+        self.violations.iter().filter(|v| v.rule == rule).count()
+    }
+
     /// Get all critical violations
     pub fn critical_violations(&self) -> Vec<&Violation> {
         self.violations
