@@ -266,6 +266,11 @@ pub struct UnifiedSummary {
     /// Internal targets linked by audited pages but absent from the sitemap.
     #[serde(skip_serializing_if = "Vec::is_empty")]
     pub linked_not_in_sitemap: Vec<String>,
+    /// Sitemap entries blocked by a `robots.txt` Disallow rule (batch only,
+    /// #549): a URL with declared indexing intent (sitemap membership) that
+    /// crawlers following `robots.txt` will not fetch.
+    #[serde(skip_serializing_if = "Vec::is_empty")]
+    pub robots_conflicts: Vec<crate::audit::RobotsSitemapConflict>,
     /// Site-wide commerce roll-up (batch only): union of mandatory/trust-page
     /// links across the audited shop pages.
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -966,6 +971,7 @@ impl UnifiedReport {
             sitemap_http_issues: presentation.portfolio_summary.sitemap_http_issues.clone(),
             orphan_sitemap_urls: presentation.portfolio_summary.orphan_sitemap_urls.clone(),
             linked_not_in_sitemap: presentation.portfolio_summary.linked_not_in_sitemap.clone(),
+            robots_conflicts: presentation.portfolio_summary.robots_conflicts.clone(),
             commerce: crate::commerce::aggregate_site_commerce(
                 batch_report
                     .reports
@@ -1146,6 +1152,7 @@ impl UnifiedReport {
             sitemap_http_issues: Vec::new(),
             orphan_sitemap_urls: Vec::new(),
             linked_not_in_sitemap: Vec::new(),
+            robots_conflicts: Vec::new(),
             commerce: None,
         };
 
@@ -1237,6 +1244,7 @@ impl UnifiedReport {
             sitemap_http_issues: Vec::new(),
             orphan_sitemap_urls: Vec::new(),
             linked_not_in_sitemap: Vec::new(),
+            robots_conflicts: Vec::new(),
             commerce: None,
         };
 

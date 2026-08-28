@@ -700,6 +700,21 @@ pub struct SitemapDiagnostics {
     /// Internal targets linked by audited pages but absent from the sitemap.
     #[serde(skip_serializing_if = "Vec::is_empty")]
     pub linked_not_in_sitemap: Vec<String>,
+    /// Sitemap entries blocked by a `Disallow` rule in `robots.txt` under
+    /// `User-agent: *` — a URL with declared indexing intent (sitemap
+    /// membership) that crawlers following `robots.txt` will not fetch (#549).
+    #[serde(skip_serializing_if = "Vec::is_empty")]
+    pub robots_conflicts: Vec<RobotsSitemapConflict>,
+}
+
+/// One sitemap URL blocked by a `robots.txt` `Disallow` rule under
+/// `User-agent: *` (#549) — a contradiction between declared indexing intent
+/// (sitemap membership) and actual crawler access.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct RobotsSitemapConflict {
+    pub url: String,
+    /// The specific `Disallow` path prefix that blocks this URL.
+    pub rule: String,
 }
 
 /// One sitemap URL whose HTTP/indexability state contradicts sitemap guidance.

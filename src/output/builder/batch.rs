@@ -441,7 +441,7 @@ pub fn build_batch_presentation_with_normalized(
     // Non-reciprocal hreflang relationships among audited pages
     let hreflang_issues = build_hreflang_issues(&batch.reports);
 
-    let (sitemap_http_issues, orphan_sitemap_urls, linked_not_in_sitemap) = batch
+    let (sitemap_http_issues, orphan_sitemap_urls, linked_not_in_sitemap, robots_conflicts) = batch
         .sitemap_diagnostics
         .as_ref()
         .map(|diagnostics| {
@@ -449,6 +449,7 @@ pub fn build_batch_presentation_with_normalized(
                 diagnostics.http_issues.clone(),
                 diagnostics.orphan_sitemap_urls.clone(),
                 diagnostics.linked_not_in_sitemap.clone(),
+                diagnostics.robots_conflicts.clone(),
             )
         })
         .unwrap_or_default();
@@ -789,6 +790,7 @@ pub fn build_batch_presentation_with_normalized(
             sitemap_http_issues,
             orphan_sitemap_urls,
             linked_not_in_sitemap,
+            robots_conflicts,
         },
         top_issues: top_issues.into_iter().take(10).collect(),
         issue_frequency,

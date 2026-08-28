@@ -46,9 +46,9 @@ pub use report::{
     ConsentCookieSignal, ConsentPrivacySnapshot, CrawlDiagnostics, DiscoverabilitySection,
     DualViewportResults, ExecutionEnvironment, ExecutionStatus, ExperienceSection, ModuleRun,
     NavigationSnapshot, PageScreenshots, PerformanceResults, RecurringRule, RedirectChain,
-    SampleMetadata, ScreenshotStatus, SitemapDiagnostics, SitemapHttpIssue, SubcheckRun,
-    ThrottledPerfResult, ViewportAuditData, ViewportDefinition, ViewportScoreSet, ViewportScores,
-    ViewportScreenshot,
+    RobotsSitemapConflict, SampleMetadata, ScreenshotStatus, SitemapDiagnostics, SitemapHttpIssue,
+    SubcheckRun, ThrottledPerfResult, ViewportAuditData, ViewportDefinition, ViewportScoreSet,
+    ViewportScores, ViewportScreenshot,
 };
 pub use scoring::{AccessibilityScorer, CoverageRatio, PrincipleCoverage, ViolationStatistics};
 pub use template_dedup::{detect_template_clusters, TemplateCluster};

@@ -1145,6 +1145,8 @@ pub struct PortfolioSummary {
     pub orphan_sitemap_urls: Vec<String>,
     /// Internal linked URLs that are absent from the sitemap
     pub linked_not_in_sitemap: Vec<String>,
+    /// Sitemap entries blocked by a robots.txt Disallow rule (#549)
+    pub robots_conflicts: Vec<crate::audit::RobotsSitemapConflict>,
 }
 
 pub struct CrawlLinkSummary {

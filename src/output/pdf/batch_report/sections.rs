@@ -2754,6 +2754,20 @@ pub(super) fn render_batch_seo_section(
         builder = builder.add_component(table);
     }
 
+    // Sitemap entries blocked by robots.txt (#549)
+    if !pres.portfolio_summary.robots_conflicts.is_empty() {
+        let mut table = AuditTable::new(vec![
+            TableColumn::new(i18n.t("batch-col-page-a")),
+            TableColumn::new(i18n.t("batch-col-robots-rule")),
+        ])
+        .with_title(i18n.t("batch-seo-robots-conflicts-title"));
+
+        for conflict in &pres.portfolio_summary.robots_conflicts {
+            table = table.add_row(vec![truncate_url(&conflict.url, 45), conflict.rule.clone()]);
+        }
+        builder = builder.add_component(table);
+    }
+
     // Page type distribution
     if !pres.portfolio_summary.page_type_distribution.is_empty() {
         let high_label = i18n.t("batch-relevance-high");

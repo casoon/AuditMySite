@@ -17,10 +17,14 @@ use tracing::{info, warn};
 use url::Url;
 
 use super::pipeline::{audit_page, PipelineConfig};
-use super::report::{AuditReport, BatchError, BatchReport, SitemapDiagnostics, SitemapHttpIssue};
+use super::report::{
+    AuditReport, BatchError, BatchReport, RobotsSitemapConflict, SitemapDiagnostics,
+    SitemapHttpIssue,
+};
 use crate::browser::{BrowserOptions, BrowserPool, PoolConfig};
 use crate::cli::{Args, RequestMode};
 use crate::error::{AuditError, Result};
+use crate::seo::{BotClass, RobotsAudit};
 use crate::util::build_browser_client;
 
 /// Batch audit configuration
@@ -283,12 +287,100 @@ pub async fn analyze_sitemap_diagnostics(
         linked_set.difference(&sitemap_set).cloned().collect();
     linked_not_in_sitemap.sort();
 
+    // robots.txt is domain-wide, not per-page — every audited page carries an
+    // identical fetch, so any one of them is a valid source (#549).
+    let robots_conflicts = reports
+        .iter()
+        .find_map(|r| {
+            r.discoverability
+                .seo
+                .as_ref()
+                .and_then(|s| s.robots.as_ref())
+        })
+        .filter(|robots| robots.fetched)
+        .map(|robots| find_robots_sitemap_conflicts(sitemap_urls, robots))
+        .unwrap_or_default();
+
     SitemapDiagnostics {
         checked_urls: sitemap_urls.len(),
         http_issues,
         orphan_sitemap_urls,
         linked_not_in_sitemap,
+        robots_conflicts,
     }
+}
+
+/// Cap on the number of robots.txt/sitemap conflicts surfaced in a batch
+/// report (mirrors the existing per-list truncation used for orphan/linked
+/// sitemap URLs in the PDF renderer).
+const MAX_ROBOTS_SITEMAP_CONFLICTS: usize = 50;
+
+/// Cross-check sitemap-listed URLs against the site's `robots.txt` (#549): a
+/// URL listed in the sitemap declares indexing intent, but if `robots.txt`
+/// blocks it via a `Disallow` rule under `User-agent: *`, that's a real
+/// contradiction crawlers following `robots.txt` will hit.
+///
+/// Matching is deliberately simplified to plain robots.txt *prefix* matching
+/// (`Disallow: /foo` blocks any path starting with `/foo`), plus a
+/// same-group `Allow` override when a matching `Allow` rule is at least as
+/// specific (long) as the matching `Disallow` rule — a simplified version of
+/// the standard robots.txt "longest/most-specific rule wins" precedence.
+/// Full wildcard (`*`, `$`) robots.txt pattern matching is out of scope: a
+/// plain prefix match already covers the vast majority of real-world
+/// robots.txt files.
+fn find_robots_sitemap_conflicts(
+    sitemap_urls: &[String],
+    robots: &RobotsAudit,
+) -> Vec<RobotsSitemapConflict> {
+    let disallows: Vec<&str> = robots
+        .groups
+        .iter()
+        .filter(|g| g.bot_class == BotClass::Wildcard)
+        .flat_map(|g| g.disallows.iter().map(String::as_str))
+        .filter(|rule| !rule.is_empty())
+        .collect();
+    if disallows.is_empty() {
+        return Vec::new();
+    }
+    let allows: Vec<&str> = robots
+        .groups
+        .iter()
+        .filter(|g| g.bot_class == BotClass::Wildcard)
+        .flat_map(|g| g.allows.iter().map(String::as_str))
+        .filter(|rule| !rule.is_empty())
+        .collect();
+
+    let mut conflicts = Vec::new();
+    for url in sitemap_urls {
+        let Ok(parsed) = Url::parse(url) else {
+            continue;
+        };
+        let path = parsed.path();
+
+        let Some(blocking_rule) = disallows
+            .iter()
+            .filter(|rule| path.starts_with(**rule))
+            .max_by_key(|rule| rule.len())
+        else {
+            continue;
+        };
+
+        let allowed_override = allows
+            .iter()
+            .any(|rule| path.starts_with(*rule) && rule.len() >= blocking_rule.len());
+        if allowed_override {
+            continue;
+        }
+
+        conflicts.push(RobotsSitemapConflict {
+            url: url.clone(),
+            rule: (*blocking_rule).to_string(),
+        });
+        if conflicts.len() >= MAX_ROBOTS_SITEMAP_CONFLICTS {
+            break;
+        }
+    }
+    conflicts
 }
 
 async fn check_sitemap_url(client: &Client, url: &str) -> Option<SitemapHttpIssue> {
@@ -910,5 +1002,47 @@ mod tests {
                 );
             }
         }
+    }
+
+    fn wildcard_robots(disallows: &[&str], allows: &[&str]) -> RobotsAudit {
+        RobotsAudit {
+            fetched: true,
+            groups: vec![crate::seo::RobotsGroup {
+                user_agent: "*".to_string(),
+                bot_class: BotClass::Wildcard,
+                allows: allows.iter().map(|s| s.to_string()).collect(),
+                disallows: disallows.iter().map(|s| s.to_string()).collect(),
+            }],
+            ..Default::default()
+        }
+    }
+
+    #[test]
+    fn robots_sitemap_conflict_found_for_wildcard_disallow() {
+        let robots = wildcard_robots(&["/private/"], &[]);
+        let sitemap_urls = vec![
+            "https://example.com/private/page".to_string(),
+            "https://example.com/public/page".to_string(),
+        ];
+        let conflicts = find_robots_sitemap_conflicts(&sitemap_urls, &robots);
+        assert_eq!(conflicts.len(), 1);
+        assert_eq!(conflicts[0].url, "https://example.com/private/page");
+        assert_eq!(conflicts[0].rule, "/private/");
+    }
+
+    #[test]
+    fn robots_sitemap_conflict_suppressed_by_more_specific_allow() {
+        let robots = wildcard_robots(&["/private/"], &["/private/public-page"]);
+        let sitemap_urls = vec!["https://example.com/private/public-page".to_string()];
+        let conflicts = find_robots_sitemap_conflicts(&sitemap_urls, &robots);
+        assert!(conflicts.is_empty());
+    }
+
+    #[test]
+    fn robots_sitemap_conflict_empty_when_no_overlap() {
+        let robots = wildcard_robots(&["/admin/"], &[]);
+        let sitemap_urls = vec!["https://example.com/products/page".to_string()];
+        let conflicts = find_robots_sitemap_conflicts(&sitemap_urls, &robots);
+        assert!(conflicts.is_empty());
     }
 }
