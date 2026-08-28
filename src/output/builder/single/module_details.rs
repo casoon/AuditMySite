@@ -11,9 +11,9 @@ use crate::output::report_model::{
     ImageProvenanceFindingPresentation, JourneyDimensionPresentation, JourneyPresentation,
     MinificationPresentation, MobilePresentation, ModuleDetailsBlock, OversizedImageRow,
     PerformancePresentation, PerformanceViewport, RobotsPresentation, SecurityPresentation,
-    SeoPresentation, SeoProfilePresentation, SignalDetails, ThirdPartyOriginRow,
-    ThirdPartyPresentation, ThrottledPerfEntry, UxDimensionPresentation, UxIssuePresentation,
-    UxPresentation, VisionDeficiencyModePresentation,
+    SeoPresentation, SeoProfilePresentation, SignalDetails, ThirdPartyImpactRow,
+    ThirdPartyOriginRow, ThirdPartyPresentation, ThrottledPerfEntry, UxDimensionPresentation,
+    UxIssuePresentation, UxPresentation, VisionDeficiencyModePresentation,
 };
 use crate::output::search_experience::build_search_experience;
 
@@ -403,6 +403,16 @@ fn build_performance_details(
                 total_kb: tp.total_bytes as f64 / 1024.0,
                 total_requests: tp.total_requests,
                 is_significant: tp.is_significant(page_total),
+                isolated_impact: tp
+                    .isolated_impact
+                    .iter()
+                    .map(|i| ThirdPartyImpactRow {
+                        origin: i.origin.clone(),
+                        baseline_tbt_ms: i.baseline_tbt_ms,
+                        without_script_tbt_ms: i.without_script_tbt_ms,
+                        estimated_impact_ms: i.estimated_impact_ms,
+                    })
+                    .collect(),
             }
         });
 

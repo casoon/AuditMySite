@@ -283,6 +283,17 @@ pub struct PipelineConfig {
     /// unique host per process run regardless of how many pages are audited
     /// (see `network::dns::module`'s per-host memoization).
     pub check_dns: bool,
+    /// Run the opt-in isolated third-party script impact measurement
+    /// (#531): reload the page once per top third-party origin with that
+    /// origin's requests blocked via CDP, and diff TBT against the baseline.
+    /// Requires `check_performance` to also be true (a TBT baseline and the
+    /// third-party attribution must exist) — costly even relative to other
+    /// `--full` checks, one extra full page reload per isolated origin
+    /// (capped at `performance::MAX_ISOLATED_ORIGINS`). Structurally
+    /// single-URL only: only `run_single_audit` invokes the isolation pass,
+    /// batch's `audit_page` path never does (same precedent as the
+    /// throttled-performance multi-pass).
+    pub check_isolate_third_party_impact: bool,
     /// Run tech stack detection and stack-specific audits
     pub check_stack: bool,
     /// `[rules] disabled`/`enabled_only` from `auditmysite.toml`, by axe_id.
@@ -345,14 +356,15 @@ impl PipelineConfig {
         // page-stability provenance, 12 for the design_quality module field,
         // 13 for the ai_transparency module field, 14 for rule_filter (#560
         // — disabled/enabled_only now actually change which findings run),
-        // 15 for the network_dns module field (#545).
-        const CACHE_FMT: u8 = 15;
+        // 15 for the network_dns module field (#545), 16 for the isolated
+        // third-party impact field (#531).
+        const CACHE_FMT: u8 = 16;
         let mut disabled = self.rule_filter.disabled_rules.clone();
         disabled.sort();
         let mut enabled_only = self.rule_filter.enabled_only_rules.clone();
         enabled_only.sort();
         format!(
-            "v={};fmt={};level={};perf={};seo={};sec={};mobile={};dark={};design_quality={};ai_transparency={};dns={};stack={};consent={};interactive={:?};journey_budget_ms={};lang={};disabled={};enabled_only={}",
+            "v={};fmt={};level={};perf={};seo={};sec={};mobile={};dark={};design_quality={};ai_transparency={};dns={};isolate_tp_impact={};stack={};consent={};interactive={:?};journey_budget_ms={};lang={};disabled={};enabled_only={}",
             env!("CARGO_PKG_VERSION"),
             CACHE_FMT,
             self.wcag_level,
@@ -364,6 +376,7 @@ impl PipelineConfig {
             self.check_design_quality as u8,
             self.check_ai_transparency as u8,
             self.check_dns as u8,
+            self.check_isolate_third_party_impact as u8,
             self.check_stack as u8,
             self.dismiss_consent as u8,
             self.interactive,
@@ -453,6 +466,12 @@ impl PipelineConfig {
             // detail is only ever `fix_guidance`/`en301549_annex`).
             check_ai_transparency: args.ai_transparency && args.url.is_some(),
             check_dns: args.dns_check,
+            // Requires performance checking itself active — an isolation
+            // pass without a baseline TBT/third-party attribution to diff
+            // against is meaningless (see doc comment on the field).
+            check_isolate_third_party_impact: args.isolate_third_party_impact
+                && (full_audit || args.performance)
+                && !args.skip_performance,
             check_stack: full_audit || args.stack,
             rule_filter,
             persist_artifacts: true,
@@ -483,6 +502,42 @@ pub async fn run_single_audit(
     debug!("Created new page");
 
     let (mut report, snapshot) = audit_page(&page, url, config, browser).await?;
+
+    // Isolated third-party script impact (#531). Deliberately runs BEFORE
+    // the throttled-performance pass below, so the baseline TBT it diffs
+    // against is the normal, unthrottled audit_page measurement — not a
+    // throttled LhMobile value the canonical-perf adoption might substitute
+    // afterwards.
+    if config.check_isolate_third_party_impact {
+        let baseline = report.performance.as_ref().and_then(|p| {
+            let baseline_tbt_ms = p.vitals.tbt.as_ref()?.value;
+            let origins = p.third_party.as_ref()?.origins.clone();
+            Some((baseline_tbt_ms, origins))
+        });
+        if let Some((baseline_tbt_ms, origins)) = baseline {
+            if !origins.is_empty() {
+                let impacts = crate::performance::isolate_third_party_impact(
+                    &page,
+                    browser,
+                    url,
+                    &origins,
+                    baseline_tbt_ms,
+                )
+                .await;
+                if let Some(perf) = report.performance.as_mut() {
+                    if let Some(third_party) = perf.third_party.as_mut() {
+                        third_party.isolated_impact = impacts;
+                    }
+                }
+                if let Err(e) = settle(&page).await {
+                    warn!(
+                        "Browser settle failed after third-party isolation pass: {}",
+                        e
+                    );
+                }
+            }
+        }
+    }
 
     if config.check_performance {
         let content_weight = report
@@ -2174,6 +2229,7 @@ mod tests {
             design_quality: false,
             ai_transparency: false,
             dns_check: false,
+            isolate_third_party_impact: false,
             stack: false,
             reuse_cache: false,
             force_refresh: false,
@@ -2261,6 +2317,7 @@ mod tests {
             check_design_quality: false,
             check_ai_transparency: false,
             check_dns: false,
+            check_isolate_third_party_impact: false,
             check_stack: false,
             rule_filter: crate::wcag::RuleFilterConfig::default(),
             persist_artifacts: true,

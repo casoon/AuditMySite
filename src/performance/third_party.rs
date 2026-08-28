@@ -3,12 +3,16 @@
 //! Groups all page resources by their full hostname and classifies each
 //! hostname as first-party or third-party relative to the page host.
 
+use chromiumoxide::cdp::browser_protocol::network::SetBlockedUrLsParams;
 use chromiumoxide::Page;
 use serde::{Deserialize, Serialize};
-use tracing::info;
+use tracing::{info, warn};
 use url::Url;
 
+use crate::browser::BrowserManager;
 use crate::error::{AuditError, Result};
+
+use super::vitals::{extract_web_vitals, prepare_vitals_collection};
 
 /// Per-origin resource summary for a single third-party domain.
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -45,6 +49,31 @@ pub struct ThirdPartyAttribution {
     pub total_bytes: u64,
     /// Total number of third-party requests
     pub total_requests: u32,
+    /// Isolated main-thread impact per origin, measured via CDP request
+    /// blocking (#531). Only populated when `--isolate-third-party-impact`
+    /// is set; empty otherwise (opt-in, requires extra page reloads).
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub isolated_impact: Vec<ThirdPartyImpact>,
+}
+
+/// Isolated main-thread impact of a single third-party origin (#531).
+///
+/// Measured by reloading the page once with this origin's requests blocked
+/// via CDP `Network.setBlockedURLs` and diffing the resulting Total Blocking
+/// Time against the baseline TBT already measured during the page's normal,
+/// unblocked audit pass — no separate baseline-only reload is performed.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ThirdPartyImpact {
+    /// Third-party origin this measurement isolates (matches `ThirdPartyOrigin.origin`)
+    pub origin: String,
+    /// CDP `Network.setBlockedURLs` wildcard pattern used to block this origin
+    pub blocked_url_pattern: String,
+    /// TBT (ms) measured during the page's normal, unblocked audit pass
+    pub baseline_tbt_ms: f64,
+    /// TBT (ms) measured with this origin's requests blocked
+    pub without_script_tbt_ms: f64,
+    /// Estimated main-thread impact attributable to this origin: `max(0, baseline - without)`
+    pub estimated_impact_ms: f64,
 }
 
 impl ThirdPartyAttribution {
@@ -154,7 +183,138 @@ pub async fn analyze_third_party_attribution(
         total_origins,
         total_bytes,
         total_requests,
+        isolated_impact: Vec::new(),
     })
+}
+
+// ── Isolated third-party impact (#531) ─────────────────────────────────────
+
+/// Cap on how many third-party origins get isolated per page.
+///
+/// Each isolated origin costs one additional full page reload. Five keeps
+/// the extra-reload budget in the same order of magnitude as the existing
+/// throttled-performance passes (3 reloads, `ThrottleProfile::AUTO_PROFILES`)
+/// that already run under `--full`, even on a page with dozens of
+/// third-party origins.
+pub const MAX_ISOLATED_ORIGINS: usize = 5;
+
+/// Select the origins to isolate: the top `cap` origins from `origins`.
+///
+/// `origins` is expected to already be sorted by `transfer_bytes` descending
+/// (as produced by `analyze_third_party_attribution`), so this is a plain
+/// prefix-take — the origins responsible for the most third-party bytes (and,
+/// in practice, usually the most requests) are isolated first.
+pub fn select_origins_to_isolate(
+    origins: &[ThirdPartyOrigin],
+    cap: usize,
+) -> Vec<&ThirdPartyOrigin> {
+    origins.iter().take(cap).collect()
+}
+
+/// Compute the isolated-impact delta for one origin's blocked-vs-baseline TBT
+/// measurement. Pure so the delta math is unit-testable without a browser.
+pub fn compute_isolated_impact(
+    origin: &str,
+    blocked_url_pattern: &str,
+    baseline_tbt_ms: f64,
+    without_script_tbt_ms: f64,
+) -> ThirdPartyImpact {
+    ThirdPartyImpact {
+        origin: origin.to_string(),
+        blocked_url_pattern: blocked_url_pattern.to_string(),
+        baseline_tbt_ms,
+        without_script_tbt_ms,
+        estimated_impact_ms: (baseline_tbt_ms - without_script_tbt_ms).max(0.0),
+    }
+}
+
+/// Block (or unblock, when `patterns` is empty) URL patterns via CDP
+/// `Network.setBlockedURLs`.
+async fn set_blocked_urls(page: &Page, patterns: &[String]) -> Result<()> {
+    page.execute(SetBlockedUrLsParams::new(patterns.to_vec()))
+        .await
+        .map_err(|e| AuditError::CdpError(format!("Network.setBlockedURLs failed: {e}")))?;
+    Ok(())
+}
+
+/// Measure the isolated main-thread impact of the top third-party origins on
+/// a page (#531, opt-in via `--isolate-third-party-impact`).
+///
+/// For each of the top [`MAX_ISOLATED_ORIGINS`] origins (by transfer bytes),
+/// reloads `page` with that origin's requests blocked via CDP
+/// `Network.setBlockedURLs`, re-measures TBT using the same
+/// `extract_web_vitals` mechanism as the normal audit pass, and diffs it
+/// against `baseline_tbt_ms` — the TBT already measured during the page's
+/// normal, unblocked audit pass. No separate baseline-only reload is done.
+///
+/// Reuses the already-loaded `page`/`browser` (same pattern as the
+/// throttled-performance multi-pass in `pipeline.rs`) rather than opening a
+/// new browser instance. A failed reload or vitals read for one origin is
+/// logged and skipped — the origin is simply absent from the result, the
+/// remaining origins still get isolated.
+///
+/// Costly: one full page reload per isolated origin. Callers must only
+/// invoke this when both performance checking and the explicit
+/// `--isolate-third-party-impact` opt-in are active (see `PipelineConfig`).
+pub async fn isolate_third_party_impact(
+    page: &Page,
+    browser: &BrowserManager,
+    url: &str,
+    origins: &[ThirdPartyOrigin],
+    baseline_tbt_ms: f64,
+) -> Vec<ThirdPartyImpact> {
+    let mut results = Vec::new();
+
+    for origin in select_origins_to_isolate(origins, MAX_ISOLATED_ORIGINS) {
+        let pattern = format!("*{}*", origin.origin);
+        info!("Isolating third-party impact for {}", origin.origin);
+
+        if let Err(e) = set_blocked_urls(page, std::slice::from_ref(&pattern)).await {
+            warn!("Failed to block {} for isolation: {}", origin.origin, e);
+            continue;
+        }
+
+        if let Err(e) = prepare_vitals_collection(page).await {
+            warn!(
+                "Vitals injection failed while isolating {}: {}",
+                origin.origin, e
+            );
+            let _ = set_blocked_urls(page, &[]).await;
+            continue;
+        }
+
+        if let Err(e) = browser.navigate(page, url).await {
+            warn!("Navigation failed while isolating {}: {}", origin.origin, e);
+            let _ = set_blocked_urls(page, &[]).await;
+            continue;
+        }
+
+        let without_tbt = match extract_web_vitals(page).await {
+            Ok(vitals) => vitals.tbt.map(|m| m.value),
+            Err(e) => {
+                warn!(
+                    "Vitals extraction failed while isolating {}: {}",
+                    origin.origin, e
+                );
+                None
+            }
+        };
+
+        // Always clear blocking again, regardless of outcome, before the
+        // next origin (or any subsequent pass) navigates.
+        let _ = set_blocked_urls(page, &[]).await;
+
+        if let Some(without_tbt) = without_tbt {
+            results.push(compute_isolated_impact(
+                &origin.origin,
+                &pattern,
+                baseline_tbt_ms,
+                without_tbt,
+            ));
+        }
+    }
+
+    results
 }
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
@@ -287,8 +447,66 @@ mod tests {
             total_origins: 0,
             total_bytes: 200_000,
             total_requests: 5,
+            isolated_impact: vec![],
         };
         assert!(attr.is_significant(500_000)); // 40 %
         assert!(!attr.is_significant(2_000_000)); // 10 %
+    }
+
+    fn test_origin(host: &str, bytes: u64) -> ThirdPartyOrigin {
+        ThirdPartyOrigin {
+            origin: host.to_string(),
+            transfer_bytes: bytes,
+            request_count: 1,
+            resource_kinds: vec!["script".to_string()],
+            largest_url: None,
+            provider: None,
+            category: None,
+            largest_bytes: bytes,
+        }
+    }
+
+    #[test]
+    fn select_origins_to_isolate_caps_at_the_given_number() {
+        let origins: Vec<ThirdPartyOrigin> = (0..8)
+            .map(|i| test_origin(&format!("host{i}.example.com"), (8 - i) * 1000))
+            .collect();
+
+        let selected = select_origins_to_isolate(&origins, MAX_ISOLATED_ORIGINS);
+
+        assert_eq!(selected.len(), MAX_ISOLATED_ORIGINS);
+        // Prefix-take preserves the caller's ordering (already sorted by bytes descending).
+        assert_eq!(selected[0].origin, "host0.example.com");
+        assert_eq!(selected[4].origin, "host4.example.com");
+    }
+
+    #[test]
+    fn select_origins_to_isolate_returns_all_when_under_the_cap() {
+        let origins = vec![
+            test_origin("a.example.com", 100),
+            test_origin("b.example.com", 50),
+        ];
+        let selected = select_origins_to_isolate(&origins, MAX_ISOLATED_ORIGINS);
+        assert_eq!(selected.len(), 2);
+    }
+
+    #[test]
+    fn compute_isolated_impact_is_the_positive_baseline_minus_without_delta() {
+        let impact = compute_isolated_impact("tag.example.com", "*tag.example.com*", 450.0, 120.0);
+        assert_eq!(impact.origin, "tag.example.com");
+        assert_eq!(impact.blocked_url_pattern, "*tag.example.com*");
+        assert_eq!(impact.baseline_tbt_ms, 450.0);
+        assert_eq!(impact.without_script_tbt_ms, 120.0);
+        assert_eq!(impact.estimated_impact_ms, 330.0);
+    }
+
+    #[test]
+    fn compute_isolated_impact_clamps_negative_delta_to_zero() {
+        // Blocking a script should never make the page slower; if noise in
+        // measurement makes "without" look higher than baseline, the impact
+        // must be reported as 0, not negative.
+        let impact =
+            compute_isolated_impact("noise.example.com", "*noise.example.com*", 100.0, 140.0);
+        assert_eq!(impact.estimated_impact_ms, 0.0);
     }
 }

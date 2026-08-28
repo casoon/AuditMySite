@@ -204,6 +204,19 @@ pub struct Args {
     #[arg(long)]
     pub dns_check: bool,
 
+    /// Measure the isolated main-thread impact of individual third-party
+    /// scripts (tag managers, chat widgets, tracking pixels) via CDP
+    /// request-blocking (#531).
+    ///
+    /// For each of the top 5 third-party origins found on the page, reloads
+    /// the page once with that origin's requests blocked and diffs the
+    /// resulting Total Blocking Time against the normal audit pass. Opt-in
+    /// and costly (up to 5 extra full page reloads per audited page) —
+    /// requires performance checking (`--full` or `--performance`) to also
+    /// be active, and only runs in single-URL mode.
+    #[arg(long)]
+    pub isolate_third_party_impact: bool,
+
     /// Attempt to dismiss cookie consent banners before auditing.
     ///
     /// Injects known CMP consent cookies before navigation and clicks
@@ -764,6 +777,7 @@ mod tests {
             design_quality: false,
             ai_transparency: false,
             dns_check: false,
+            isolate_third_party_impact: false,
             stack: false,
             reuse_cache: false,
             force_refresh: false,

@@ -544,6 +544,29 @@ pub(in crate::output::pdf) fn render_performance(
                 ]);
             }
             builder = builder.add_component(table);
+
+            // Isolated third-party impact (#531) — only present when
+            // `--isolate-third-party-impact` was set for this run.
+            if !tp.isolated_impact.is_empty() {
+                builder = builder.add_component(
+                    KeyValueList::new().with_title(i18n.t("pdf-perf-tp-isolated-title")),
+                );
+                let mut impact_table = AuditTable::new(vec![
+                    TableColumn::new(col_origin).with_width("40%"),
+                    TableColumn::new(i18n.t("pdf-perf-tp-isolated-baseline")).with_width("20%"),
+                    TableColumn::new(i18n.t("pdf-perf-tp-isolated-without")).with_width("20%"),
+                    TableColumn::new(i18n.t("pdf-perf-tp-isolated-impact")).with_width("20%"),
+                ]);
+                for row in &tp.isolated_impact {
+                    impact_table = impact_table.add_row(vec![
+                        row.origin.as_str(),
+                        &format!("{:.0} ms", row.baseline_tbt_ms),
+                        &format!("{:.0} ms", row.without_script_tbt_ms),
+                        &format!("{:.0} ms", row.estimated_impact_ms),
+                    ]);
+                }
+                builder = builder.add_component(impact_table);
+            }
         }
     }
 

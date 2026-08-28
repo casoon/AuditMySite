@@ -58,6 +58,7 @@ mod tests {
             check_design_quality: false,
             check_ai_transparency: false,
             check_dns: false,
+            check_isolate_third_party_impact: false,
             check_stack,
             rule_filter: crate::wcag::RuleFilterConfig::default(),
             persist_artifacts: false,

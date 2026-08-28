@@ -636,6 +636,18 @@ pub struct ThirdPartyPresentation {
     pub total_kb: f64,
     pub total_requests: u32,
     pub is_significant: bool,
+    /// Isolated per-origin main-thread impact rows (#531), empty unless
+    /// `--isolate-third-party-impact` was set.
+    pub isolated_impact: Vec<ThirdPartyImpactRow>,
+}
+
+/// One row in the isolated third-party impact table (#531) — numeric-only,
+/// no message strings, so no i18n kind-enum machinery is needed here.
+pub struct ThirdPartyImpactRow {
+    pub origin: String,
+    pub baseline_tbt_ms: f64,
+    pub without_script_tbt_ms: f64,
+    pub estimated_impact_ms: f64,
 }
 
 /// Critical request chain summary
