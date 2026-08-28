@@ -17,7 +17,9 @@ use crate::output::report_model::{
 };
 use crate::output::search_experience::build_search_experience;
 
-use super::super::helpers::{truncate_list, truncate_url_list, yes_no};
+use super::super::helpers::{
+    security_header_tier_label, security_issue_kind_label, truncate_list, truncate_url_list, yes_no,
+};
 use super::super::modules::{
     build_tracking_summary_text, build_vitals_list, derive_performance_recommendations,
     derive_security_recommendations,
@@ -1568,14 +1570,30 @@ fn build_security_details(
                         Some(v) => ("Vorhanden".to_string(), truncate_url(v, 50)),
                         None => ("Fehlt".to_string(), "—".to_string()),
                     };
-                    (name.to_string(), status, val)
+                    let tier =
+                        security_header_tier_label(locale, crate::security::header_tier(name));
+                    (name.to_string(), status, val, tier)
                 })
                 .collect(),
             ssl_info,
             issues: sec
                 .issues
                 .iter()
-                .map(|i| (i.header.clone(), i.severity, i.message.clone()))
+                .map(|i| {
+                    let title = format!(
+                        "{} — {}",
+                        i.header,
+                        security_issue_kind_label(locale, &i.issue_type)
+                    );
+                    let message = crate::security::coop_corp_verification_text(
+                        &i.header,
+                        &i.issue_type,
+                        locale == "en",
+                    )
+                    .map(str::to_string)
+                    .unwrap_or_else(|| i.message.clone());
+                    (title, i.severity, message)
+                })
                 .collect(),
             recommendations: derive_security_recommendations(i18n, sec),
             protection: sec

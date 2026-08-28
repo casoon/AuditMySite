@@ -32,7 +32,7 @@ pub(in crate::output::pdf) fn render_security(
     let header_count = sec
         .headers
         .iter()
-        .filter(|(_, status, _)| status.to_lowercase().contains("vorhanden") || status == "✓")
+        .filter(|(_, status, _, _)| status.to_lowercase().contains("vorhanden") || status == "✓")
         .count();
     builder = builder.add_component(
         MetricStrip::new(vec![
@@ -60,13 +60,24 @@ pub(in crate::output::pdf) fn render_security(
         let mut table = AuditTable::new(vec![
             TableColumn::new("Header"),
             TableColumn::new("Status"),
+            TableColumn::new(i18n.t("pdf-sec-header-tier-column")),
             TableColumn::new(i18n.t("pdf-seo-value")),
         ])
         .with_title("Security Headers");
-        for (name, status, val) in &sec.headers {
-            table = table.add_row(vec![name.as_str(), status.as_str(), val.as_str()]);
+        for (name, status, tier, val) in &sec.headers {
+            table = table.add_row(vec![
+                name.as_str(),
+                status.as_str(),
+                tier.as_str(),
+                val.as_str(),
+            ]);
         }
         builder = builder.add_component(table);
+        builder = builder.add_component(
+            Label::new(i18n.t("pdf-sec-header-tier-note"))
+                .with_size("8.8pt")
+                .with_color(crate::output::pdf::design::tokens::NEUTRAL),
+        );
     }
 
     if !sec.ssl_info.is_empty() {

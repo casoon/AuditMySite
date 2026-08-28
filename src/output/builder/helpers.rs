@@ -170,6 +170,43 @@ pub(super) fn yes_no(locale: &str, val: bool) -> String {
     }
 }
 
+/// Localized label for a security header's classification tier (#578) —
+/// lets the security header table show at a glance which missing headers
+/// are baseline hygiene vs. situational, instead of a flat present/missing
+/// count.
+pub(super) fn security_header_tier_label(
+    locale: &str,
+    tier: crate::security::HeaderTier,
+) -> String {
+    use crate::security::HeaderTier::*;
+    match (locale, tier) {
+        ("en", Baseline) => "Baseline",
+        ("en", ArchitectureDependent) => "Architecture-dependent",
+        ("en", ContextDependent) => "Context-dependent",
+        ("en", NotAssessable) => "Not assessable remotely",
+        (_, Baseline) => "Basisschutz",
+        (_, ArchitectureDependent) => "Architekturabhängig",
+        (_, ContextDependent) => "Kontextabhängig",
+        (_, NotAssessable) => "Remote nicht bewertbar",
+    }
+    .to_string()
+}
+
+/// Localized label distinguishing "header not sent at all" from "header
+/// sent but weak/permissive" (#578) — makes a distinction that already
+/// exists internally via `SecurityIssue::issue_type` visible in the
+/// rendered report instead of leaving it implicit in the finding message.
+pub(super) fn security_issue_kind_label(locale: &str, issue_type: &str) -> String {
+    let missing = issue_type == "missing_header" || issue_type == "missing_https";
+    match (locale, missing) {
+        ("en", true) => "Missing",
+        ("en", false) => "Misconfigured",
+        (_, true) => "Fehlt",
+        (_, false) => "Fehlkonfiguriert",
+    }
+    .to_string()
+}
+
 pub(super) fn truncate_list(items: &[String], limit: usize) -> String {
     let mut values: Vec<String> = items
         .iter()

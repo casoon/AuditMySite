@@ -181,6 +181,105 @@ impl SslInfo {
     }
 }
 
+/// Classification tier for a security header (#578).
+///
+/// A raw "N headers missing" count treats every header as equally urgent,
+/// which isn't true: some are baseline hygiene for virtually every site,
+/// some only matter for a specific architecture, some depend on a
+/// deployment context this tool cannot observe from a single automated page
+/// fetch, and some can't be meaningfully judged as present/absent at all.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum HeaderTier {
+    /// Applies to virtually every site; missing it is a real gap regardless
+    /// of architecture (CSP, HSTS, X-Content-Type-Options, X-Frame-Options,
+    /// HTTPS itself).
+    Baseline,
+    /// Good practice, but whether it's expected depends on the site's
+    /// architecture (Referrer-Policy, Permissions-Policy).
+    ArchitectureDependent,
+    /// Relevance depends on a deployment context (e.g. SharedArrayBuffer
+    /// usage, cross-origin isolation) that can't be determined from a
+    /// single automated page fetch (Cross-Origin-Opener/Resource-Policy).
+    ContextDependent,
+    /// Presence or absence alone isn't a meaningful signal — a static crawl
+    /// can't tell whether cross-origin sharing is intentional (CORS
+    /// headers).
+    NotAssessable,
+}
+
+/// Localized presentation text for the COOP/CORP context-verification
+/// messages introduced in #578 (#406 kind-enum pattern: `SecurityIssue.message`
+/// stays canonical English for JSON; the PDF layer derives the run-locale
+/// text via this function instead of rendering `.message` directly — those
+/// two messages became long explanatory paragraphs in #578, so leaving them
+/// unlocalized would leak substantial English prose into German reports).
+/// Returns `None` for any other `(header, issue_type)` pair — callers should
+/// fall back to `SecurityIssue.message` for those, matching this codebase's
+/// existing (documented, out-of-scope-to-fully-fix-here) behavior for the
+/// rest of the security issue catalog.
+pub fn coop_corp_verification_text(
+    header: &str,
+    issue_type: &str,
+    en: bool,
+) -> Option<&'static str> {
+    if issue_type != "missing_header" {
+        return None;
+    }
+    match header {
+        "Cross-Origin-Opener-Policy" => Some(if en {
+            "Cross-Origin-Opener-Policy is not set. This header only matters if the page uses \
+             SharedArrayBuffer, high-resolution timers, or needs to isolate itself from \
+             cross-origin popups — if none of that applies, no action is needed here. If it \
+             does apply, set it to same-origin and verify popup/window interactions still work \
+             as expected."
+        } else {
+            "Cross-Origin-Opener-Policy ist nicht gesetzt. Dieser Header ist nur relevant, wenn \
+             die Seite SharedArrayBuffer, hochauflösende Timer verwendet oder sich von \
+             Cross-Origin-Popups isolieren muss — trifft das nicht zu, ist hier keine Maßnahme \
+             nötig. Trifft es zu: auf same-origin setzen und prüfen, ob Popup-/Fenster-\
+             Interaktionen weiterhin wie erwartet funktionieren."
+        }),
+        "Cross-Origin-Resource-Policy" => Some(if en {
+            "Cross-Origin-Resource-Policy is not set. This header only matters if the page \
+             serves fonts, scripts, or media that other origins should be prevented from \
+             loading — if the site's resources are intentionally public, no action is needed \
+             here. If cross-origin loading should be restricted, set it to same-origin or \
+             same-site."
+        } else {
+            "Cross-Origin-Resource-Policy ist nicht gesetzt. Dieser Header ist nur relevant, \
+             wenn die Seite Schriften, Skripte oder Medien ausliefert, die andere Origins nicht \
+             laden können sollen — sind die Ressourcen bewusst öffentlich zugänglich, ist hier \
+             keine Maßnahme nötig. Soll das Laden von anderen Origins eingeschränkt werden: auf \
+             same-origin oder same-site setzen."
+        }),
+        _ => None,
+    }
+}
+
+/// Classifies a security header by how universally applicable it is (#578).
+/// Falls back to `Baseline` for anything outside the fixed table, which
+/// covers confirmed misconfigurations (e.g. CSP quality issues, public
+/// source maps) — those are never ambiguous by nature, so they read as
+/// baseline findings rather than context-dependent ones.
+pub fn header_tier(header: &str) -> HeaderTier {
+    match header {
+        "Content-Security-Policy"
+        | "Strict-Transport-Security"
+        | "X-Content-Type-Options"
+        | "X-Frame-Options"
+        | "HTTPS" => HeaderTier::Baseline,
+        "Referrer-Policy" | "Permissions-Policy" => HeaderTier::ArchitectureDependent,
+        "Cross-Origin-Opener-Policy" | "Cross-Origin-Resource-Policy" => {
+            HeaderTier::ContextDependent
+        }
+        "Access-Control-Allow-Origin" | "Access-Control-Allow-Credentials" => {
+            HeaderTier::NotAssessable
+        }
+        _ => HeaderTier::Baseline,
+    }
+}
+
 /// Security issue
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct SecurityIssue {
@@ -188,6 +287,10 @@ pub struct SecurityIssue {
     pub issue_type: String,
     pub message: String,
     pub severity: Severity,
+    /// Classification tier for the underlying header (#578) — lets report
+    /// consumers distinguish baseline hygiene from context-dependent
+    /// findings without re-deriving it from `header`.
+    pub tier: HeaderTier,
 }
 
 /// Analyze security headers of a URL
@@ -241,6 +344,7 @@ pub async fn analyze_security(url: &str) -> Result<SecurityAnalysis> {
                 ssl.hsts_include_subdomains
             ),
             severity: Severity::Low,
+            tier: HeaderTier::Baseline,
         });
     }
     if permissions_policy_is_permissive(&headers) {
@@ -249,6 +353,7 @@ pub async fn analyze_security(url: &str) -> Result<SecurityAnalysis> {
             issue_type: "permissions_policy_permissive".to_string(),
             message: "Permissions-Policy header is present but doesn't restrict any feature (empty or wildcard-only)".to_string(),
             severity: Severity::Low,
+            tier: HeaderTier::ArchitectureDependent,
         });
     }
 
@@ -265,6 +370,7 @@ pub async fn analyze_security(url: &str) -> Result<SecurityAnalysis> {
                 sourcemap_leaks.leaks[0].map_url
             ),
             severity: Severity::High,
+            tier: HeaderTier::Baseline,
         });
     }
 
@@ -457,6 +563,7 @@ pub(crate) fn generate_security_issues(
             issue_type: "missing_https".to_string(),
             message: "Site is not served over HTTPS".to_string(),
             severity: Severity::Critical,
+            tier: HeaderTier::Baseline,
         });
     }
 
@@ -466,6 +573,7 @@ pub(crate) fn generate_security_issues(
             issue_type: "missing_header".to_string(),
             message: "Missing Content-Security-Policy header".to_string(),
             severity: Severity::High,
+            tier: HeaderTier::Baseline,
         });
     } else if let Some(ref csp) = headers.content_security_policy {
         issues.extend(collect_csp_quality_issues(csp));
@@ -477,6 +585,7 @@ pub(crate) fn generate_security_issues(
             issue_type: "missing_header".to_string(),
             message: "Missing X-Content-Type-Options header".to_string(),
             severity: Severity::Medium,
+            tier: HeaderTier::Baseline,
         });
     }
 
@@ -486,6 +595,7 @@ pub(crate) fn generate_security_issues(
             issue_type: "missing_header".to_string(),
             message: "Missing X-Frame-Options header (clickjacking protection)".to_string(),
             severity: Severity::Medium,
+            tier: HeaderTier::Baseline,
         });
     }
 
@@ -495,6 +605,7 @@ pub(crate) fn generate_security_issues(
             issue_type: "missing_header".to_string(),
             message: "Missing HSTS header".to_string(),
             severity: Severity::High,
+            tier: HeaderTier::Baseline,
         });
     }
 
@@ -504,6 +615,7 @@ pub(crate) fn generate_security_issues(
             issue_type: "missing_header".to_string(),
             message: "Missing Referrer-Policy header".to_string(),
             severity: Severity::Low,
+            tier: HeaderTier::ArchitectureDependent,
         });
     }
 
@@ -513,15 +625,29 @@ pub(crate) fn generate_security_issues(
             issue_type: "missing_header".to_string(),
             message: "Missing Permissions-Policy header".to_string(),
             severity: Severity::Low,
+            tier: HeaderTier::ArchitectureDependent,
         });
     }
 
+    // COOP/CORP relevance depends on deployment context this tool cannot
+    // observe from a single unauthenticated fetch — a marketing page almost
+    // never needs them, but an authenticated app page using SharedArrayBuffer
+    // or a cross-origin OAuth popup flow genuinely might. A static crawl has
+    // no way to tell those two cases apart, so the message below asks the
+    // verification question instead of asserting either "add this" or
+    // "ignore this" (#578).
     if headers.cross_origin_opener_policy.is_none() {
         issues.push(SecurityIssue {
             header: "Cross-Origin-Opener-Policy".to_string(),
             issue_type: "missing_header".to_string(),
-            message: "Missing Cross-Origin-Opener-Policy header".to_string(),
+            message: "Cross-Origin-Opener-Policy is not set. This header only matters if the \
+                page uses SharedArrayBuffer, high-resolution timers, or needs to isolate itself \
+                from cross-origin popups — if none of that applies, no action is needed here. If \
+                it does apply, set it to same-origin and verify popup/window interactions still \
+                work as expected."
+                .to_string(),
             severity: Severity::Low,
+            tier: HeaderTier::ContextDependent,
         });
     }
 
@@ -529,8 +655,14 @@ pub(crate) fn generate_security_issues(
         issues.push(SecurityIssue {
             header: "Cross-Origin-Resource-Policy".to_string(),
             issue_type: "missing_header".to_string(),
-            message: "Missing Cross-Origin-Resource-Policy header".to_string(),
+            message: "Cross-Origin-Resource-Policy is not set. This header only matters if the \
+                page serves fonts, scripts, or media that other origins should be prevented from \
+                loading — if the site's resources are intentionally public, no action is needed \
+                here. If cross-origin loading should be restricted, set it to same-origin or \
+                same-site."
+                .to_string(),
             severity: Severity::Low,
+            tier: HeaderTier::ContextDependent,
         });
     }
 
@@ -540,6 +672,7 @@ pub(crate) fn generate_security_issues(
             issue_type: "cors_wildcard_credentials".to_string(),
             message: "CORS allows any origin while also allowing credentials".to_string(),
             severity: Severity::High,
+            tier: HeaderTier::Baseline,
         });
     }
 
@@ -700,6 +833,7 @@ fn csp_issue(issue_type: &str, message: &str, severity: Severity) -> SecurityIss
         issue_type: issue_type.to_string(),
         message: message.to_string(),
         severity,
+        tier: HeaderTier::Baseline,
     }
 }
 
@@ -859,6 +993,30 @@ mod tests {
     use super::*;
 
     #[test]
+    fn coop_corp_verification_text_is_localized_and_distinct_from_english() {
+        for header in ["Cross-Origin-Opener-Policy", "Cross-Origin-Resource-Policy"] {
+            let en = coop_corp_verification_text(header, "missing_header", true)
+                .expect("expected English text");
+            let de = coop_corp_verification_text(header, "missing_header", false)
+                .expect("expected German text");
+            assert_ne!(en, de, "{header}: DE text must differ from EN");
+            let has_umlaut = |s: &str| s.chars().any(|c| "äöüÄÖÜß".contains(c));
+            assert!(!has_umlaut(en), "{header} EN text leaks German: {en}");
+        }
+    }
+
+    #[test]
+    fn coop_corp_verification_text_none_for_other_issue_types() {
+        assert!(coop_corp_verification_text(
+            "Cross-Origin-Opener-Policy",
+            "some_other_issue_type",
+            true
+        )
+        .is_none());
+        assert!(coop_corp_verification_text("X-Frame-Options", "missing_header", true).is_none());
+    }
+
+    #[test]
     fn test_security_headers_count() {
         let headers = SecurityHeaders {
             content_security_policy: Some(strong_csp()),
@@ -889,11 +1047,114 @@ mod tests {
         assert!(recs
             .iter()
             .any(|r| r.contains("Cross-Origin-Resource-Policy")));
-        // COOP and CORP now generate Low-severity issues
+        // COOP and CORP now generate Low-severity issues, tagged context-dependent
         let issues = generate_security_issues(&headers, true);
-        assert!(issues
+        assert!(issues.iter().any(|i| i.header.contains("Cross-Origin")
+            && i.severity == Severity::Low
+            && i.tier == HeaderTier::ContextDependent));
+    }
+
+    /// Header classification table (#578): Baseline headers apply to
+    /// virtually every site, architecture-dependent ones are good practice
+    /// but not universal, context-dependent relevance can't be determined
+    /// from a single automated fetch, and CORS presence/absence alone isn't
+    /// assessable at all.
+    #[test]
+    fn test_header_tier_classification() {
+        assert_eq!(header_tier("Content-Security-Policy"), HeaderTier::Baseline);
+        assert_eq!(
+            header_tier("Strict-Transport-Security"),
+            HeaderTier::Baseline
+        );
+        assert_eq!(header_tier("X-Content-Type-Options"), HeaderTier::Baseline);
+        assert_eq!(header_tier("X-Frame-Options"), HeaderTier::Baseline);
+        assert_eq!(header_tier("HTTPS"), HeaderTier::Baseline);
+
+        assert_eq!(
+            header_tier("Referrer-Policy"),
+            HeaderTier::ArchitectureDependent
+        );
+        assert_eq!(
+            header_tier("Permissions-Policy"),
+            HeaderTier::ArchitectureDependent
+        );
+
+        assert_eq!(
+            header_tier("Cross-Origin-Opener-Policy"),
+            HeaderTier::ContextDependent
+        );
+        assert_eq!(
+            header_tier("Cross-Origin-Resource-Policy"),
+            HeaderTier::ContextDependent
+        );
+
+        assert_eq!(
+            header_tier("Access-Control-Allow-Origin"),
+            HeaderTier::NotAssessable
+        );
+        assert_eq!(
+            header_tier("Access-Control-Allow-Credentials"),
+            HeaderTier::NotAssessable
+        );
+    }
+
+    /// "Standardmarketingseite" scenario (#578 acceptance criteria): a page
+    /// with only baseline headers set and COOP/CORP missing should read as a
+    /// verification question, not an unconditional "add this header"
+    /// instruction — the tool cannot know whether this deployment needs
+    /// cross-origin isolation at all.
+    #[test]
+    fn test_coop_missing_message_is_a_verification_question_not_a_flat_instruction() {
+        let headers = SecurityHeaders::default();
+        let issues = generate_security_issues(&headers, true);
+        let coop = issues
             .iter()
-            .any(|i| i.header.contains("Cross-Origin") && i.severity == Severity::Low));
+            .find(|i| i.header == "Cross-Origin-Opener-Policy")
+            .expect("COOP issue expected when header is absent");
+
+        assert_eq!(coop.severity, Severity::Low);
+        assert_eq!(coop.tier, HeaderTier::ContextDependent);
+        assert!(
+            coop.message.contains("SharedArrayBuffer"),
+            "message should name the concrete scenario that makes COOP relevant: {}",
+            coop.message
+        );
+        assert!(
+            coop.message.contains("no action is needed"),
+            "message should tell the reader when COOP does NOT apply: {}",
+            coop.message
+        );
+        assert!(
+            !coop.message.starts_with("Missing"),
+            "message should not read as a flat missing-header instruction: {}",
+            coop.message
+        );
+    }
+
+    /// "Cross-Origin-Ressourcen-Szenario" (#578 acceptance criteria): CORP's
+    /// guidance must name the concrete scenario (other origins loading
+    /// fonts/scripts/media) rather than a blanket "add this header" line.
+    #[test]
+    fn test_corp_missing_message_covers_cross_origin_resource_scenario() {
+        let headers = SecurityHeaders::default();
+        let issues = generate_security_issues(&headers, true);
+        let corp = issues
+            .iter()
+            .find(|i| i.header == "Cross-Origin-Resource-Policy")
+            .expect("CORP issue expected when header is absent");
+
+        assert_eq!(corp.severity, Severity::Low);
+        assert_eq!(corp.tier, HeaderTier::ContextDependent);
+        assert!(
+            corp.message.contains("other origins"),
+            "message should name the cross-origin resource-loading scenario: {}",
+            corp.message
+        );
+        assert!(
+            corp.message.contains("intentionally public"),
+            "message should tell the reader when CORP does NOT apply: {}",
+            corp.message
+        );
     }
 
     #[test]
@@ -906,6 +1167,7 @@ mod tests {
             issue_type: "missing_header".into(),
             message: "Missing Content-Security-Policy header".into(),
             severity: Severity::High,
+            tier: HeaderTier::Baseline,
         }];
         let permissive_csp: Vec<SecurityIssue> = [
             "unsafe_inline_script",
@@ -920,6 +1182,7 @@ mod tests {
             issue_type: (*t).into(),
             message: "csp quality".into(),
             severity: Severity::High,
+            tier: HeaderTier::Baseline,
         })
         .collect();
         let s_missing = calculate_security_score(&SecurityHeaders::default(), &ssl, &missing_csp);

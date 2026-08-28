@@ -142,10 +142,48 @@ pub enum InterpretArea {
 ///
 /// Wording follows the "Report Wording Style" rules in CLAUDE.md.
 pub fn interpret_score_localized(area: InterpretArea, score: f32) -> LocalizedText {
+    interpret_band_localized(area, ScoreBand::from_score(score))
+}
+
+/// Security-specific override of `interpret_score_localized` (#578).
+///
+/// The generic band text above is shared across six modules and keyed on the
+/// numeric score alone — for Security that's a real problem: several
+/// Low-severity/context-dependent header misses (e.g. missing COOP/CORP,
+/// which most standard sites don't need) can stack up and push the
+/// aggregate score into the `Critical` band even though no individual issue
+/// is actually severe. The `Critical` band's "significant security risks...
+/// immediate action" wording should only fire when a genuinely severe issue
+/// is present — not merely because several minor items stacked up.
+///
+/// Rather than threading the issues list into the shared `interpret_score_localized`
+/// (which would change behavior for five unrelated modules), this override
+/// lives here and only ever downgrades the *text* band actually shown — the
+/// numeric score/grade elsewhere in the report is untouched.
+pub fn interpret_security_score_localized(
+    score: f32,
+    issues: &[crate::security::SecurityIssue],
+) -> LocalizedText {
+    let band = ScoreBand::from_score(score);
+    let has_severe_issue = issues.iter().any(|i| {
+        matches!(
+            i.severity,
+            crate::taxonomy::Severity::Critical | crate::taxonomy::Severity::High
+        )
+    });
+    let effective_band = if band == ScoreBand::Critical && !has_severe_issue {
+        ScoreBand::Weak
+    } else {
+        band
+    };
+    interpret_band_localized(InterpretArea::Security, effective_band)
+}
+
+fn interpret_band_localized(area: InterpretArea, band: ScoreBand) -> LocalizedText {
     use InterpretArea::*;
     use ScoreBand::*;
 
-    let (de, en): (&str, &str) = match (area, ScoreBand::from_score(score)) {
+    let (de, en): (&str, &str) = match (area, band) {
         (Accessibility, Excellent) => (
             "Sehr gut — die Barrierefreiheit ist technisch sauber umgesetzt und weist nur geringe Einschränkungen auf.",
             "Excellent — accessibility is implemented cleanly, with only minor limitations.",
@@ -469,7 +507,7 @@ fn build_per_module_localized(normalized: &AuditContext<'_>) -> HashMap<String, 
     if let Some(s) = normalized.raw_security {
         map.insert(
             "security".to_string(),
-            interpret_score_localized(InterpretArea::Security, s.score as f32),
+            interpret_security_score_localized(s.score as f32, &s.issues),
         );
     }
 
@@ -726,6 +764,8 @@ fn pick_score_note_key(normalized: &AuditContext<'_>) -> Option<String> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::security::SecurityIssue;
+    use crate::taxonomy::Severity;
 
     #[test]
     fn score_band_boundaries() {
@@ -803,6 +843,96 @@ mod tests {
                 );
             }
         }
+    }
+
+    fn low_severity_context_issue(
+        header: &str,
+        tier: crate::security::HeaderTier,
+    ) -> SecurityIssue {
+        SecurityIssue {
+            header: header.to_string(),
+            issue_type: "missing_header".to_string(),
+            message: format!("{header} is not set."),
+            severity: Severity::Low,
+            tier,
+        }
+    }
+
+    /// "Standardmarketingseite" scenario (#578 acceptance criteria): several
+    /// Low-severity/context-dependent header misses (Referrer-Policy,
+    /// Permissions-Policy, COOP, CORP) can push the numeric score below the
+    /// Critical threshold on their own, even though none of them is an
+    /// actually severe issue. The report must not claim "significant
+    /// security risks... immediate action" in that case.
+    #[test]
+    fn interpret_security_score_stacked_low_severity_misses_does_not_read_as_critical() {
+        use crate::security::HeaderTier;
+
+        let issues = vec![
+            low_severity_context_issue("Referrer-Policy", HeaderTier::ArchitectureDependent),
+            low_severity_context_issue("Permissions-Policy", HeaderTier::ArchitectureDependent),
+            low_severity_context_issue("Cross-Origin-Opener-Policy", HeaderTier::ContextDependent),
+            low_severity_context_issue(
+                "Cross-Origin-Resource-Policy",
+                HeaderTier::ContextDependent,
+            ),
+        ];
+        // Numeric band alone would be Critical at this score.
+        assert_eq!(ScoreBand::from_score(20.0), ScoreBand::Critical);
+
+        let text = interpret_security_score_localized(20.0, &issues);
+        assert!(
+            !text.de.starts_with("Kritisch"),
+            "stacked low-severity misses must not read as Kritisch: {}",
+            text.de
+        );
+        assert!(
+            !text.en.starts_with("Critical"),
+            "stacked low-severity misses must not read as Critical: {}",
+            text.en
+        );
+        assert!(text.de.starts_with("Ausbaufähig"), "got: {}", text.de);
+        assert!(text.en.starts_with("Inadequate"), "got: {}", text.en);
+    }
+
+    /// A genuinely severe finding (missing HTTPS, broken CSP, missing
+    /// clickjacking protection, ...) must keep the Critical wording
+    /// regardless of how many other low-severity items are also present —
+    /// CSP/HSTS/clickjacking protection stay clearly prioritized (#578).
+    #[test]
+    fn interpret_security_score_real_critical_issue_still_reads_as_critical() {
+        use crate::security::HeaderTier;
+
+        let issues = vec![
+            SecurityIssue {
+                header: "HTTPS".to_string(),
+                issue_type: "missing_https".to_string(),
+                message: "Site is not served over HTTPS".to_string(),
+                severity: Severity::Critical,
+                tier: HeaderTier::Baseline,
+            },
+            low_severity_context_issue("Cross-Origin-Opener-Policy", HeaderTier::ContextDependent),
+        ];
+
+        let text = interpret_security_score_localized(20.0, &issues);
+        assert!(text.de.starts_with("Kritisch"), "got: {}", text.de);
+        assert!(text.en.starts_with("Critical"), "got: {}", text.en);
+    }
+
+    /// The override only ever downgrades the Critical band — non-Critical
+    /// bands must behave exactly like the generic `interpret_score_localized`.
+    #[test]
+    fn interpret_security_score_non_critical_band_is_unaffected() {
+        use crate::security::HeaderTier;
+
+        let issues = vec![low_severity_context_issue(
+            "Cross-Origin-Opener-Policy",
+            HeaderTier::ContextDependent,
+        )];
+        let text = interpret_security_score_localized(80.0, &issues);
+        let baseline = interpret_score_localized(InterpretArea::Security, 80.0);
+        assert_eq!(text.de, baseline.de);
+        assert_eq!(text.en, baseline.en);
     }
 
     #[test]

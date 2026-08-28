@@ -864,7 +864,11 @@ pub struct SecurityPresentation {
     pub score: u32,
     pub grade: String,
     pub interpretation: String,
-    pub headers: Vec<(String, String, String)>,
+    /// (header name, status, value, classification tier label) — the tier
+    /// label distinguishes baseline hygiene from context-/architecture-
+    /// dependent headers so a missing-header count doesn't read as uniformly
+    /// urgent (#578).
+    pub headers: Vec<(String, String, String, String)>,
     pub ssl_info: Vec<(String, String)>,
     pub issues: Vec<(String, Severity, String)>,
     pub recommendations: Vec<String>,
