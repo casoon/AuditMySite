@@ -57,6 +57,7 @@ mod tests {
             check_dark_mode: false,
             check_design_quality: false,
             check_ai_transparency: false,
+            check_dns: false,
             check_stack,
             rule_filter: crate::wcag::RuleFilterConfig::default(),
             persist_artifacts: false,

@@ -2239,6 +2239,42 @@ pub(super) fn render_batch_action_plan_section(
             .add_component(kv);
     }
 
+    // Cross-page minification consistency (#537)
+    if !pres
+        .portfolio_summary
+        .minification_inconsistencies
+        .is_empty()
+    {
+        let mut table = AuditTable::new(vec![
+            TableColumn::new(i18n.t("batch-col-minify-asset")),
+            TableColumn::new(i18n.t("batch-col-minify-kind")),
+            TableColumn::new(i18n.t("batch-col-minify-minified-on")),
+            TableColumn::new(i18n.t("batch-col-minify-unminified-on")),
+        ])
+        .with_title(i18n.t("batch-minification-inconsistency-title"));
+
+        for entry in &pres.portfolio_summary.minification_inconsistencies {
+            let kind_label = match entry.kind.as_str() {
+                "script" => i18n.t("batch-minify-kind-script"),
+                "css" => i18n.t("batch-minify-kind-css"),
+                other => other.to_string(),
+            };
+            table = table.add_row(vec![
+                truncate_url(&entry.url, 45),
+                kind_label,
+                entry.minified_on_count.to_string(),
+                entry.unminified_on_count.to_string(),
+            ]);
+        }
+        let minify_intro = i18n.t("batch-minification-inconsistency-intro");
+        builder = builder
+            .add_component(
+                Section::new(i18n.t("batch-minification-inconsistency-section")).with_level(1),
+            )
+            .add_component(TextBlock::new(minify_intro))
+            .add_component(table);
+    }
+
     // Performance budgets
     if !pres.portfolio_summary.budget_summary.is_empty() {
         let pages_col = i18n.t("batch-budget-pages-col");

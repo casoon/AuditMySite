@@ -359,6 +359,7 @@ pub struct ModuleDetailsBlock {
     pub dark_mode: Option<DarkModePresentation>,
     pub design_quality: Option<DesignQualityPresentation>,
     pub ai_transparency: Option<AiTransparencyPresentation>,
+    pub network_dns: Option<crate::network::dns::NetworkDnsAnalysis>,
     pub source_quality: Option<crate::source_quality::SourceQualityAnalysis>,
     pub ai_visibility: Option<crate::ai_visibility::AiVisibilityAnalysis>,
     pub tech_stack: Option<crate::tech_stack::TechStackAnalysis>,
@@ -1087,6 +1088,23 @@ pub struct HreflangIssue {
     pub lang: String,
 }
 
+/// A JS/CSS asset URL that is served minified on some audited pages and
+/// unminified on others (#537) — the cross-page consistency counterpart to
+/// `performance::minification`'s existing per-page "flagged unminified"
+/// finding. Points at a build-config inconsistency between templates/routes
+/// (e.g. one content collection not going through the minifier) rather than
+/// an isolated per-page issue. `kind` is a canonical, language-neutral key
+/// (`"script"` or `"css"`); the PDF layer derives the localized label at
+/// render time (#406).
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+pub struct MinificationInconsistency {
+    pub url: String,
+    pub kind: String,
+    pub minified_on_count: usize,
+    pub unminified_on_count: usize,
+    pub total_pages_with_asset: usize,
+}
+
 pub struct PortfolioSummary {
     pub total_urls: usize,
     pub passed: usize,
@@ -1147,6 +1165,8 @@ pub struct PortfolioSummary {
     pub linked_not_in_sitemap: Vec<String>,
     /// Sitemap entries blocked by a robots.txt Disallow rule (#549)
     pub robots_conflicts: Vec<crate::audit::RobotsSitemapConflict>,
+    /// Asset URLs served minified on some pages and unminified on others (#537)
+    pub minification_inconsistencies: Vec<MinificationInconsistency>,
 }
 
 pub struct CrawlLinkSummary {

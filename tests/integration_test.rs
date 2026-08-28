@@ -118,6 +118,7 @@ fn default_config() -> PipelineConfig {
         check_dark_mode: false,
         check_design_quality: false,
         check_ai_transparency: false,
+        check_dns: false,
         check_stack: false,
         rule_filter: auditmysite::wcag::RuleFilterConfig::default(),
         persist_artifacts: true,

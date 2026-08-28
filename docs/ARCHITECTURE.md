@@ -215,6 +215,10 @@ src/
 │   ├── image_provenance.rs # cfg(feature = "ai-transparency") — fetch + c2pa parsing
 │   └── extract.js
 │
+├── network/             # Opt-in, score-neutral, host-scoped network checks (#545)
+│   └── dns/             # DNS configuration: CAA, DNSSEC (best-effort), SPF/MX
+│       └── mod.rs, module.rs # hickory-resolver queries, once per unique host per run
+│
 ├── ux/                  # UX analysis (5 dimensions, saturation curves)
 │   ├── mod.rs, module.rs
 │   ├── analysis.rs

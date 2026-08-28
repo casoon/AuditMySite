@@ -53,6 +53,8 @@ src/
 ├── dark_mode/           # Dark mode support detection and contrast
 ├── design_quality/      # Opt-in UX/readability heuristics (overflow-clip, line length/height, all-caps, layout transitions) — score-neutral (#528)
 ├── ai_transparency/     # Opt-in C2PA image-provenance check (EU AI Act Art. 50), single-URL only, score-neutral; requires `ai-transparency` Cargo feature
+├── network/             # Opt-in, score-neutral, host-scoped network checks (#545)
+│   └── dns/             # DNS configuration: CAA, DNSSEC (best-effort), SPF/MX — once per unique host per run
 ├── ux/                  # UX analysis (5 dimensions, saturation curves)
 ├── journey/             # User journey analysis, page intent detection
 ├── screen_reader/       # Screen-reader reading-order primitives

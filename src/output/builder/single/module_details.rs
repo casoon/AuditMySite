@@ -2088,6 +2088,8 @@ pub(super) fn build_module_details_from_normalized(
     let ux = build_ux_details(normalized, i18n);
     let journey = build_journey_details(normalized, i18n);
 
+    let network_dns = normalized.raw_network_dns.cloned();
+
     let source_quality = normalized.raw_source_quality.cloned();
     let ai_visibility = normalized.raw_ai_visibility.cloned();
     let tech_stack = normalized.raw_tech_stack.cloned();
@@ -2105,6 +2107,7 @@ pub(super) fn build_module_details_from_normalized(
         || dark_mode.is_some()
         || design_quality.is_some()
         || ai_transparency.is_some()
+        || network_dns.is_some()
         || source_quality.is_some()
         || ai_visibility.is_some()
         || tech_stack.is_some()
@@ -2123,6 +2126,7 @@ pub(super) fn build_module_details_from_normalized(
         dark_mode,
         design_quality,
         ai_transparency,
+        network_dns,
         source_quality,
         ai_visibility,
         tech_stack,
@@ -2150,6 +2154,7 @@ pub(super) fn pdf_rendered_modules() -> std::collections::BTreeSet<&'static str>
         "dark_mode",
         "design_quality",
         "ai_transparency",
+        "network_dns",
         "source_quality",
         "ai_visibility",
         "tech_stack",

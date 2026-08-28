@@ -861,7 +861,16 @@ mod tests {
                 ),
             }],
             images_checked: 3,
-        });
+        })
+        .with_network_dns(crate::network::dns::build_analysis(
+            "example.com",
+            &crate::network::dns::DnsCheckResult {
+                caa_present: false,
+                dnssec_detected: true,
+                mx_present: true,
+                spf_present: false,
+            },
+        ));
         let sq = crate::source_quality::analyze_source_quality(&report);
         let av = crate::ai_visibility::analyze_ai_visibility(&report);
         report.discoverability.source_quality = Some(sq);

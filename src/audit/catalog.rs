@@ -42,6 +42,7 @@ impl AuditCatalog {
         use crate::design_quality::DesignQualityModule;
         use crate::journey::JourneyModule;
         use crate::mobile::MobileModule;
+        use crate::network::NetworkDnsModule;
         use crate::performance::PerformanceModule;
         use crate::security::SecurityModule;
         use crate::seo::SeoModule;
@@ -57,6 +58,7 @@ impl AuditCatalog {
             .with_module(Box::new(DarkModeModule))
             .with_module(Box::new(DesignQualityModule))
             .with_module(Box::new(AiTransparencyModule))
+            .with_module(Box::new(NetworkDnsModule))
             .with_module(Box::new(TechStackModule))
             .with_module(Box::new(UxModule))
             .with_module(Box::new(BestPracticesModule))
@@ -360,6 +362,7 @@ mod tests {
             "dark_mode",
             "design_quality",
             "ai_transparency",
+            "network_dns",
             "tech_stack",
             "ux",
             "best_practices",

@@ -271,6 +271,11 @@ pub struct UnifiedSummary {
     /// crawlers following `robots.txt` will not fetch.
     #[serde(skip_serializing_if = "Vec::is_empty")]
     pub robots_conflicts: Vec<crate::audit::RobotsSitemapConflict>,
+    /// Asset URLs served minified on some pages and unminified on others
+    /// (batch only, #537) — points at a build-config inconsistency between
+    /// templates/routes rather than an isolated per-page issue.
+    #[serde(skip_serializing_if = "Vec::is_empty")]
+    pub minification_inconsistencies: Vec<crate::output::report_model::MinificationInconsistency>,
     /// Site-wide commerce roll-up (batch only): union of mandatory/trust-page
     /// links across the audited shop pages.
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -587,6 +592,8 @@ pub struct ModuleBlob {
     pub design_quality: Option<serde_json::Value>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub ai_transparency: Option<serde_json::Value>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub network_dns: Option<serde_json::Value>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub source_quality: Option<serde_json::Value>,
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -972,6 +979,10 @@ impl UnifiedReport {
             orphan_sitemap_urls: presentation.portfolio_summary.orphan_sitemap_urls.clone(),
             linked_not_in_sitemap: presentation.portfolio_summary.linked_not_in_sitemap.clone(),
             robots_conflicts: presentation.portfolio_summary.robots_conflicts.clone(),
+            minification_inconsistencies: presentation
+                .portfolio_summary
+                .minification_inconsistencies
+                .clone(),
             commerce: crate::commerce::aggregate_site_commerce(
                 batch_report
                     .reports
@@ -1153,6 +1164,7 @@ impl UnifiedReport {
             orphan_sitemap_urls: Vec::new(),
             linked_not_in_sitemap: Vec::new(),
             robots_conflicts: Vec::new(),
+            minification_inconsistencies: Vec::new(),
             commerce: None,
         };
 
@@ -1245,6 +1257,7 @@ impl UnifiedReport {
             orphan_sitemap_urls: Vec::new(),
             linked_not_in_sitemap: Vec::new(),
             robots_conflicts: Vec::new(),
+            minification_inconsistencies: Vec::new(),
             commerce: None,
         };
 

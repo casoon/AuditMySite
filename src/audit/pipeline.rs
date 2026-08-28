@@ -180,6 +180,7 @@ pub struct SnapshotData {
     dark_mode: Option<DarkModeAnalysis>,
     design_quality: Option<DesignQualityAnalysis>,
     ai_transparency: Option<crate::ai_transparency::AiTransparencyAnalysis>,
+    network_dns: Option<crate::network::dns::NetworkDnsAnalysis>,
     tech_stack: Option<crate::tech_stack::TechStackAnalysis>,
     best_practices: Option<BestPracticesAnalysis>,
     module_runs: Vec<crate::audit::ModuleRun>,
@@ -233,6 +234,7 @@ impl SnapshotData {
             ModuleData::DarkMode(d) => self.dark_mode = Some(*d),
             ModuleData::DesignQuality(d) => self.design_quality = Some(*d),
             ModuleData::AiTransparency(a) => self.ai_transparency = Some(*a),
+            ModuleData::NetworkDns(d) => self.network_dns = Some(*d),
             ModuleData::TechStack(t) => self.tech_stack = Some(*t),
             ModuleData::BestPractices(b) => self.best_practices = Some(*b),
             ModuleData::SourceQuality(_)
@@ -276,6 +278,11 @@ pub struct PipelineConfig {
     /// feature to do anything (see `src/cli/runners.rs`'s early feature
     /// check).
     pub check_ai_transparency: bool,
+    /// Run the opt-in DNS-configuration check (CAA, DNSSEC, SPF/MX — #545).
+    /// Not part of `--full`. Host-scoped, not page-scoped: runs once per
+    /// unique host per process run regardless of how many pages are audited
+    /// (see `network::dns::module`'s per-host memoization).
+    pub check_dns: bool,
     /// Run tech stack detection and stack-specific audits
     pub check_stack: bool,
     /// `[rules] disabled`/`enabled_only` from `auditmysite.toml`, by axe_id.
@@ -337,14 +344,15 @@ impl PipelineConfig {
         // page-fit assessments, 10 for the report quality model, 11 for
         // page-stability provenance, 12 for the design_quality module field,
         // 13 for the ai_transparency module field, 14 for rule_filter (#560
-        // — disabled/enabled_only now actually change which findings run).
-        const CACHE_FMT: u8 = 14;
+        // — disabled/enabled_only now actually change which findings run),
+        // 15 for the network_dns module field (#545).
+        const CACHE_FMT: u8 = 15;
         let mut disabled = self.rule_filter.disabled_rules.clone();
         disabled.sort();
         let mut enabled_only = self.rule_filter.enabled_only_rules.clone();
         enabled_only.sort();
         format!(
-            "v={};fmt={};level={};perf={};seo={};sec={};mobile={};dark={};design_quality={};ai_transparency={};stack={};consent={};interactive={:?};journey_budget_ms={};lang={};disabled={};enabled_only={}",
+            "v={};fmt={};level={};perf={};seo={};sec={};mobile={};dark={};design_quality={};ai_transparency={};dns={};stack={};consent={};interactive={:?};journey_budget_ms={};lang={};disabled={};enabled_only={}",
             env!("CARGO_PKG_VERSION"),
             CACHE_FMT,
             self.wcag_level,
@@ -355,6 +363,7 @@ impl PipelineConfig {
             self.check_dark_mode as u8,
             self.check_design_quality as u8,
             self.check_ai_transparency as u8,
+            self.check_dns as u8,
             self.check_stack as u8,
             self.dismiss_consent as u8,
             self.interactive,
@@ -376,7 +385,7 @@ impl From<&Args> for PipelineConfig {
 impl PipelineConfig {
     /// Return a viewport-specific copy with the correct module on/off pattern.
     ///
-    /// Desktop: SEO, security, mobile and stack detection are off (run on mobile pass).
+    /// Desktop: SEO, security, mobile, DNS and stack detection are off (run on mobile pass).
     ///          Dark-mode analysis keeps the configured value.
     /// Mobile:  Security and dark-mode are off.  All other user flags are respected.
     pub fn for_viewport(&self, viewport: Viewport) -> Self {
@@ -387,6 +396,7 @@ impl PipelineConfig {
                 check_mobile: false,
                 check_design_quality: false,
                 check_ai_transparency: false,
+                check_dns: false,
                 check_stack: false,
                 ..self.clone()
             },
@@ -442,6 +452,7 @@ impl PipelineConfig {
             // discard the whole module blob per page (#256's per-page
             // detail is only ever `fix_guidance`/`en301549_annex`).
             check_ai_transparency: args.ai_transparency && args.url.is_some(),
+            check_dns: args.dns_check,
             check_stack: full_audit || args.stack,
             rule_filter,
             persist_artifacts: true,
@@ -802,6 +813,7 @@ pub async fn audit_page(
         dark_mode: desktop_snap.dark_mode.clone(), // taken from desktop pass
         design_quality: mobile_snap.design_quality.clone(),
         ai_transparency: mobile_snap.ai_transparency.clone(),
+        network_dns: mobile_snap.network_dns.clone(),
         tech_stack: mobile_snap.tech_stack.clone(),
         best_practices: mobile_snap.best_practices.clone(),
         module_runs: desktop_snap
@@ -1276,6 +1288,7 @@ async fn extract_snapshot(
         dark_mode: None,
         design_quality: None,
         ai_transparency: None,
+        network_dns: None,
         tech_stack: None,
         best_practices: None,
         module_runs: Vec::new(),
@@ -1586,6 +1599,9 @@ fn aggregate_report(
     }
     if let Some(ai_transparency) = snapshot.ai_transparency.clone() {
         report = report.with_ai_transparency(ai_transparency);
+    }
+    if let Some(network_dns) = snapshot.network_dns.clone() {
+        report = report.with_network_dns(network_dns);
     }
 
     if let Some(tech_stack) = snapshot.tech_stack.clone() {
@@ -2157,6 +2173,7 @@ mod tests {
             skip_mobile: false,
             design_quality: false,
             ai_transparency: false,
+            dns_check: false,
             stack: false,
             reuse_cache: false,
             force_refresh: false,
@@ -2243,6 +2260,7 @@ mod tests {
             check_dark_mode: true,
             check_design_quality: false,
             check_ai_transparency: false,
+            check_dns: false,
             check_stack: false,
             rule_filter: crate::wcag::RuleFilterConfig::default(),
             persist_artifacts: true,

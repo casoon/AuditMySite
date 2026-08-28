@@ -199,6 +199,11 @@ pub struct Args {
     #[arg(long)]
     pub ai_transparency: bool,
 
+    /// Enable the DNS-configuration check (CAA, DNSSEC, SPF/MX; opt-in,
+    /// score-neutral, #545). Runs once per unique host, not once per page.
+    #[arg(long)]
+    pub dns_check: bool,
+
     /// Attempt to dismiss cookie consent banners before auditing.
     ///
     /// Injects known CMP consent cookies before navigation and clicks
@@ -758,6 +763,7 @@ mod tests {
             skip_mobile: false,
             design_quality: false,
             ai_transparency: false,
+            dns_check: false,
             stack: false,
             reuse_cache: false,
             force_refresh: false,

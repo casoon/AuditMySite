@@ -20,6 +20,7 @@ mod dark_mode;
 mod design_quality;
 mod experience;
 mod indicators;
+mod network_dns;
 mod overview;
 mod performance;
 mod platform;
@@ -34,6 +35,7 @@ pub(super) use indicators::{
     render_ai_visibility, render_best_practices, render_content_visibility, render_source_quality,
     render_tech_stack,
 };
+pub(super) use network_dns::render_network_dns;
 pub(super) use overview::{render_budget_violations, render_search_experience};
 pub(super) use performance::render_performance;
 pub(super) use platform::{render_mobile, render_security};

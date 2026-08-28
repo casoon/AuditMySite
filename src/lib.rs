@@ -36,6 +36,7 @@
 //!         check_mobile: false,
 //!         check_dark_mode: false,
 //!         check_design_quality: false,
+//!         check_dns: false,
 //!         check_stack: false,
 //!         persist_artifacts: true,
 //!         capture_screenshots: false,
@@ -102,6 +103,7 @@ pub mod interaction;
 pub mod journey;
 pub mod lint;
 pub mod mobile;
+pub mod network;
 pub mod output;
 pub mod patterns;
 pub mod performance;

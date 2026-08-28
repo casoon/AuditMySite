@@ -441,6 +441,9 @@ pub fn build_batch_presentation_with_normalized(
     // Non-reciprocal hreflang relationships among audited pages
     let hreflang_issues = build_hreflang_issues(&batch.reports);
 
+    // Cross-page minification consistency (#537)
+    let minification_inconsistencies = build_minification_inconsistencies(&batch.reports);
+
     let (sitemap_http_issues, orphan_sitemap_urls, linked_not_in_sitemap, robots_conflicts) = batch
         .sitemap_diagnostics
         .as_ref()
@@ -791,6 +794,7 @@ pub fn build_batch_presentation_with_normalized(
             orphan_sitemap_urls,
             linked_not_in_sitemap,
             robots_conflicts,
+            minification_inconsistencies,
         },
         top_issues: top_issues.into_iter().take(10).collect(),
         issue_frequency,
@@ -1179,6 +1183,122 @@ fn build_hreflang_issues(reports: &[crate::audit::AuditReport]) -> Vec<HreflangI
             .cmp(&b.source_url)
             .then_with(|| a.target_url.cmp(&b.target_url))
     });
+    out
+}
+
+/// Cross-page minification consistency check (#537): the same asset URL
+/// served minified on some pages and unminified on others points at a
+/// build-config inconsistency (e.g. one template/content-collection route
+/// not going through the minifier) rather than an isolated per-page issue.
+/// This is purely a batch-level re-aggregation of `performance::minification`'s
+/// existing per-page "flagged unminified" signal — no new detection, and
+/// score-neutral (the per-page findings that already feed the performance
+/// score are untouched; this just re-groups them across pages).
+///
+/// An asset flagged unminified on a page (`MinificationAnalysis.unminified_*`)
+/// is presence-confirmed by construction — it was observed via
+/// `PerformanceResourceTiming`. The harder half is "present but NOT flagged
+/// unminified", i.e. proving the asset was actually loaded (and thus minified)
+/// on a page rather than simply absent there — the pipeline does not store a
+/// full per-page inventory of every loaded JS/CSS URL, so this reconstructs an
+/// approximate one from the two existing data sources that do carry a URL
+/// list: `CoverageAnalysis.unused_js.scripts` (near-complete script inventory
+/// whenever JS coverage collection ran — it records every script the V8
+/// profiler saw execute, not just render-blocking ones) and
+/// `RenderBlockingAnalysis.blocking_scripts`/`.blocking_css` (render-blocking
+/// resources only). For scripts this gives fairly reliable presence
+/// confirmation; for CSS it only catches render-blocking stylesheets — a
+/// lazily-loaded or media-gated stylesheet may be missed as "not present" even
+/// when it was actually loaded and minified there, which would simply mean
+/// that page is not counted rather than a wrong count. Full byte-content
+/// comparison is deliberately out of scope (#551).
+fn build_minification_inconsistencies(
+    reports: &[crate::audit::AuditReport],
+) -> Vec<MinificationInconsistency> {
+    use std::collections::HashSet;
+
+    #[derive(Default)]
+    struct Counts {
+        minified: usize,
+        unminified: usize,
+    }
+
+    let mut counts: HashMap<(String, &'static str), Counts> = HashMap::new();
+
+    for r in reports {
+        let Some(perf) = &r.performance else {
+            continue;
+        };
+        let Some(min) = &perf.minification else {
+            continue;
+        };
+
+        let unminified_scripts: HashSet<&str> = min
+            .unminified_scripts
+            .iter()
+            .map(|a| a.url.as_str())
+            .collect();
+        let unminified_styles: HashSet<&str> = min
+            .unminified_styles
+            .iter()
+            .map(|a| a.url.as_str())
+            .collect();
+
+        for url in &unminified_scripts {
+            counts
+                .entry((url.to_string(), "script"))
+                .or_default()
+                .unminified += 1;
+        }
+        for url in &unminified_styles {
+            counts
+                .entry((url.to_string(), "css"))
+                .or_default()
+                .unminified += 1;
+        }
+
+        // Presence inventory for "loaded but NOT flagged unminified" — see
+        // the doc comment above for the data-source limitation.
+        let mut known_scripts: HashSet<&str> = HashSet::new();
+        let mut known_styles: HashSet<&str> = HashSet::new();
+        if let Some(coverage) = &perf.coverage {
+            known_scripts.extend(coverage.unused_js.scripts.iter().map(|s| s.url.as_str()));
+        }
+        if let Some(rb) = &perf.render_blocking {
+            known_scripts.extend(rb.blocking_scripts.iter().map(|res| res.url.as_str()));
+            known_styles.extend(rb.blocking_css.iter().map(|res| res.url.as_str()));
+        }
+
+        for url in known_scripts.difference(&unminified_scripts) {
+            counts
+                .entry((url.to_string(), "script"))
+                .or_default()
+                .minified += 1;
+        }
+        for url in known_styles.difference(&unminified_styles) {
+            counts.entry((url.to_string(), "css")).or_default().minified += 1;
+        }
+    }
+
+    let mut out: Vec<MinificationInconsistency> = counts
+        .into_iter()
+        .filter(|(_, c)| c.minified > 0 && c.unminified > 0)
+        .map(|((url, kind), c)| MinificationInconsistency {
+            url,
+            kind: kind.to_string(),
+            minified_on_count: c.minified,
+            unminified_on_count: c.unminified,
+            total_pages_with_asset: c.minified + c.unminified,
+        })
+        .collect();
+
+    // Deterministic order: worst inconsistency first, then by url.
+    out.sort_by(|a, b| {
+        b.unminified_on_count
+            .cmp(&a.unminified_on_count)
+            .then_with(|| a.url.cmp(&b.url))
+    });
+    out.truncate(30);
     out
 }
 
@@ -1784,5 +1904,185 @@ mod duplicate_content_tests {
                 "EN distribution insight must not contain German characters: {text}"
             );
         }
+    }
+}
+
+#[cfg(test)]
+mod minification_inconsistency_tests {
+    use super::*;
+    use crate::audit::AuditReport;
+    use crate::cli::WcagLevel;
+    use crate::performance::{
+        CoverageAnalysis, MinificationAnalysis, PerformanceScore, RenderBlockingAnalysis,
+        ScriptCoverageEntry, UnminifiedAsset, UnusedCssAnalysis, UnusedJsAnalysis, WebVitals,
+    };
+    use crate::wcag::WcagResults;
+
+    fn perf_score() -> PerformanceScore {
+        PerformanceScore {
+            overall: 80,
+            grade: crate::performance::PerformanceGrade::Gold,
+            lcp_score: None,
+            fcp_score: None,
+            cls_score: None,
+            interactivity_score: None,
+            si_score: None,
+            metrics_available: 0,
+            size_penalty: None,
+            js_penalty: None,
+            request_penalty: None,
+            dom_penalty: None,
+            is_capped: None,
+        }
+    }
+
+    fn coverage_with_scripts(urls: &[&str]) -> CoverageAnalysis {
+        CoverageAnalysis {
+            unused_js: UnusedJsAnalysis {
+                scripts: urls
+                    .iter()
+                    .map(|u| ScriptCoverageEntry {
+                        url: u.to_string(),
+                        total_bytes: 1000,
+                        unused_bytes: 0,
+                        used_pct: 100.0,
+                    })
+                    .collect(),
+                total_bytes: 1000,
+                unused_bytes: 0,
+                used_pct: 100.0,
+            },
+            unused_css: UnusedCssAnalysis {
+                total_rules: 0,
+                used_rules: 0,
+                used_pct: None,
+                measurement: "not_available".to_string(),
+            },
+            measurement_warnings: vec![],
+        }
+    }
+
+    fn minification(
+        unminified_scripts: &[&str],
+        unminified_styles: &[&str],
+    ) -> MinificationAnalysis {
+        let scripts: Vec<UnminifiedAsset> = unminified_scripts
+            .iter()
+            .map(|u| UnminifiedAsset {
+                url: u.to_string(),
+                kind: "script".to_string(),
+                decoded_bytes: 100_000,
+                transfer_bytes: 20_000,
+                savings_bytes: 66_000,
+            })
+            .collect();
+        let styles: Vec<UnminifiedAsset> = unminified_styles
+            .iter()
+            .map(|u| UnminifiedAsset {
+                url: u.to_string(),
+                kind: "css".to_string(),
+                decoded_bytes: 100_000,
+                transfer_bytes: 20_000,
+                savings_bytes: 66_000,
+            })
+            .collect();
+        let total_unminified_count = (scripts.len() + styles.len()) as u32;
+        MinificationAnalysis {
+            unminified_scripts: scripts,
+            unminified_styles: styles,
+            total_savings_bytes: 0,
+            total_unminified_count,
+            legacy_scripts: vec![],
+            total_legacy_wasted_bytes: 0,
+        }
+    }
+
+    fn report_with_perf(
+        url: &str,
+        unminified_scripts: &[&str],
+        unminified_styles: &[&str],
+        known_scripts: &[&str],
+    ) -> AuditReport {
+        AuditReport::new(url.to_string(), WcagLevel::AA, WcagResults::new(), 100).with_performance(
+            crate::audit::PerformanceResults {
+                vitals: WebVitals::default(),
+                score: perf_score(),
+                render_blocking: Some(RenderBlockingAnalysis {
+                    blocking_scripts: vec![],
+                    blocking_css: vec![],
+                    blocking_transfer_bytes: 0,
+                    first_party_bytes: 0,
+                    third_party_bytes: 0,
+                    third_party_origin_count: 0,
+                    suggestions: vec![],
+                }),
+                content_weight: None,
+                third_party: None,
+                critical_chain: None,
+                minification: Some(minification(unminified_scripts, unminified_styles)),
+                animations: None,
+                coverage: Some(coverage_with_scripts(known_scripts)),
+                measurement_warnings: vec![],
+            },
+        )
+    }
+
+    #[test]
+    fn flags_asset_unminified_on_one_page_and_minified_on_another() {
+        let shared = "https://x.test/assets/app.js";
+        let reports = vec![
+            // Unminified on page A; coverage confirms it also loaded there.
+            report_with_perf("https://x.test/a", &[shared], &[], &[shared]),
+            // Same URL present (per coverage) but NOT flagged unminified on B.
+            report_with_perf("https://x.test/b", &[], &[], &[shared]),
+        ];
+
+        let inconsistencies = build_minification_inconsistencies(&reports);
+
+        let entry = inconsistencies
+            .iter()
+            .find(|i| i.url == shared)
+            .expect("expected inconsistency entry for shared script");
+        assert_eq!(entry.kind, "script");
+        assert_eq!(entry.unminified_on_count, 1);
+        assert_eq!(entry.minified_on_count, 1);
+        assert_eq!(entry.total_pages_with_asset, 2);
+    }
+
+    #[test]
+    fn does_not_flag_asset_unminified_on_every_page_it_appears_on() {
+        let shared = "https://x.test/assets/legacy.js";
+        let reports = vec![
+            report_with_perf("https://x.test/a", &[shared], &[], &[shared]),
+            report_with_perf("https://x.test/b", &[shared], &[], &[shared]),
+        ];
+
+        let inconsistencies = build_minification_inconsistencies(&reports);
+
+        assert!(
+            !inconsistencies.iter().any(|i| i.url == shared),
+            "consistently-unminified asset must not be reported as an inconsistency"
+        );
+    }
+
+    #[test]
+    fn does_not_flag_asset_that_never_appears_unminified() {
+        let shared = "https://x.test/assets/clean.js";
+        let reports = vec![
+            report_with_perf("https://x.test/a", &[], &[], &[shared]),
+            report_with_perf("https://x.test/b", &[], &[], &[shared]),
+        ];
+
+        let inconsistencies = build_minification_inconsistencies(&reports);
+
+        assert!(
+            !inconsistencies.iter().any(|i| i.url == shared),
+            "asset never flagged unminified must not be reported"
+        );
+    }
+
+    #[test]
+    fn empty_input_yields_empty_output() {
+        assert!(build_minification_inconsistencies(&[]).is_empty());
     }
 }

@@ -18,7 +18,7 @@ use super::appendix::build_cli_snapshot_table;
 use super::detail_modules::{
     render_a11y_journey_findings, render_ai_transparency, render_ai_visibility,
     render_best_practices, render_budget_violations, render_content_visibility, render_dark_mode,
-    render_design_quality, render_journey, render_mobile, render_performance,
+    render_design_quality, render_journey, render_mobile, render_network_dns, render_performance,
     render_screen_reader_section, render_search_experience, render_security, render_seo,
     render_source_quality, render_tech_stack, render_ux,
 };
@@ -1411,6 +1411,11 @@ fn render_active_module_section(
         "ai_transparency" => {
             if let Some(ref at) = vm.module_details.ai_transparency {
                 return (render_ai_transparency(builder, at, is_first, i18n), true);
+            }
+        }
+        "network_dns" => {
+            if let Some(ref dns) = vm.module_details.network_dns {
+                return (render_network_dns(builder, dns, is_first, i18n), true);
             }
         }
         "source_quality" => {

@@ -309,6 +309,12 @@ pub struct ExperienceSection {
     /// grade, or certificate.
     #[serde(skip_serializing_if = "Option::is_none", default)]
     pub ai_transparency: Option<crate::ai_transparency::AiTransparencyAnalysis>,
+    /// Opt-in DNS-configuration check (CAA, DNSSEC, SPF/MX — #545, optional).
+    /// Host-scoped rather than page-scoped (see `network::dns::module`), but
+    /// still attached per-page here like the other opt-in modules. Never
+    /// affects accessibility/overall score, grade, or certificate.
+    #[serde(skip_serializing_if = "Option::is_none", default)]
+    pub network_dns: Option<crate::network::dns::NetworkDnsAnalysis>,
     /// Budget violations detected for this page
     #[serde(skip_serializing_if = "Vec::is_empty", default)]
     pub budget_violations: Vec<crate::audit::budget::BudgetViolation>,
@@ -597,6 +603,15 @@ impl AuditReport {
         ai_transparency: crate::ai_transparency::AiTransparencyAnalysis,
     ) -> Self {
         self.experience.ai_transparency = Some(ai_transparency);
+        self
+    }
+
+    /// Set DNS-configuration check results (#545)
+    pub fn with_network_dns(
+        mut self,
+        network_dns: crate::network::dns::NetworkDnsAnalysis,
+    ) -> Self {
+        self.experience.network_dns = Some(network_dns);
         self
     }
 
