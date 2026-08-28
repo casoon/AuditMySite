@@ -263,6 +263,11 @@ pub struct ModulesBlock {
 pub struct ModuleScore {
     pub name: String,
     pub score: u32,
+    /// Free-form convention shared with `audit::normalized::ModuleScoreEntry`:
+    /// `"measured"`, `"composite"`, `"heuristic"`, `"optional"`,
+    /// `"not_measured"`, or a module-specific detection method
+    /// (`"c2pa_manifest"`, `"dns_query"`). See [`ModuleTaxonomyClass`] for the
+    /// coarse classification derived from this value.
     pub measurement_type: String,
     pub interpretation: String,
     pub card_context: String,
@@ -270,6 +275,127 @@ pub struct ModuleScore {
     pub key_lever: String,
     pub good_threshold: u32,
     pub warn_threshold: u32,
+}
+
+/// Coarse taxonomy for how a module's 0–100 score was derived (#577).
+///
+/// The report mixes genuinely different kinds of measurement in one score
+/// grid — WCAG compliance findings, directly measured metrics, a
+/// presentation-level composite, heuristic estimates, and optional/
+/// non-normative product features. This taxonomy makes that distinction
+/// explicit so render surfaces can qualify non-normative scores instead of
+/// presenting them with the same visual weight as a compliance/measured one.
+///
+/// Deliberately a derivation over the existing `measurement_type` string
+/// rather than a replacement of that field's type: `measurement_type` has
+/// ~30 read/write sites across `audit::normalized`, the PDF builder, and
+/// JSON tests. Widening its string convention with one new value
+/// (`"optional"`) plus this pure classifier is additive; migrating every
+/// call site to a typed field is a disproportionate refactor for this scope.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum ModuleTaxonomyClass {
+    /// WCAG/legal conformance signal. Accessibility only.
+    Compliance,
+    /// Directly measured/counted signal (Performance, Security, Mobile, SEO,
+    /// Best Practices — all currently stored as `measurement_type: "measured"`).
+    Measured,
+    /// Presentation-level blend of measured and heuristic sub-signals (the
+    /// `search_experience` roll-up, which mixes technical SEO with UX/AI-
+    /// visibility-style estimates — neither purely measured nor purely
+    /// heuristic).
+    Composite,
+    /// Automated estimate, not a hard measurement (UX, Journey, AI
+    /// Visibility, Source Quality, Content Visibility).
+    Heuristic,
+    /// Optional/non-normative product feature — its absence is a product
+    /// choice, not a compliance deficiency (Dark Mode).
+    Optional,
+}
+
+impl ModuleTaxonomyClass {
+    /// Classifies a `measurement_type` string as stored on `ModuleScore` /
+    /// `audit::normalized::ModuleScoreEntry`. `module_name` disambiguates
+    /// Accessibility from the other `"measured"` modules, since
+    /// `measurement_type` alone cannot distinguish Compliance from Measured.
+    /// Any other detection-method value (`"not_measured"`, `"c2pa_manifest"`,
+    /// `"dns_query"`, …) falls back to `Measured` — all are directly
+    /// observed signals, not heuristic estimates.
+    pub fn from_measurement_type(measurement_type: &str, module_name: &str) -> Self {
+        match measurement_type {
+            "heuristic" => ModuleTaxonomyClass::Heuristic,
+            "optional" => ModuleTaxonomyClass::Optional,
+            "composite" => ModuleTaxonomyClass::Composite,
+            _ if module_name.eq_ignore_ascii_case("Accessibility") => {
+                ModuleTaxonomyClass::Compliance
+            }
+            _ => ModuleTaxonomyClass::Measured,
+        }
+    }
+
+    /// Whether this class should carry a non-normative name-suffix qualifier
+    /// on render surfaces that otherwise give a module the same visual
+    /// weight as a Compliance/Measured module (cover gauges, dashboard
+    /// cards, technical modules overview).
+    pub fn needs_suffix_qualifier(self) -> bool {
+        matches!(
+            self,
+            ModuleTaxonomyClass::Heuristic | ModuleTaxonomyClass::Optional
+        )
+    }
+}
+
+#[cfg(test)]
+mod taxonomy_tests {
+    use super::ModuleTaxonomyClass;
+
+    #[test]
+    fn classifies_accessibility_as_compliance() {
+        assert_eq!(
+            ModuleTaxonomyClass::from_measurement_type("measured", "Accessibility"),
+            ModuleTaxonomyClass::Compliance
+        );
+    }
+
+    #[test]
+    fn classifies_performance_as_measured() {
+        assert_eq!(
+            ModuleTaxonomyClass::from_measurement_type("measured", "Performance"),
+            ModuleTaxonomyClass::Measured
+        );
+    }
+
+    #[test]
+    fn classifies_ux_as_heuristic() {
+        assert_eq!(
+            ModuleTaxonomyClass::from_measurement_type("heuristic", "UX"),
+            ModuleTaxonomyClass::Heuristic
+        );
+    }
+
+    #[test]
+    fn classifies_dark_mode_as_optional() {
+        assert_eq!(
+            ModuleTaxonomyClass::from_measurement_type("optional", "Dark Mode"),
+            ModuleTaxonomyClass::Optional
+        );
+    }
+
+    #[test]
+    fn classifies_search_experience_as_composite() {
+        assert_eq!(
+            ModuleTaxonomyClass::from_measurement_type("composite", "Search Experience"),
+            ModuleTaxonomyClass::Composite
+        );
+    }
+
+    #[test]
+    fn only_heuristic_and_optional_need_a_suffix_qualifier() {
+        assert!(ModuleTaxonomyClass::Heuristic.needs_suffix_qualifier());
+        assert!(ModuleTaxonomyClass::Optional.needs_suffix_qualifier());
+        assert!(!ModuleTaxonomyClass::Compliance.needs_suffix_qualifier());
+        assert!(!ModuleTaxonomyClass::Measured.needs_suffix_qualifier());
+        assert!(!ModuleTaxonomyClass::Composite.needs_suffix_qualifier());
+    }
 }
 
 /// Pre-computed severity breakdown

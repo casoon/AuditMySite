@@ -110,7 +110,14 @@ fn build_single_report(
         .modules
         .dashboard
         .iter()
-        .map(|m| CoverModuleGauge::new(m.name.clone(), m.score))
+        .map(|m| {
+            let name = self::helpers::module_name_with_taxonomy_suffix(
+                &m.name,
+                &m.measurement_type,
+                &i18n,
+            );
+            CoverModuleGauge::new(name, m.score)
+        })
         .collect();
     let (score_lbl, find_lbl, mod_lbl, crit_lbl, no_crit) = if en {
         (

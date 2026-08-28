@@ -118,10 +118,16 @@ fn build_severity_counter_strip(vm: &ReportViewModel, i18n: &I18n) -> MetricStri
 }
 
 /// Build a dashboard card for one module, aligned with the report's grade bands
-/// (good ≥ 75, watch 40–74, problem < 40).
-fn module_dashboard_card(module: &ModuleScore) -> DashboardCard {
+/// (good ≥ 75, watch 40–74, problem < 40). Carries the same non-normative
+/// name-suffix qualifier as the cover gauges and the technical modules
+/// overview for Heuristic/Optional-tier modules (#577).
+fn module_dashboard_card(module: &ModuleScore, i18n: &I18n) -> DashboardCard {
     DashboardCard {
-        name: module.name.clone(),
+        name: super::helpers::module_name_with_taxonomy_suffix(
+            &module.name,
+            &module.measurement_type,
+            i18n,
+        ),
         score: module.score,
         interpretation: if module.interpretation.is_empty() {
             format!("{}/100", module.score)
@@ -147,14 +153,14 @@ fn render_module_split_dashboards(
         .dashboard
         .iter()
         .filter(|m| m.score >= 75)
-        .map(module_dashboard_card)
+        .map(|m| module_dashboard_card(m, i18n))
         .collect();
     let weak: Vec<DashboardCard> = vm
         .modules
         .dashboard
         .iter()
         .filter(|m| m.score < 75)
-        .map(module_dashboard_card)
+        .map(|m| module_dashboard_card(m, i18n))
         .collect();
 
     if !strong.is_empty() {
@@ -654,16 +660,11 @@ pub(super) fn render_tech_details(
                 } else {
                     "bad"
                 };
-                let display_name = if module.measurement_type == "heuristic" {
-                    let suffix = if i18n.locale() == "en" {
-                        "Indicator"
-                    } else {
-                        "Indikator"
-                    };
-                    format!("{} ({suffix})", module.name)
-                } else {
-                    module.name.clone()
-                };
+                let display_name = super::helpers::module_name_with_taxonomy_suffix(
+                    &module.name,
+                    &module.measurement_type,
+                    i18n,
+                );
                 DiagnosisRow::new(&display_name, format!("{}/100", module.score))
                     .with_status(status)
             })

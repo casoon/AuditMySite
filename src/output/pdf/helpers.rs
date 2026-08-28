@@ -106,6 +106,38 @@ pub(super) fn score_quality_color(score: u32) -> &'static str {
     }
 }
 
+/// Appends a non-normative qualifier to a module's display name wherever it
+/// renders with the same visual weight as a Compliance/Measured module
+/// (cover gauges, dashboard cards, technical modules overview). Single
+/// shared implementation of the "(Indikator)"/"(Indicator)" suffix that
+/// previously only covered the technical modules overview panel — extended
+/// here to also cover Optional-tier modules (e.g. Dark Mode) and reused
+/// across every render surface instead of being re-implemented per call
+/// site (#577).
+pub(super) fn module_name_with_taxonomy_suffix(
+    name: &str,
+    measurement_type: &str,
+    i18n: &I18n,
+) -> String {
+    use crate::output::report_model::ModuleTaxonomyClass;
+    let class = ModuleTaxonomyClass::from_measurement_type(measurement_type, name);
+    if !class.needs_suffix_qualifier() {
+        return name.to_string();
+    }
+    let en = i18n.locale() == "en";
+    let suffix = match class {
+        ModuleTaxonomyClass::Optional => "Optional",
+        _ => {
+            if en {
+                "Indicator"
+            } else {
+                "Indikator"
+            }
+        }
+    };
+    format!("{name} ({suffix})")
+}
+
 #[cfg(test)]
 mod tests {
     use super::create_engine;
@@ -134,5 +166,50 @@ mod tests {
 
         assert!(template.contains("align: bottom + left"));
         assert!(!template.contains("pad(top: 3pt)"));
+    }
+
+    #[test]
+    fn taxonomy_suffix_leaves_compliance_and_measured_names_untouched() {
+        let de = crate::i18n::I18n::new("de").expect("i18n");
+        assert_eq!(
+            super::module_name_with_taxonomy_suffix("Accessibility", "measured", &de),
+            "Accessibility"
+        );
+        assert_eq!(
+            super::module_name_with_taxonomy_suffix("Performance", "measured", &de),
+            "Performance"
+        );
+        assert_eq!(
+            super::module_name_with_taxonomy_suffix("Search Experience", "composite", &de),
+            "Search Experience"
+        );
+    }
+
+    #[test]
+    fn taxonomy_suffix_marks_heuristic_modules_as_indicator() {
+        let de = crate::i18n::I18n::new("de").expect("i18n");
+        let en = crate::i18n::I18n::new("en").expect("i18n");
+        assert_eq!(
+            super::module_name_with_taxonomy_suffix("UX", "heuristic", &de),
+            "UX (Indikator)"
+        );
+        assert_eq!(
+            super::module_name_with_taxonomy_suffix("UX", "heuristic", &en),
+            "UX (Indicator)"
+        );
+    }
+
+    #[test]
+    fn taxonomy_suffix_marks_optional_modules_as_optional() {
+        let de = crate::i18n::I18n::new("de").expect("i18n");
+        let en = crate::i18n::I18n::new("en").expect("i18n");
+        assert_eq!(
+            super::module_name_with_taxonomy_suffix("Dark Mode", "optional", &de),
+            "Dark Mode (Optional)"
+        );
+        assert_eq!(
+            super::module_name_with_taxonomy_suffix("Dark Mode", "optional", &en),
+            "Dark Mode (Optional)"
+        );
     }
 }

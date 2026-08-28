@@ -264,9 +264,12 @@ pub(super) fn build_detail(ctx: &AuditContext<'_>, detail_ctx: DetailContext) ->
         journey: ctx
             .raw_journey
             .map(|m| with_normalized_score(m.to_json(), normalized, "Journey")),
+        // Dark Mode is an optional/non-normative product feature, not a WCAG
+        // conformance criterion — distinct from the other indicator modules
+        // below, which are heuristic estimates (#577).
         dark_mode: ctx
             .raw_dark_mode
-            .map(|m| inject_grade(m.to_json(), m.score)),
+            .map(|m| with_measurement_type(inject_grade(m.to_json(), m.score), "optional")),
         design_quality: ctx
             .raw_design_quality
             .map(|m| with_measurement_type(m.to_json(), "heuristic")),

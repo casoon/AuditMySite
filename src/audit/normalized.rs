@@ -385,6 +385,10 @@ pub struct ModuleScoreEntry {
     /// but not part of the core weighted average.
     pub contributes_to_overall: bool,
     /// Whether this module uses direct measurement or heuristic inference.
+    /// One of `"measured"`, `"composite"`, `"heuristic"`, `"optional"`,
+    /// `"not_measured"`, `"c2pa_manifest"`, `"dns_query"`. See
+    /// `output::report_model::ModuleTaxonomyClass` for the coarse
+    /// classification derived from this value (#577).
     pub measurement_type: String,
 }
 
@@ -2275,7 +2279,10 @@ fn build_module_scores(
         });
     };
     if let Some(ref dm) = report.experience.dark_mode {
-        push_indicator("Dark Mode", dm.score, "measured");
+        // Dark Mode is an optional/non-normative product feature, not a WCAG
+        // conformance criterion — distinct from the other `push_indicator`
+        // calls below, which classify as "heuristic" (#577).
+        push_indicator("Dark Mode", dm.score, "optional");
     }
     if let Some(ref ai) = report.discoverability.ai_visibility {
         push_indicator("AI Visibility", ai.score, "heuristic");

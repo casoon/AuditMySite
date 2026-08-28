@@ -303,6 +303,9 @@ batch-panel-module-averages = Module averages (avg. across all URLs)
 # Heuristic indicator (shared by UX, Journey, AI Visibility)
 label-heuristic-indicator = Heuristic estimate based on structural signals
 
+# Optional/non-normative feature (Dark Mode, #577)
+label-optional-feature = Optional feature
+
 # Performance section
 perf-score-card = Performance score
 perf-technical-indicators = Supporting measurements
@@ -730,6 +733,7 @@ pdf-journey-detected-page-type = Detected page type
 pdf-journey-more-issues = { $count } additional issues in the detailed appendix.
 pdf-dm-status-supported = Supported
 pdf-dm-status-not-supported = Not supported
+pdf-dm-optional-note = Dark mode is an optional product feature, not a WCAG conformance criterion — the score on the left describes the detected implementation depth, not a pass/fail assessment.
 pdf-dm-score-title = Dark mode score
 pdf-dm-methods = Methods
 pdf-dm-css-variables = CSS variables

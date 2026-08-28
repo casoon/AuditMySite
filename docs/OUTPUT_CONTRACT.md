@@ -15,7 +15,8 @@
 - Every `report.module_scores[]` entry includes `measurement_type`.
 - `measurement_type = "measured"` means the score is based on direct audit data such as WCAG checks, CDP metrics, HTTP headers, or mobile viewport measurements.
 - `measurement_type = "heuristic"` means the score is an indicator inferred from structural signals. These values are report guidance, not direct measurements.
-- Heuristic top-level module payloads such as `source_quality`, `ai_visibility`, and `content_visibility` include `measurement_type = "heuristic"` when present.
+- `measurement_type = "optional"` means the module scores an optional, non-normative product feature (currently: Dark Mode) — a low score reflects the absence of that feature, not a compliance deficiency. It does not contribute to `overall_score`.
+- Heuristic top-level module payloads such as `source_quality`, `ai_visibility`, and `content_visibility` include `measurement_type = "heuristic"` when present. The `dark_mode` module payload includes `measurement_type = "optional"` when present.
 
 ## Score and Count Semantics
 

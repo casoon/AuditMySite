@@ -21,8 +21,21 @@ pub(in crate::output::pdf) fn render_dark_mode(
     builder = super::module_chapter_opener(builder, &dm_title, dm_takeaway, is_first);
     builder = builder.add_component(
         ScoreCard::new(super::module_score_caption(i18n), dm.score)
-            .with_description(super::score_band_label(dm.score, i18n))
-            .with_thresholds(75, 40),
+            // Dark Mode is an optional product feature, not a WCAG
+            // conformance criterion (#577) — unlike every other module's
+            // ScoreCard, this one deliberately does NOT use
+            // `score_band_label`'s Excellent/Good/…/Critical compliance
+            // language, and the thresholds are capped so a low score never
+            // reaches the "Bad" (red/critical) status a real compliance
+            // deficiency would. The number itself still reflects the
+            // detected implementation depth.
+            .with_description(i18n.t("label-optional-feature"))
+            .with_thresholds(50, 0),
+    );
+    builder = builder.add_component(
+        Label::new(i18n.t("pdf-dm-optional-note"))
+            .with_size("10.5pt")
+            .with_color(crate::output::pdf::design::tokens::NEUTRAL),
     );
 
     builder = builder.add_component(
