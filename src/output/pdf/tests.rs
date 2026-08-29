@@ -181,6 +181,102 @@ mod tests {
         }
     }
 
+    /// Build a report where a single WCAG A/AA rule recurs `count` times on
+    /// the one audited page — enough to cross the `occurrence_count >= 10`
+    /// threshold that promotes a finding into the "systemic"
+    /// (`is_component_issue`) category
+    /// (`src/output/builder/single/findings.rs`).
+    fn pdf_fixture_report_with_repeated_rule(count: usize) -> AuditReport {
+        let mut results = WcagResults::new();
+        for idx in 0..count {
+            results.add_violation(
+                Violation::new(
+                    "4.1.2",
+                    "Name, Role, Value",
+                    WcagLevel::AA,
+                    Severity::High,
+                    format!("Button {idx} has no accessible name"),
+                    format!("node-{idx}"),
+                )
+                .with_selector(format!("#item-{idx}"))
+                .with_fix("Add an accessible name"),
+            );
+        }
+        AuditReport::new(
+            "https://example.com".to_string(),
+            WcagLevel::AA,
+            results,
+            1_500,
+        )
+    }
+
+    /// #575: single-report "systemic" finding-category text must not assert
+    /// unverified cross-page coverage ("resolves the issue ... across all
+    /// pages") — a single-URL audit never observed any other page. It must
+    /// instead read as an explicit hypothesis pending evidence from
+    /// additional pages.
+    #[test]
+    fn test_systemic_finding_category_text_is_hypothesis_not_domain_wide_assertion() {
+        let report = pdf_fixture_report_with_repeated_rule(12);
+
+        for (locale, unqualified_claim, hypothesis_marker) in [
+            (
+                "de",
+                "auf allen betroffenen Seiten",
+                "Belegen von weiteren Seiten",
+            ),
+            ("en", "across all pages", "evidence from additional pages"),
+        ] {
+            let typ = generate_typ(
+                &report,
+                &ReportConfig {
+                    level: ReportLevel::Standard,
+                    locale: locale.to_string(),
+                    ..ReportConfig::default()
+                },
+            )
+            .expect("Typst source should render");
+
+            assert!(
+                !typ.contains(unqualified_claim),
+                "[{locale}] unqualified domain-wide claim {unqualified_claim:?} should not appear in Typst source"
+            );
+            assert!(
+                typ.contains(hypothesis_marker),
+                "[{locale}] expected hypothesis-framing marker {hypothesis_marker:?} in Typst source"
+            );
+        }
+    }
+
+    /// #575: the management-summary page must state the audit's actual scope
+    /// (exactly one URL, both viewports, no site-wide crawl) up front, so the
+    /// page-scoped language used elsewhere in the report can't be misread as
+    /// a domain-wide claim.
+    #[test]
+    fn test_management_summary_scope_line_states_single_url_no_crawl() {
+        let report = pdf_fixture_report();
+
+        let de =
+            generate_typ(&report, &ReportConfig::default()).expect("DE Typst source should render");
+        assert!(
+            de.contains("Geprüft: 1 URL · Desktop und Mobile · kein Website-Crawl"),
+            "expected DE scope line in Typst source"
+        );
+
+        let en = generate_typ(
+            &report,
+            &ReportConfig {
+                locale: "en".to_string(),
+                ..ReportConfig::default()
+            },
+        )
+        .expect("EN Typst source should render");
+        assert!(
+            en.contains("Audited: 1 URL · Desktop and Mobile · no website crawl"),
+            "expected EN scope line in Typst source"
+        );
+    }
+
     /// Regression test for the tech-stack findings-severity localization fix
     /// in `detail_modules/indicators.rs::render_tech_stack` — the severity
     /// column used to call `finding.severity.label()` unconditionally, always

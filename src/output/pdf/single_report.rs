@@ -552,6 +552,24 @@ pub(super) fn render_management_page(
             .with_level(1),
     );
 
+    // Scope line (#575): this report only ever covers exactly one audited
+    // URL, checked with both desktop and mobile viewports (the pipeline
+    // always runs both — see `pipeline.rs`'s unconditional dual-viewport
+    // pass), and never crawls the rest of the site. Stated explicitly and
+    // prominently up front so findings/recommendations phrased around
+    // "the audited page" further down aren't misread as domain-wide claims.
+    let scope_line = if en {
+        "Audited: 1 URL · Desktop and Mobile · no website crawl".to_string()
+    } else {
+        "Geprüft: 1 URL · Desktop und Mobile · kein Website-Crawl".to_string()
+    };
+    builder = builder.add_component(
+        Label::new(scope_line)
+            .with_size("10.5pt")
+            .bold()
+            .with_color(design::tokens::NEUTRAL),
+    );
+
     // 1. Scannable severity counters — the 20-second top line
     builder = builder.add_component(build_severity_counter_strip(vm, i18n));
     // Short definition right at first use, so a reader doesn't have to reach
@@ -1080,9 +1098,9 @@ fn render_findings_section(
                 "Systemische Template- & Komponentenfehler (WCAG A/AA)"
             };
             let desc = if en {
-                "These findings affect recurring templates or component structures. A central template fix will automatically resolve these issues across all pages."
+                "This pattern suggests a reused component or template — confirming that requires evidence from additional pages. A central fix would likely also resolve the cause on other pages sharing the same pattern."
             } else {
-                "Diese Befunde betreffen wiederkehrende Template- oder Komponentenfehler. Eine zentrale Behebung in der Vorlage behebt die Fehler auf allen betroffenen Seiten gleichzeitig."
+                "Dieses Muster deutet auf eine wiederverwendete Komponente oder Vorlage hin — bestätigt ist das erst mit Belegen von weiteren Seiten. Eine zentrale Behebung würde die Ursache voraussichtlich auch auf anderen Seiten mit demselben Muster beheben."
             };
             if rendered_categories > 0 {
                 builder = builder.add_component(PageBreak::new());
@@ -1117,9 +1135,9 @@ fn render_findings_section(
                 "Systemische Qualitäts- & SEO-Optimierungen"
             };
             let desc = if en {
-                "Recurring quality and search engine discoverability recommendations at the template level."
+                "These recommendations recur within this single page, which suggests a shared template — confirming that would require checking additional pages."
             } else {
-                "Wiederkehrende Empfehlungen zur Qualitätsverbesserung und Suchmaschinen-Auffindbarkeit im Template."
+                "Diese Empfehlungen wiederholen sich innerhalb dieser einen Seite, was auf eine gemeinsame Vorlage hindeutet — bestätigt ist das erst nach Prüfung weiterer Seiten."
             };
             if rendered_categories > 0 {
                 builder = builder.add_component(PageBreak::new());

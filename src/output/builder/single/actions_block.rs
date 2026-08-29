@@ -130,15 +130,20 @@ pub(super) fn build_actions_block(
         .cloned()
         .collect();
 
+    // #575: this report audits exactly one page, so "affects all pages" is
+    // never something the tool actually observed — reworded from an
+    // assertion into a hypothesis, with an explicit verification task
+    // attached (only these systemic/component-issue actions carry this
+    // ambiguity; local actions below don't).
     let (systemic_label, systemic_desc) = if en {
         (
             "Systemic actions",
-            "Fix once in the template or component — this resolves the issue across all affected pages.",
+            "Fix once in the template or component — the pattern suggests other pages using it are affected too. Note: verify on additional page types whether the same pattern also occurs there.",
         )
     } else {
         (
             "Systemische Maßnahmen",
-            "Einmal in Vorlage oder Komponente beheben — wirkt auf allen betroffenen Seiten zugleich.",
+            "Einmal in Vorlage oder Komponente beheben — das Muster deutet darauf hin, dass auch andere Seiten mit dieser Komponente betroffen sind. Hinweis: auf weiteren Seitentypen gegenprüfen, ob dasselbe Muster dort ebenfalls auftritt.",
         )
     };
     let (local_label, local_desc) = if en {
