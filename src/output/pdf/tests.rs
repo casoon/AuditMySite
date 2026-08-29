@@ -1394,20 +1394,36 @@ mod tests {
     }
 
     /// Count PDF pages by scanning for `/Type /Page` objects (not `/Type /Pages`).
+    /// Count PDF `/Type /Page` objects (leaf pages, not the `/Pages` tree
+    /// node). Uses `lopdf` to parse the actual object graph rather than a raw
+    /// byte-string scan: Typst 0.15 (renderreport's Typst upgrade for
+    /// PDF/UA-1 tagging, #573) can place page objects inside compressed
+    /// object streams for larger documents, where the literal ASCII bytes
+    /// `/Type /Page` never appear uncompressed — a raw scan silently found 0
+    /// pages for exactly the larger (Standard/Batch level) fixtures while
+    /// still finding some for small ones, which made this look like a
+    /// fixture-specific bug rather than the real cause. `lopdf::Document`
+    /// decompresses object streams into `doc.objects` on load, so this
+    /// mirrors `count_pdf_annotations` below and stays correct either way.
     fn count_pdf_pages(pdf: &[u8]) -> usize {
-        let needle = b"/Type /Page";
-        let mut count = 0;
-        let mut i = 0;
-        while i + needle.len() <= pdf.len() {
-            if pdf[i..i + needle.len()] == *needle {
-                // Exclude /Type /Pages (the catalogue node)
-                if pdf.get(i + needle.len()).copied() != Some(b's') {
-                    count += 1;
+        let doc = match lopdf::Document::load_mem(pdf) {
+            Ok(d) => d,
+            Err(_) => return 0,
+        };
+        doc.objects
+            .values()
+            .filter(|o| {
+                if let Ok(d) = o.as_dict() {
+                    return d
+                        .get(b"Type")
+                        .ok()
+                        .and_then(|v| v.as_name().ok())
+                        .map(|n| n == b"Page")
+                        .unwrap_or(false);
                 }
-            }
-            i += 1;
-        }
-        count
+                false
+            })
+            .count()
     }
 
     /// Count PDF `/Annot` entries — proxy for callout boxes / links.
@@ -1588,6 +1604,90 @@ mod tests {
             lopdf::Document::load_mem(&pdf).is_ok(),
             "PDF must parse via lopdf"
         );
+    }
+
+    /// Asserts the PDF/UA-1 structural export checklist from auditmysite#573
+    /// directly on real, end-to-end generated report bytes: a structure tree
+    /// (tagged), a declared document language, a document title, and at
+    /// least one outline/bookmark entry. renderreport 0.4.0 (Typst 0.15)
+    /// enforces `PdfStandard::Ua_1` at compile time — a report that fails any
+    /// of these would already fail to render at all — but this asserts
+    /// directly on the emitted bytes rather than relying on that enforcement
+    /// alone, per the issue's own "automatisierbaren Export-Check" criterion.
+    fn assert_pdf_ua_structure(pdf: &[u8], expected_lang: &str) {
+        let doc = lopdf::Document::load_mem(pdf).expect("PDF must parse via lopdf");
+        let catalog = doc.catalog().expect("PDF must have a document catalog");
+
+        assert!(
+            catalog.has(b"StructTreeRoot"),
+            "catalog is missing /StructTreeRoot — the PDF is not tagged"
+        );
+
+        let lang = catalog
+            .get(b"Lang")
+            .ok()
+            .and_then(|o| o.as_str().ok())
+            .map(|b| String::from_utf8_lossy(b).to_string());
+        assert_eq!(
+            lang.as_deref(),
+            Some(expected_lang),
+            "catalog /Lang did not match the report's locale"
+        );
+
+        let title = doc
+            .trailer
+            .get(b"Info")
+            .ok()
+            .and_then(|o| o.as_reference().ok())
+            .and_then(|id| doc.get_dictionary(id).ok())
+            .and_then(|info| info.get(b"Title").ok())
+            .and_then(|o| o.as_str().ok());
+        assert!(
+            title.is_some_and(|t| !t.is_empty()),
+            "/Info dictionary is missing a non-empty /Title"
+        );
+
+        assert!(
+            !pdf_outline_titles(pdf).is_empty(),
+            "PDF has no outline/bookmark entries"
+        );
+    }
+
+    #[test]
+    fn test_single_pdf_with_findings_is_pdf_ua_tagged() {
+        let report = pdf_fixture_report_rich();
+        let pdf = generate_pdf(&report, &ReportConfig::default()).expect("standard PDF");
+        assert_pdf_ua_structure(&pdf, "de");
+    }
+
+    #[test]
+    fn test_single_pdf_with_zero_findings_is_pdf_ua_tagged() {
+        // #573 acceptance criterion: verify both a report with findings and a
+        // clean (0-violation) report — the zero-finding path renders
+        // different content (the #572/#576 clean-run callouts) and must stay
+        // just as conformant.
+        let report = AuditReport::new(
+            "https://example.com".to_string(),
+            WcagLevel::AA,
+            WcagResults::new(),
+            1_000,
+        );
+        let pdf = generate_pdf(&report, &ReportConfig::default()).expect("standard PDF");
+        assert_pdf_ua_structure(&pdf, "de");
+    }
+
+    #[test]
+    fn test_batch_pdf_is_pdf_ua_tagged() {
+        let batch = BatchReport::from_reports(
+            vec![
+                pdf_fixture_report_for_url("https://example.com"),
+                pdf_fixture_report_for_url("https://example.com/about"),
+            ],
+            vec![],
+            2_400,
+        );
+        let pdf = generate_batch_pdf(&batch, &ReportConfig::default()).expect("batch PDF");
+        assert_pdf_ua_structure(&pdf, "de");
     }
 
     #[test]

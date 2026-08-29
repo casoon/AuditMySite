@@ -92,6 +92,7 @@ fn build_single_report(
         .metadata("version", &vm.meta.version)
         .metadata("author", &vm.meta.author)
         .metadata("score", &vm.meta.score_label)
+        .metadata("lang", i18n.locale())
         .metadata("footer_prefix", "Audit:")
         .metadata("footer_link_url", "")
         .metadata(

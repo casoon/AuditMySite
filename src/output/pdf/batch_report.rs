@@ -39,6 +39,7 @@ fn build_batch_report(
         .metadata("date", &pres.cover.date)
         .metadata("version", &pres.cover.version)
         .metadata("author", domain)
+        .metadata("lang", i18n.locale())
         .metadata("footer_prefix", "Audit:")
         .metadata("footer_link_url", "")
         .metadata(
