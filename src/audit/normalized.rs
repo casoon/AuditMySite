@@ -125,6 +125,7 @@ pub struct AuditContext<'a> {
     pub raw_performance_desktop: Option<&'a PerformanceResults>,
     pub raw_seo: Option<&'a SeoAnalysis>,
     pub raw_security: Option<&'a SecurityAnalysis>,
+    pub raw_html_conform: Option<&'a crate::html_conform::HtmlConformAnalysis>,
     pub raw_mobile: Option<&'a MobileFriendliness>,
     pub raw_ux: Option<&'a crate::ux::UxAnalysis>,
     pub raw_journey: Option<&'a crate::journey::JourneyAnalysis>,
@@ -2192,6 +2193,25 @@ fn build_module_scores(
             measurement_type: "measured".to_string(),
         });
     }
+    if let Some(ref hc) = report.html_conform {
+        // Score-neutral (not weight_pct: 0 by accident — deliberately, like
+        // UX/Journey/Best Practices below): html-conform's vendored HTML5
+        // schema currently has no RDFa/Open-Graph vocabulary awareness, so a
+        // page using standard `<meta property="og:...">` tags (effectively
+        // every commercial site) racks up dozens of "unexpected attribute"
+        // findings and gets clamped to score 0 — a false positive, not a
+        // real defect. Paused from the weighted score until that gap is
+        // fixed upstream in html-conform; still shown with its own score
+        // for visibility. See regression note in CLAUDE.md.
+        module_scores.push(ModuleScoreEntry {
+            name: "HTML Conformance".to_string(),
+            score: hc.score,
+            grade: AccessibilityScorer::calculate_grade(hc.score as f32).to_string(),
+            weight_pct: 0,
+            contributes_to_overall: false,
+            measurement_type: "measured".to_string(),
+        });
+    }
     if let Some(ref ux) = report.ux {
         // Accessibility flows into UX: critical a11y issues penalize UX score
         // Rationale: for users with disabilities, Accessibility IS the UX.
@@ -2913,6 +2933,7 @@ pub fn normalize<'a>(report: &'a AuditReport) -> AuditContext<'a> {
             .and_then(|d| d.desktop.performance.as_ref()),
         raw_seo: report.discoverability.seo.as_ref(),
         raw_security: report.security.as_ref(),
+        raw_html_conform: report.html_conform.as_ref(),
         raw_mobile: report.experience.mobile.as_ref(),
         raw_ux: report.ux.as_ref(),
         raw_journey: report.journey.as_ref(),

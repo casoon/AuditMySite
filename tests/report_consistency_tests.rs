@@ -112,6 +112,18 @@ fn make_security() -> SecurityAnalysis {
     }
 }
 
+fn make_html_conform() -> auditmysite::html_conform::HtmlConformAnalysis {
+    auditmysite::html_conform::HtmlConformAnalysis {
+        score: 90,
+        checked: true,
+        error_count: 0,
+        warning_count: 1,
+        info_count: 0,
+        findings: vec![],
+        raw_html: None,
+    }
+}
+
 fn make_mobile() -> MobileFriendliness {
     MobileFriendliness {
         score: 85,
@@ -143,6 +155,7 @@ fn make_full_report() -> AuditReport {
     .with_performance(make_performance())
     .with_seo(make_seo())
     .with_security(make_security())
+    .with_html_conform(make_html_conform())
     .with_mobile(make_mobile())
     .with_ux(make_ux())
     .with_journey(make_journey())
@@ -181,6 +194,10 @@ fn test_all_modules_present_in_module_scores() {
     assert!(
         module_names.contains(&"Mobile"),
         "Mobile missing from module_scores"
+    );
+    assert!(
+        module_names.contains(&"HTML Conformance"),
+        "HTML Conformance missing from module_scores"
     );
     assert!(
         module_names.contains(&"UX"),
@@ -643,9 +660,13 @@ fn test_module_weights_correct() {
             "Security" => 10,
             "Mobile" => 10,
             // Indicator modules do not contribute to the overall score, so their
-            // displayed weight is 0 (#447).
+            // displayed weight is 0 (#447). HTML Conformance joined this list
+            // (not scored) because html-conform's vendored schema currently
+            // flags standard Open-Graph `<meta property="og:...">` tags as
+            // errors, a false positive that would otherwise tank the score
+            // for nearly every real site — paused until fixed upstream.
             "UX" | "Journey" | "Best Practices" | "Dark Mode" | "AI Visibility"
-            | "Source Quality" | "Tech Stack" => 0,
+            | "Source Quality" | "Tech Stack" | "HTML Conformance" => 0,
             _ => panic!("Unknown module: {}", m.name),
         };
         assert_eq!(
@@ -1130,6 +1151,7 @@ fn test_schema_contains_extra_module_top_level_keys() {
         "content_visibility",
         "tech_stack",
         "patterns",
+        "html_conform",
     ] {
         assert!(
             module_props.contains_key(*key),
@@ -1279,7 +1301,7 @@ fn test_contributes_to_overall_flags_correct() {
     let normalized = normalize(&report);
 
     let core = ["Accessibility", "Performance", "SEO", "Security", "Mobile"];
-    let supplemental = ["UX", "Journey"];
+    let supplemental = ["UX", "Journey", "HTML Conformance"];
 
     for m in &normalized.normalized.module_scores {
         if core.contains(&m.name.as_str()) {

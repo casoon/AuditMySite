@@ -602,6 +602,33 @@ pub(in crate::output::pdf) fn render_performance(
         if let Some(callout) = coverage_callout(cov, i18n) {
             builder = builder.add_component(callout);
         }
+
+        // Duplicate assets (#551) — compact, proportional to the feature's
+        // low priority: a summary line plus one bullet per group. Nothing
+        // renders when no duplicates were found.
+        if !cov.duplicate_assets.is_empty() {
+            let wasted_kb: f64 = cov
+                .duplicate_assets
+                .iter()
+                .map(|g| g.kb * g.urls.len().saturating_sub(1) as f64)
+                .sum();
+            let mut dup_list = List::new().with_title(i18n.t_args(
+                "pdf-perf-dup-title",
+                &[
+                    ("count", cov.duplicate_assets.len().to_string()),
+                    ("wasted", localized_decimal(wasted_kb, is_english(i18n))),
+                ],
+            ));
+            for group in &cov.duplicate_assets {
+                dup_list = dup_list.add_item(format!(
+                    "{} (~{} KB): {}",
+                    group.kind,
+                    localized_decimal(group.kb, is_english(i18n)),
+                    group.urls.join(", ")
+                ));
+            }
+            builder = builder.add_component(dup_list);
+        }
     }
 
     // ── Subsection 3: Lade-Engpässe & Rendering ────────────────────────

@@ -479,6 +479,7 @@ pub struct ModuleDetailsBlock {
     pub performance: Option<PerformancePresentation>,
     pub seo: Option<SeoPresentation>,
     pub security: Option<SecurityPresentation>,
+    pub html_conform: Option<HtmlConformPresentation>,
     pub mobile: Option<MobilePresentation>,
     pub ux: Option<UxPresentation>,
     pub journey: Option<JourneyPresentation>,
@@ -801,6 +802,15 @@ pub struct CoveragePresentation {
     pub css_used_pct: Option<f64>,
     pub css_total_rules: Option<u32>,
     pub css_used_rules: Option<u32>,
+    /// Same file served under 2+ URLs (#551), empty unless found.
+    pub duplicate_assets: Vec<DuplicateAssetRow>,
+}
+
+/// One duplicate-asset group (#551) for the compact PDF list.
+pub struct DuplicateAssetRow {
+    pub kind: String,
+    pub kb: f64,
+    pub urls: Vec<String>,
 }
 
 /// Non-composited animation findings
@@ -1002,6 +1012,21 @@ pub struct SecurityPresentation {
     pub protection: Vec<(String, String)>,
     pub has_waf: bool,
     pub has_cdn: bool,
+}
+
+/// HTML5 spec-conformance presentation block (html-conform crate).
+///
+/// `rule_id`/`message` stay opaque canonical-English payload (#406 passthrough
+/// pattern, same as best_practices) — only `severity_label` is localized.
+pub struct HtmlConformPresentation {
+    pub score: u32,
+    pub checked: bool,
+    pub interpretation: String,
+    pub error_count: u32,
+    pub warning_count: u32,
+    pub info_count: u32,
+    /// (rule_id, localized severity label, message, location) rows.
+    pub findings: Vec<(String, String, String, String)>,
 }
 
 pub struct MobilePresentation {

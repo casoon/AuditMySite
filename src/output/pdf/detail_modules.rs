@@ -19,6 +19,7 @@ mod ai_transparency;
 mod dark_mode;
 mod design_quality;
 mod experience;
+mod html_conform;
 mod indicators;
 mod network_dns;
 mod overview;
@@ -31,6 +32,7 @@ pub(super) use ai_transparency::render_ai_transparency;
 pub(super) use dark_mode::render_dark_mode;
 pub(super) use design_quality::render_design_quality;
 pub(super) use experience::{render_journey, render_ux};
+pub(super) use html_conform::render_html_conform;
 pub(super) use indicators::{
     render_ai_visibility, render_best_practices, render_content_visibility, render_source_quality,
     render_tech_stack,
@@ -87,6 +89,8 @@ fn module_customer_context(
         ("search_experience", false) => "Dieser Wert verbindet technische Auffindbarkeit mit der Frage, ob Nutzer, Suchmaschinen und KI-Systeme die Inhalte tatsächlich verstehen und ihnen vertrauen können.",
         ("security", true) => "Security headers and HTTPS signals influence visible trust and reduce avoidable browser-side risk in the checked scope.",
         ("security", false) => "Security Header und HTTPS-Signale beeinflussen sichtbares Vertrauen und reduzieren vermeidbare Browser-Risiken im geprüften Umfang.",
+        ("html_conform", true) => "Clean, spec-conformant HTML helps browsers, assistive technologies and search engines parse and render the page reliably.",
+        ("html_conform", false) => "Sauberes, spezifikationskonformes HTML hilft Browsern, assistiven Technologien und Suchmaschinen, die Seite zuverlässig zu verarbeiten und darzustellen.",
         ("mobile", true) => "Mobile visitors depend on readable text, fitting content and controls that are easy to tap on small screens.",
         ("mobile", false) => "Mobile Besucher sind auf lesbaren Text, passende Inhaltsbreiten und gut antippbare Bedienelemente angewiesen.",
         ("ux", true) => "This indicator estimates whether the page feels understandable, consistent and low-friction for common visitor tasks.",

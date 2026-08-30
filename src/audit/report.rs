@@ -386,6 +386,10 @@ pub struct AuditReport {
     /// Security analysis (optional)
     #[serde(skip_serializing_if = "Option::is_none")]
     pub security: Option<SecurityAnalysis>,
+    /// HTML5 spec-conformance analysis (optional) — URL/page-level, not
+    /// per-viewport, same placement rationale as `security`.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub html_conform: Option<crate::html_conform::HtmlConformAnalysis>,
     /// User-experience signals grouped into one section: mobile friendliness,
     /// dark-mode support and performance-budget violations.
     #[serde(default)]
@@ -514,6 +518,7 @@ impl AuditReport {
             duration_ms,
             performance: None,
             security: None,
+            html_conform: None,
             experience: ExperienceSection::default(),
             ux: None,
             journey: None,
@@ -563,6 +568,15 @@ impl AuditReport {
     /// Set security results
     pub fn with_security(mut self, security: SecurityAnalysis) -> Self {
         self.security = Some(security);
+        self
+    }
+
+    /// Set HTML5 spec-conformance results
+    pub fn with_html_conform(
+        mut self,
+        html_conform: crate::html_conform::HtmlConformAnalysis,
+    ) -> Self {
+        self.html_conform = Some(html_conform);
         self
     }
 

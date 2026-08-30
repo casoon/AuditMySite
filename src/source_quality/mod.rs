@@ -1251,6 +1251,7 @@ mod tests {
             duration_ms: 1000,
             performance: None,
             security: None,
+            html_conform: None,
             experience: crate::audit::ExperienceSection::default(),
             ux: None,
             journey: None,

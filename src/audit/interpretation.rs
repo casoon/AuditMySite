@@ -136,6 +136,7 @@ pub enum InterpretArea {
     Mobile,
     Ux,
     Journey,
+    HtmlConform,
 }
 
 /// Localized, module-specific score interpretation. Returns both DE and EN.
@@ -245,6 +246,27 @@ fn interpret_band_localized(area: InterpretArea, band: ScoreBand) -> LocalizedTe
         (Security, Critical) => (
             "Kritisch — es bestehen erhebliche Sicherheitsrisiken mit unmittelbarem Handlungsbedarf.",
             "Critical — significant security risks exist that require immediate action.",
+        ),
+
+        (HtmlConform, Excellent) => (
+            "Sehr gut — das ausgelieferte HTML ist technisch sauber und spezifikationskonform, Browser und assistive Technologien können es zuverlässig verarbeiten.",
+            "Excellent — the rendered HTML is technically clean and spec-conformant; browsers and assistive technologies can parse it reliably.",
+        ),
+        (HtmlConform, Good) => (
+            "Gut — das HTML ist überwiegend konform, einzelne Abweichungen von der Spezifikation sind vorhanden.",
+            "Good — the HTML is largely conformant, with a few deviations from the specification.",
+        ),
+        (HtmlConform, NeedsImprovement) => (
+            "Verbesserungswürdig — mehrere Spezifikationsverstöße im HTML können die Verarbeitung durch Browser oder assistive Technologien beeinträchtigen.",
+            "Needs improvement — several HTML specification violations can affect processing by browsers or assistive technologies.",
+        ),
+        (HtmlConform, Weak) => (
+            "Ausbaufähig — verbreitete Spezifikationsverstöße erschweren eine zuverlässige Verarbeitung des Markups.",
+            "Inadequate — widespread specification violations make reliable markup processing harder.",
+        ),
+        (HtmlConform, Critical) => (
+            "Kritisch — das HTML weicht erheblich von der Spezifikation ab, Rendering und Barrierefreiheit sind unmittelbar betroffen.",
+            "Critical — the HTML deviates significantly from the specification, directly affecting rendering and accessibility.",
         ),
 
         (Mobile, Excellent) => (
@@ -509,6 +531,15 @@ fn build_per_module_localized(normalized: &AuditContext<'_>) -> HashMap<String, 
             "security".to_string(),
             interpret_security_score_localized(s.score as f32, &s.issues),
         );
+    }
+
+    if let Some(hc) = normalized.raw_html_conform {
+        if hc.checked {
+            map.insert(
+                "html_conform".to_string(),
+                interpret_score_localized(InterpretArea::HtmlConform, hc.score as f32),
+            );
+        }
     }
 
     if let Some(m) = normalized.raw_mobile {
@@ -784,7 +815,15 @@ mod tests {
     #[test]
     fn interpret_score_all_areas_all_bands() {
         use InterpretArea::*;
-        let areas = [Accessibility, Performance, Security, Mobile, Ux, Journey];
+        let areas = [
+            Accessibility,
+            Performance,
+            Security,
+            Mobile,
+            Ux,
+            Journey,
+            HtmlConform,
+        ];
         let scores: &[f32] = &[95.0, 80.0, 65.0, 50.0, 20.0];
 
         for area in areas {
@@ -814,6 +853,7 @@ mod tests {
             InterpretArea::Mobile,
             InterpretArea::Ux,
             InterpretArea::Journey,
+            InterpretArea::HtmlConform,
         ];
 
         let band_prefixes: &[(f32, &str, &str)] = &[

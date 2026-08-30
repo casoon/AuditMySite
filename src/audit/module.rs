@@ -28,6 +28,7 @@ use crate::content_visibility::ContentVisibilityAnalysis;
 use crate::dark_mode::DarkModeAnalysis;
 use crate::design_quality::DesignQualityAnalysis;
 use crate::error::Result;
+use crate::html_conform::HtmlConformAnalysis;
 use crate::journey::JourneyAnalysis;
 use crate::mobile::MobileFriendliness;
 use crate::network::dns::NetworkDnsAnalysis;
@@ -86,6 +87,7 @@ pub enum ModuleData {
     DesignQuality(Box<DesignQualityAnalysis>),
     AiTransparency(Box<AiTransparencyAnalysis>),
     NetworkDns(Box<NetworkDnsAnalysis>),
+    HtmlConform(Box<HtmlConformAnalysis>),
     Error(String),
 }
 

@@ -2037,6 +2037,7 @@ mod minification_inconsistency_tests {
                 measurement: "not_available".to_string(),
             },
             measurement_warnings: vec![],
+            duplicate_assets: vec![],
         }
     }
 

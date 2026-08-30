@@ -592,6 +592,8 @@ pub struct ModuleBlob {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub security: Option<serde_json::Value>,
     #[serde(skip_serializing_if = "Option::is_none")]
+    pub html_conform: Option<serde_json::Value>,
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub mobile: Option<serde_json::Value>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub ux: Option<serde_json::Value>,

@@ -179,6 +179,7 @@ pub struct SnapshotData {
     journey: Option<JourneyAnalysis>,
     dark_mode: Option<DarkModeAnalysis>,
     design_quality: Option<DesignQualityAnalysis>,
+    html_conform: Option<crate::html_conform::HtmlConformAnalysis>,
     ai_transparency: Option<crate::ai_transparency::AiTransparencyAnalysis>,
     network_dns: Option<crate::network::dns::NetworkDnsAnalysis>,
     tech_stack: Option<crate::tech_stack::TechStackAnalysis>,
@@ -233,6 +234,7 @@ impl SnapshotData {
             ModuleData::Journey(j) => self.journey = Some(*j),
             ModuleData::DarkMode(d) => self.dark_mode = Some(*d),
             ModuleData::DesignQuality(d) => self.design_quality = Some(*d),
+            ModuleData::HtmlConform(h) => self.html_conform = Some(*h),
             ModuleData::AiTransparency(a) => self.ai_transparency = Some(*a),
             ModuleData::NetworkDns(d) => self.network_dns = Some(*d),
             ModuleData::TechStack(t) => self.tech_stack = Some(*t),
@@ -272,6 +274,9 @@ pub struct PipelineConfig {
     pub check_dark_mode: bool,
     /// Run the opt-in design-quality module (#528). Not part of `--full` yet.
     pub check_design_quality: bool,
+    /// Run HTML5 spec-conformance checking (html-conform crate). Part of
+    /// `--full`, no dedicated CLI flag.
+    pub check_html_conform: bool,
     /// Run the opt-in C2PA image-provenance check (EU AI Act Art. 50
     /// transparency duties). Not part of `--full`; single-URL mode only (see
     /// `from_args_and_config`) and requires the `ai-transparency` Cargo
@@ -308,9 +313,10 @@ pub struct PipelineConfig {
     pub check_stack: bool,
     /// `[rules] disabled`/`enabled_only` from `auditmysite.toml`, by axe_id.
     /// Consulted by `check_all_with_config` for tree-based rules and, inline,
-    /// by contrast (`color-contrast`) and reflow (`css-overflow-hidden`,
+    /// by contrast (`color-contrast`), reflow (`css-overflow-hidden`,
     /// matching the user-visible finding id rather than the `"reflow"`
-    /// logging-only label — #560). Table-driven `PAGE_RULES` entries are not
+    /// logging-only label — #560), and HTML content-model conformance
+    /// (`html-content-model`, #579). Table-driven `PAGE_RULES` entries are not
     /// yet covered (their `rule_id` is logging-only; a single check_fn can
     /// emit more than one real axe_id).
     pub rule_filter: crate::wcag::RuleFilterConfig,
@@ -368,14 +374,14 @@ impl PipelineConfig {
         // — disabled/enabled_only now actually change which findings run),
         // 15 for the network_dns module field (#545), 16 for the isolated
         // third-party impact field (#531), 17 for the SSR/hydration
-        // content-gap check field (#534).
-        const CACHE_FMT: u8 = 17;
+        // content-gap check field (#534), 18 for the html_conform module field.
+        const CACHE_FMT: u8 = 18;
         let mut disabled = self.rule_filter.disabled_rules.clone();
         disabled.sort();
         let mut enabled_only = self.rule_filter.enabled_only_rules.clone();
         enabled_only.sort();
         format!(
-            "v={};fmt={};level={};perf={};seo={};sec={};mobile={};dark={};design_quality={};ai_transparency={};dns={};isolate_tp_impact={};ssr_content={};stack={};consent={};interactive={:?};journey_budget_ms={};lang={};disabled={};enabled_only={}",
+            "v={};fmt={};level={};perf={};seo={};sec={};mobile={};dark={};design_quality={};html_conform={};ai_transparency={};dns={};isolate_tp_impact={};ssr_content={};stack={};consent={};interactive={:?};journey_budget_ms={};lang={};disabled={};enabled_only={}",
             env!("CARGO_PKG_VERSION"),
             CACHE_FMT,
             self.wcag_level,
@@ -385,6 +391,7 @@ impl PipelineConfig {
             self.check_mobile as u8,
             self.check_dark_mode as u8,
             self.check_design_quality as u8,
+            self.check_html_conform as u8,
             self.check_ai_transparency as u8,
             self.check_dns as u8,
             self.check_isolate_third_party_impact as u8,
@@ -420,6 +427,7 @@ impl PipelineConfig {
                 check_security: false,
                 check_mobile: false,
                 check_design_quality: false,
+                check_html_conform: false,
                 check_ai_transparency: false,
                 check_dns: false,
                 check_stack: false,
@@ -471,6 +479,7 @@ impl PipelineConfig {
             check_mobile: (full_audit || args.mobile) && !args.skip_mobile,
             check_dark_mode: true,
             check_design_quality: args.design_quality,
+            check_html_conform: full_audit,
             // Single-URL mode only (`args.url.is_some()`, same condition as
             // `capture_element_evidence`) — a batch run would fetch+parse
             // every image on every page only to have `build_batch_detail()`
@@ -902,6 +911,7 @@ pub async fn audit_page(
         journey: mobile_snap.journey.clone(),
         dark_mode: desktop_snap.dark_mode.clone(), // taken from desktop pass
         design_quality: mobile_snap.design_quality.clone(),
+        html_conform: mobile_snap.html_conform.clone(),
         ai_transparency: mobile_snap.ai_transparency.clone(),
         network_dns: mobile_snap.network_dns.clone(),
         tech_stack: mobile_snap.tech_stack.clone(),
@@ -1377,6 +1387,7 @@ async fn extract_snapshot(
         journey: None,
         dark_mode: None,
         design_quality: None,
+        html_conform: None,
         ai_transparency: None,
         network_dns: None,
         tech_stack: None,
@@ -1430,6 +1441,32 @@ async fn run_rules(
         info!("Found {} contrast findings", findings.len());
         wcag_results.rule_outcomes.push(outcome);
         wcag_results.extend_findings(findings);
+    }
+
+    // HTML content-model conformance carries extra args (raw HTML + the
+    // html-conform findings) and stays inline, like contrast and reflow
+    // (#579). `html_conform`'s collect phase already ran before `run_rules`
+    // is called and only populates `SnapshotData.html_conform` on the
+    // mobile viewport pass (see `PipelineConfig::for_viewport`) — so this
+    // is naturally a no-op on the desktop pass without any extra gating.
+    if let Some(ref hc) = snapshot.html_conform {
+        if let Some(ref html) = hc.raw_html {
+            if config
+                .rule_filter
+                .should_run(wcag::rules::HTML_CONTENT_MODEL_RULE.axe_id)
+            {
+                let raw_findings = wcag::rules::check_html_content_model(html, &hc.findings);
+                let (outcome, findings) = page_rule_outcome(
+                    wcag::rules::HTML_CONTENT_MODEL_RULE.axe_id,
+                    Some(wcag::rules::HTML_CONTENT_MODEL_RULE.id),
+                    viewport_label,
+                    raw_findings,
+                );
+                info!("Found {} HTML content-model findings", findings.len());
+                wcag_results.rule_outcomes.push(outcome);
+                wcag_results.extend_findings(findings);
+            }
+        }
     }
 
     // Table-driven page rules (#334). min_level gates each entry.
@@ -1687,6 +1724,9 @@ fn aggregate_report(
     }
     if let Some(design_quality) = snapshot.design_quality.clone() {
         report = report.with_design_quality(design_quality);
+    }
+    if let Some(html_conform) = snapshot.html_conform.clone() {
+        report = report.with_html_conform(html_conform);
     }
     if let Some(ai_transparency) = snapshot.ai_transparency.clone() {
         report = report.with_ai_transparency(ai_transparency);
@@ -2434,6 +2474,7 @@ mod tests {
             "Accessibility Journey",
             "Best Practices",
             "Dark Mode",
+            "HTML Conformance",
             "Journey",
             "Mobile",
             "Performance",
@@ -2480,6 +2521,7 @@ mod tests {
             check_mobile: true,
             check_dark_mode: true,
             check_design_quality: false,
+            check_html_conform: false,
             check_ai_transparency: false,
             check_dns: false,
             check_isolate_third_party_impact: false,

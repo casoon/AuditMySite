@@ -206,6 +206,9 @@ src/
 ├── dark_mode/           # Dark mode support detection and contrast
 │   └── mod.rs, module.rs
 │
+├── html_conform/        # HTML5 spec-conformance checking via the html-conform crate (scored, part of --full)
+│   └── mod.rs, module.rs
+│
 ├── design_quality/      # Opt-in, score-neutral UX/readability heuristics (#528)
 │   ├── mod.rs, module.rs
 │   └── extract.js
@@ -475,6 +478,7 @@ Key crates:
 - `serde` / `serde_json` - Serialization
 - `tracing` - Logging
 - `html5ever` / `markup5ever_rcdom` - Local HTML5 parsing (link crawling, no remote validator)
+- `html-conform` - Deep HTML5 spec-conformance checking (RelaxNG + Schematron) for the html_conform module
 - `fluent-bundle` / `unic-langid` - i18n (Project Fluent, default language German)
 - `reqwest` (rustls) - Sitemap fetching, Chromium download
 - `renderreport` (optional, `pdf` feature) - PDF generation (Typst-based)

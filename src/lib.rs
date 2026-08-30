@@ -35,9 +35,14 @@
 //!         check_security: false,
 //!         check_mobile: false,
 //!         check_dark_mode: false,
+//!         check_html_conform: false,
 //!         check_design_quality: false,
+//!         check_ai_transparency: false,
 //!         check_dns: false,
+//!         check_isolate_third_party_impact: false,
+//!         check_ssr_content: false,
 //!         check_stack: false,
+//!         rule_filter: auditmysite::wcag::RuleFilterConfig::default(),
 //!         persist_artifacts: true,
 //!         capture_screenshots: false,
 //!         capture_element_evidence: false,
@@ -98,6 +103,7 @@ pub mod content_visibility;
 pub mod dark_mode;
 pub mod design_quality;
 pub mod error;
+pub mod html_conform;
 pub mod i18n;
 pub mod interaction;
 pub mod journey;

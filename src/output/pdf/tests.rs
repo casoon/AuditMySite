@@ -1182,6 +1182,7 @@ mod tests {
                     measurement: "not_available".to_string(),
                 },
                 measurement_warnings: vec![],
+                duplicate_assets: vec![],
             }),
             measurement_warnings: vec![],
         });
@@ -1212,6 +1213,68 @@ mod tests {
             assert!(
                 text.contains(expected),
                 "missing PDF interpretation: {expected}"
+            );
+        }
+    }
+
+    #[test]
+    fn test_pdf_renders_html_conform_findings() {
+        let Some(pdftotext) = find_executable("pdftotext") else {
+            return;
+        };
+
+        let report =
+            pdf_fixture_report_rich().with_html_conform(crate::html_conform::HtmlConformAnalysis {
+                score: 74,
+                checked: true,
+                error_count: 2,
+                warning_count: 1,
+                info_count: 0,
+                findings: vec![
+                    crate::html_conform::HtmlConformFinding {
+                        rule_id: "schema.html5".to_string(),
+                        severity: "error".to_string(),
+                        message: "Element <div> not allowed as child of <head>".to_string(),
+                        location: Some("12:34".to_string()),
+                        byte_offset: None,
+                    },
+                    crate::html_conform::HtmlConformFinding {
+                        rule_id: "parser.html5".to_string(),
+                        severity: "warning".to_string(),
+                        message: "Unknown entity reference".to_string(),
+                        location: None,
+                        byte_offset: None,
+                    },
+                ],
+                raw_html: None,
+            });
+        let config = ReportConfig {
+            level: ReportLevel::Standard,
+            ..ReportConfig::default()
+        };
+        let pdf = generate_pdf(&report, &config).expect("PDF should render");
+
+        let temp_dir = tempfile::tempdir().expect("temp dir");
+        let pdf_path = temp_dir.path().join("html-conform-check.pdf");
+        let txt_path = temp_dir.path().join("html-conform-check.txt");
+        std::fs::write(&pdf_path, &pdf).expect("write pdf");
+        Command::new(pdftotext)
+            .arg(&pdf_path)
+            .arg(&txt_path)
+            .status()
+            .expect("pdftotext should run");
+        let text = std::fs::read_to_string(&txt_path).expect("read extracted text");
+
+        for expected in [
+            "HTML-Konformität",
+            "schema.html5",
+            "parser.html5",
+            "Element <div> not allowed",
+            "12:34",
+        ] {
+            assert!(
+                text.contains(expected),
+                "missing HTML conformance PDF content: {expected}"
             );
         }
     }

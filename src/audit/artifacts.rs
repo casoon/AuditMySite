@@ -288,6 +288,9 @@ pub fn to_audit_report(artifacts: &AuditArtifacts, locale: &str) -> AuditReport 
         duration_ms: artifacts.audit.duration_ms,
         performance: artifacts.snapshot.performance.clone(),
         security: artifacts.snapshot.security.clone(),
+        // `SnapshotArtifact` (the lossy legacy cache-reconstruction shape) never
+        // carried this field — see `ux`/`journey` below, same treatment.
+        html_conform: None,
         experience: crate::audit::report::ExperienceSection {
             mobile: artifacts.snapshot.mobile.clone(),
             ..Default::default()

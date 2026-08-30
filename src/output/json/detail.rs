@@ -255,6 +255,9 @@ pub(super) fn build_detail(ctx: &AuditContext<'_>, detail_ctx: DetailContext) ->
         security: ctx
             .raw_security
             .map(|m| with_normalized_score(m.to_json(), normalized, "Security")),
+        html_conform: ctx
+            .raw_html_conform
+            .map(|m| with_normalized_score(m.to_json(), normalized, "HTML Conformance")),
         mobile: ctx
             .raw_mobile
             .map(|m| with_normalized_score(m.to_json(), normalized, "Mobile")),

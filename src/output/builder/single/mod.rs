@@ -780,6 +780,15 @@ mod tests {
             recommendations: vec![],
             protection: Default::default(),            sourcemap_leaks: Default::default(),
         })
+        .with_html_conform(crate::html_conform::HtmlConformAnalysis {
+            score: 90,
+            checked: true,
+            error_count: 0,
+            warning_count: 1,
+            info_count: 0,
+            findings: vec![],
+            raw_html: None,
+        })
         .with_mobile(MobileFriendliness {
             score: 75,
             viewport: ViewportAnalysis::default(),
@@ -985,6 +994,12 @@ mod tests {
             assert!(
                 details.security.is_some(),
                 "ModuleDetailsBlock.security must be Some"
+            );
+        }
+        if active_keys.contains("html_conform") {
+            assert!(
+                details.html_conform.is_some(),
+                "ModuleDetailsBlock.html_conform must be Some"
             );
         }
         if active_keys.contains("mobile") {

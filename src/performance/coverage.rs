@@ -17,18 +17,102 @@
 //!   of the call.  Rules triggered only on hover/focus/scroll may be reported as
 //!   unused in a headless audit.
 //! - Data URIs and cross-origin scripts that fail to load are excluded.
+//!
+//! **Duplicate asset detection (#551):** `take_coverage_results` additionally
+//! fetches the full source of already-loaded scripts/stylesheets via
+//! `Debugger.getScriptSource` / `CSS.getStyleSheetText` — content already
+//! resident in the browser's memory, so this adds no new network request —
+//! and hashes it to detect the same file served under 2+ different URLs.
+//! Purely advisory: never affects the performance score.
+
+use std::collections::{HashMap, HashSet};
+use std::sync::OnceLock;
 
 use chromiumoxide::cdp::browser_protocol::css::{
-    StartRuleUsageTrackingParams, StopRuleUsageTrackingParams,
+    EnableParams as CssEnableParams, EventStyleSheetAdded, GetStyleSheetTextParams,
+    StartRuleUsageTrackingParams, StopRuleUsageTrackingParams, StyleSheetId,
+};
+use chromiumoxide::cdp::browser_protocol::dom::EnableParams as DomEnableParams;
+use chromiumoxide::cdp::browser_protocol::target::TargetId;
+use chromiumoxide::cdp::js_protocol::debugger::{
+    EnableParams as DebuggerEnableParams, EventScriptParsed, GetScriptSourceParams,
 };
 use chromiumoxide::cdp::js_protocol::profiler::{
     EnableParams as ProfilerEnableParams, StartPreciseCoverageParams, TakePreciseCoverageParams,
 };
+use chromiumoxide::cdp::js_protocol::runtime::ScriptId;
+use chromiumoxide::listeners::EventStream;
 use chromiumoxide::Page;
+use futures::{FutureExt, StreamExt};
 use serde::{Deserialize, Serialize};
+use sha2::{Digest, Sha256};
+use tokio::sync::Mutex;
 use tracing::{info, warn};
 
 use crate::error::{AuditError, Result};
+
+/// Minimum size (bytes) a fetched script/stylesheet source must have to be
+/// considered for duplicate-content detection (#551) — mirrors the same
+/// threshold `unused_js`'s `ScriptCoverageEntry` filtering already uses, to
+/// avoid noise from trivial snippets.
+const MIN_DUPLICATE_ASSET_BYTES: usize = 1024;
+
+/// Safety cap on how many `CSS.styleSheetAdded` events are drained per pass
+/// — mirrors the "cap the fan-out" philosophy used elsewhere in this codebase
+/// (e.g. `design_quality`'s `MAX_SAMPLE_TASKS`) rather than trusting an
+/// unbounded page to stay small.
+const MAX_DUPLICATE_STYLESHEET_EVENTS: usize = 500;
+
+/// Same cap, for `Debugger.scriptParsed` events (#551) — see
+/// `MAX_DUPLICATE_STYLESHEET_EVENTS`.
+const MAX_DUPLICATE_SCRIPT_EVENTS: usize = 500;
+
+/// Pre-navigation `CSS.styleSheetAdded` listeners, keyed by CDP target id.
+///
+/// `prepare_coverage_collection` must register this listener *before*
+/// navigation — chromiumoxide's event streams only deliver events emitted
+/// after subscription, so subscribing once the page has already loaded (i.e.
+/// inside `take_coverage_results`) would silently miss every stylesheet.
+/// `take_coverage_results` reads this back (and removes the entry) once per
+/// viewport pass to resolve `style_sheet_id -> URL` for duplicate-CSS
+/// detection (#551) — `CSS.getStyleSheetText` itself never returns a URL,
+/// only `styleSheetAdded` does (see the CSS domain's own PDL doc comment).
+/// Routed through a target-id-keyed static instead of threading a new
+/// parameter through `ModuleContext`/the `AuditModule` catalog: nothing in
+/// that machinery carries state from `prepare_coverage_collection` (called
+/// directly in the pipeline, pre-navigation) to `take_coverage_results`
+/// (called several layers away, from `PerformanceModule::collect`, with only
+/// a `&Page`) — same constraint and same fix shape as `network::dns`'s
+/// per-host cache.
+static STYLESHEET_LISTENERS: OnceLock<Mutex<HashMap<TargetId, EventStream<EventStyleSheetAdded>>>> =
+    OnceLock::new();
+
+fn stylesheet_listeners() -> &'static Mutex<HashMap<TargetId, EventStream<EventStyleSheetAdded>>> {
+    STYLESHEET_LISTENERS.get_or_init(|| Mutex::new(HashMap::new()))
+}
+
+/// Pre-navigation `Debugger.scriptParsed` listeners, keyed by CDP target id.
+///
+/// Same shape and same reason as `STYLESHEET_LISTENERS` above, and for a
+/// related but distinct problem: unlike stylesheets (which never carry a URL
+/// via `CSS.getStyleSheetText`, so the listener's only job is resolving one),
+/// `Profiler.ScriptCoverage` already gives us each script's URL directly.
+/// This listener instead confirms *which* script ids the Debugger domain has
+/// actually registered a retrievable source for — live testing against a
+/// real site showed that calling `Debugger.getScriptSource` for a
+/// `Profiler.ScriptCoverage.script_id` fails with "No script for id" even
+/// right after `Debugger.enable`, for effectively every script, not just
+/// short-lived ones — the enable call's documented "retroactively backfills
+/// already-parsed scripts" behavior does not reliably apply synchronously.
+/// Draining this listener's buffered `scriptParsed` events before attempting
+/// `getScriptSource` (mirroring the stylesheet listener's drain pattern)
+/// avoids firing calls we already know will fail.
+static SCRIPT_PARSED_LISTENERS: OnceLock<Mutex<HashMap<TargetId, EventStream<EventScriptParsed>>>> =
+    OnceLock::new();
+
+fn script_parsed_listeners() -> &'static Mutex<HashMap<TargetId, EventStream<EventScriptParsed>>> {
+    SCRIPT_PARSED_LISTENERS.get_or_init(|| Mutex::new(HashMap::new()))
+}
 
 /// Coverage summary for a single JS script.
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -69,6 +153,18 @@ pub struct UnusedCssAnalysis {
     pub measurement: String,
 }
 
+/// A group of 2+ distinct URLs serving byte-identical content (#551) —
+/// purely advisory/informational, does not affect the performance score.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct DuplicateAssetGroup {
+    /// "script" or "stylesheet"
+    pub kind: String,
+    /// 2+ distinct URLs serving byte-identical content
+    pub urls: Vec<String>,
+    /// Size of one copy (all copies are byte-identical)
+    pub bytes: u64,
+}
+
 /// Combined coverage analysis returned to the pipeline.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct CoverageAnalysis {
@@ -79,6 +175,11 @@ pub struct CoverageAnalysis {
     /// Coverage-specific measurement warnings.
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub measurement_warnings: Vec<String>,
+    /// Same file served under 2+ different URLs (#551), sorted by `bytes`
+    /// descending (most wasteful first). Purely advisory — never affects the
+    /// performance score.
+    #[serde(default)]
+    pub duplicate_assets: Vec<DuplicateAssetGroup>,
 }
 
 /// Enable JS and CSS coverage collection **before** the page navigates.
@@ -107,12 +208,96 @@ pub async fn prepare_coverage_collection(page: &Page) -> Result<()> {
         .await
         .map_err(|e| AuditError::CdpError(format!("CSS.startRuleUsageTracking failed: {e}")))?;
 
+    // `CSS.enable` requires the DOM domain to already be enabled (per CDP
+    // spec — confirmed live: it otherwise fails with "DOM agent needs to be
+    // enabled first"). Nothing else in this codebase issues a raw
+    // `DOM.enable` (AXTree extraction goes through chromiumoxide's
+    // higher-level `Page` API, which doesn't need it), so this is a new,
+    // explicit prerequisite just for the CSS agent. Best-effort: if it
+    // fails, `CSS.enable` below will fail too and duplicate-CSS detection
+    // is silently skipped.
+    if let Err(e) = page.execute(DomEnableParams::default()).await {
+        warn!("DOM.enable failed, skipping duplicate CSS detection: {e}");
+    } else if let Err(e) = page.execute(CssEnableParams::default()).await {
+        warn!("CSS.enable failed, skipping duplicate CSS detection: {e}");
+    } else {
+        // Register a `styleSheetAdded` listener *before* navigation, so
+        // `take_coverage_results` can later resolve `style_sheet_id -> URL`
+        // for duplicate-CSS detection (#551). Best-effort/non-fatal:
+        // duplicate CSS detection is silently skipped if this fails.
+        match page.event_listener::<EventStyleSheetAdded>().await {
+            Ok(stream) => {
+                stylesheet_listeners()
+                    .lock()
+                    .await
+                    .insert(page.target_id().clone(), stream);
+            }
+            Err(e) => warn!("CSS.styleSheetAdded listener setup failed: {e}"),
+        }
+    }
+
+    // Enable the Debugger domain *before* navigation too (#551), and
+    // register a `scriptParsed` listener right after — mirroring the CSS
+    // stylesheet listener above. `Debugger.enable`'s documented "retroactively
+    // backfills already-parsed scripts" behavior turned out, live, not to make
+    // every backfilled script's source reliably retrievable via
+    // `Debugger.getScriptSource` right away (confirmed against a real site:
+    // "No script for id" for effectively every script, not just short-lived
+    // ones). `take_coverage_results` instead drains this listener's buffered
+    // events to know which script ids the Debugger domain has actually
+    // registered before attempting `getScriptSource`, avoiding calls we
+    // already know will fail. Best-effort/non-fatal: duplicate JS detection
+    // is silently skipped if either step fails.
+    match page.execute(DebuggerEnableParams::default()).await {
+        Ok(_) => match page.event_listener::<EventScriptParsed>().await {
+            Ok(stream) => {
+                script_parsed_listeners()
+                    .lock()
+                    .await
+                    .insert(page.target_id().clone(), stream);
+            }
+            Err(e) => warn!("Debugger.scriptParsed listener setup failed: {e}"),
+        },
+        Err(e) => warn!("Debugger.enable failed, skipping duplicate JS detection: {e}"),
+    }
+
     Ok(())
 }
 
 /// Read JS and CSS coverage results **after** the page has loaded.
 pub async fn take_coverage_results(page: &Page) -> Result<CoverageAnalysis> {
     info!("Taking JS and CSS coverage results...");
+
+    // Re-issue `Debugger.enable` defensively — `prepare_coverage_collection`
+    // already enables it before navigation (see its own comment for why
+    // that timing matters), this is just idempotent insurance in case that
+    // earlier call didn't run for some reason. Non-fatal: duplicate JS
+    // detection is silently skipped if this fails.
+    let debugger_enabled = match page.execute(DebuggerEnableParams::default()).await {
+        Ok(_) => true,
+        Err(e) => {
+            warn!("Debugger.enable failed, skipping duplicate JS detection: {e}");
+            false
+        }
+    };
+
+    // Drain the `scriptParsed` listener registered in
+    // `prepare_coverage_collection` to find out which script ids the
+    // Debugger domain has actually registered a retrievable source for
+    // (#551) — see that function's comment for why this gate exists.
+    let mut parsed_script_ids: HashSet<ScriptId> = HashSet::new();
+    if let Some(mut stream) = script_parsed_listeners()
+        .lock()
+        .await
+        .remove(page.target_id())
+    {
+        while let Some(Some(event)) = stream.next().now_or_never() {
+            parsed_script_ids.insert(event.script_id.clone());
+            if parsed_script_ids.len() >= MAX_DUPLICATE_SCRIPT_EVENTS {
+                break;
+            }
+        }
+    }
 
     // ── JS coverage ───────────────────────────────────────────────────────────
     let js_coverage = match page.execute(TakePreciseCoverageParams::default()).await {
@@ -126,6 +311,10 @@ pub async fn take_coverage_results(page: &Page) -> Result<CoverageAnalysis> {
     let mut scripts: Vec<ScriptCoverageEntry> = Vec::new();
     let mut total_bytes: u64 = 0;
     let mut total_unused_bytes: u64 = 0;
+    // Candidates for duplicate-content detection (#551), collected alongside
+    // the existing unused-bytes computation so the (already filtered) script
+    // list isn't walked a second time.
+    let mut js_duplicate_candidates: Vec<(ScriptId, String)> = Vec::new();
 
     for script in &js_coverage {
         let url = script.url.as_str();
@@ -193,10 +382,40 @@ pub async fn take_coverage_results(page: &Page) -> Result<CoverageAnalysis> {
                 unused_bytes: unused,
                 used_pct,
             });
+            js_duplicate_candidates.push((script.script_id.clone(), url.to_string()));
         }
     }
 
     scripts.sort_by_key(|s| std::cmp::Reverse(s.unused_bytes));
+
+    // Fetch full source text for duplicate-content detection (#551) — these
+    // scripts are already resident in the browser's memory, so this is a
+    // local CDP round-trip, not a new network download. Only attempt this
+    // for script ids `parsed_script_ids` actually confirmed via a
+    // `scriptParsed` event — calling `getScriptSource` for an unconfirmed id
+    // reliably fails ("No script for id"), so skip those quietly rather than
+    // firing (and warning on) calls already known to fail.
+    let mut js_duplicate_entries: Vec<(String, String, String)> = Vec::new();
+    if debugger_enabled {
+        for (script_id, url) in &js_duplicate_candidates {
+            if !parsed_script_ids.contains(script_id) {
+                continue;
+            }
+            match page
+                .execute(GetScriptSourceParams::new(script_id.clone()))
+                .await
+            {
+                Ok(resp) => js_duplicate_entries.push((
+                    script_id.inner().clone(),
+                    url.clone(),
+                    resp.result.script_source,
+                )),
+                Err(e) => {
+                    tracing::debug!("Debugger.getScriptSource failed for {url}: {e}")
+                }
+            }
+        }
+    }
 
     let overall_used_pct = if total_bytes > 0 {
         ((total_bytes - total_unused_bytes) as f64 / total_bytes as f64 * 100.0).clamp(0.0, 100.0)
@@ -243,6 +462,57 @@ pub async fn take_coverage_results(page: &Page) -> Result<CoverageAnalysis> {
         measurement: css_measurement,
     };
 
+    // Duplicate CSS detection (#551): resolve style_sheet_id -> URL from the
+    // pre-navigation `styleSheetAdded` listener registered in
+    // `prepare_coverage_collection`, then fetch each unique stylesheet's text
+    // (already resident in the browser's memory, not a new download) to hash it.
+    let mut css_duplicate_entries: Vec<(String, String, String)> = Vec::new();
+    if let Some(mut stream) = stylesheet_listeners().lock().await.remove(page.target_id()) {
+        let mut stylesheet_urls: HashMap<StyleSheetId, String> = HashMap::new();
+        while let Some(Some(event)) = stream.next().now_or_never() {
+            let url = event.header.source_url.clone();
+            if !url.is_empty()
+                && !url.starts_with("chrome-extension://")
+                && !url.starts_with("data:")
+            {
+                stylesheet_urls
+                    .entry(event.header.style_sheet_id.clone())
+                    .or_insert(url);
+            }
+            if stylesheet_urls.len() >= MAX_DUPLICATE_STYLESHEET_EVENTS {
+                break;
+            }
+        }
+
+        if !stylesheet_urls.is_empty() {
+            let mut seen_ids: HashSet<StyleSheetId> = HashSet::new();
+            for rule in &css_coverage {
+                let style_sheet_id = rule.style_sheet_id.clone();
+                if !seen_ids.insert(style_sheet_id.clone()) {
+                    continue;
+                }
+                let Some(url) = stylesheet_urls.get(&style_sheet_id) else {
+                    continue;
+                };
+                match page
+                    .execute(GetStyleSheetTextParams::new(style_sheet_id.clone()))
+                    .await
+                {
+                    Ok(resp) => css_duplicate_entries.push((
+                        style_sheet_id.inner().clone(),
+                        url.clone(),
+                        resp.result.text,
+                    )),
+                    Err(e) => warn!("CSS.getStyleSheetText failed for {url}: {e}"),
+                }
+            }
+        }
+    }
+
+    let mut duplicate_assets = group_duplicate_assets("script", js_duplicate_entries);
+    duplicate_assets.extend(group_duplicate_assets("stylesheet", css_duplicate_entries));
+    duplicate_assets.sort_by_key(|g| std::cmp::Reverse(g.bytes));
+
     info!(
         "Coverage: JS {:.0}% used ({:.1} KB unused), CSS {} rules used ({}/{})",
         overall_used_pct,
@@ -258,7 +528,67 @@ pub async fn take_coverage_results(page: &Page) -> Result<CoverageAnalysis> {
         unused_js,
         unused_css,
         measurement_warnings,
+        duplicate_assets,
     })
+}
+
+/// Groups fetched source texts by content hash, returning one
+/// `DuplicateAssetGroup` per hash shared by 2+ distinct URLs (#551).
+/// `entries` is `(id, url, text)` — `id` dedupes the same script/stylesheet
+/// id appearing more than once in the raw coverage list (e.g. a script that
+/// ran more than once) before grouping by URL, so the same URL is never
+/// counted twice. Pure/no I/O so it's testable without a CDP connection.
+fn group_duplicate_assets(
+    kind: &str,
+    entries: Vec<(String, String, String)>,
+) -> Vec<DuplicateAssetGroup> {
+    let mut by_id: HashMap<String, (String, String)> = HashMap::new();
+    for (id, url, text) in entries {
+        by_id.entry(id).or_insert((url, text));
+    }
+
+    let mut by_url: HashMap<String, String> = HashMap::new();
+    for (url, text) in by_id.into_values() {
+        by_url.entry(url).or_insert(text);
+    }
+
+    let mut groups: HashMap<String, (Vec<String>, u64)> = HashMap::new();
+    for (url, text) in by_url {
+        if text.len() < MIN_DUPLICATE_ASSET_BYTES {
+            continue;
+        }
+        let hash = sha256_hex(&text);
+        let group = groups
+            .entry(hash)
+            .or_insert_with(|| (Vec::new(), text.len() as u64));
+        group.0.push(url);
+    }
+
+    let mut result: Vec<DuplicateAssetGroup> = groups
+        .into_values()
+        .filter(|(urls, _)| urls.len() >= 2)
+        .map(|(mut urls, bytes)| {
+            urls.sort();
+            DuplicateAssetGroup {
+                kind: kind.to_string(),
+                urls,
+                bytes,
+            }
+        })
+        .collect();
+
+    result.sort_by_key(|g| std::cmp::Reverse(g.bytes));
+    result
+}
+
+fn sha256_hex(text: &str) -> String {
+    let mut hasher = Sha256::new();
+    hasher.update(text.as_bytes());
+    hasher
+        .finalize()
+        .iter()
+        .map(|b| format!("{b:02x}"))
+        .collect()
 }
 
 fn truncate(s: &str, max: usize) -> String {
@@ -319,5 +649,134 @@ mod tests {
         let long = "a".repeat(200);
         let result = truncate(&long, 120);
         assert!(result.len() <= 123);
+    }
+
+    fn big_text(marker: &str) -> String {
+        // Above MIN_DUPLICATE_ASSET_BYTES so it isn't filtered out as trivial.
+        format!("{marker}{}", "x".repeat(MIN_DUPLICATE_ASSET_BYTES))
+    }
+
+    #[test]
+    fn test_group_duplicate_assets_finds_two_urls_same_content() {
+        let text = big_text("shared");
+        let entries = vec![
+            (
+                "id-1".to_string(),
+                "https://a.example/app.js".to_string(),
+                text.clone(),
+            ),
+            (
+                "id-2".to_string(),
+                "https://a.example/vendor/app.js".to_string(),
+                text.clone(),
+            ),
+        ];
+        let groups = group_duplicate_assets("script", entries);
+        assert_eq!(groups.len(), 1);
+        assert_eq!(groups[0].kind, "script");
+        assert_eq!(groups[0].bytes, text.len() as u64);
+        assert_eq!(
+            groups[0].urls,
+            vec![
+                "https://a.example/app.js".to_string(),
+                "https://a.example/vendor/app.js".to_string(),
+            ]
+        );
+    }
+
+    #[test]
+    fn test_group_duplicate_assets_single_url_is_not_a_duplicate() {
+        let entries = vec![(
+            "id-1".to_string(),
+            "https://a.example/app.js".to_string(),
+            big_text("solo"),
+        )];
+        assert!(group_duplicate_assets("script", entries).is_empty());
+    }
+
+    #[test]
+    fn test_group_duplicate_assets_different_content_is_not_grouped() {
+        let entries = vec![
+            (
+                "id-1".to_string(),
+                "https://a.example/a.js".to_string(),
+                big_text("one"),
+            ),
+            (
+                "id-2".to_string(),
+                "https://a.example/b.js".to_string(),
+                big_text("two"),
+            ),
+        ];
+        assert!(group_duplicate_assets("script", entries).is_empty());
+    }
+
+    #[test]
+    fn test_group_duplicate_assets_below_size_threshold_is_ignored() {
+        let text = "tiny".to_string();
+        let entries = vec![
+            (
+                "id-1".to_string(),
+                "https://a.example/a.css".to_string(),
+                text.clone(),
+            ),
+            (
+                "id-2".to_string(),
+                "https://a.example/b.css".to_string(),
+                text,
+            ),
+        ];
+        assert!(group_duplicate_assets("stylesheet", entries).is_empty());
+    }
+
+    #[test]
+    fn test_group_duplicate_assets_same_id_repeated_counts_once() {
+        // Same script id appearing twice in the raw coverage list (e.g. it ran
+        // more than once) must not turn a single URL into a fake 2-URL group.
+        let text = big_text("repeat");
+        let entries = vec![
+            (
+                "id-1".to_string(),
+                "https://a.example/app.js".to_string(),
+                text.clone(),
+            ),
+            (
+                "id-1".to_string(),
+                "https://a.example/app.js".to_string(),
+                text,
+            ),
+        ];
+        assert!(group_duplicate_assets("script", entries).is_empty());
+    }
+
+    #[test]
+    fn test_group_duplicate_assets_sorted_by_bytes_descending() {
+        let small = big_text("small");
+        let large = format!("{small}{}", "y".repeat(2048));
+        let entries = vec![
+            (
+                "id-1".to_string(),
+                "https://a.example/small-a.js".to_string(),
+                small.clone(),
+            ),
+            (
+                "id-2".to_string(),
+                "https://a.example/small-b.js".to_string(),
+                small,
+            ),
+            (
+                "id-3".to_string(),
+                "https://a.example/large-a.js".to_string(),
+                large.clone(),
+            ),
+            (
+                "id-4".to_string(),
+                "https://a.example/large-b.js".to_string(),
+                large,
+            ),
+        ];
+        let groups = group_duplicate_assets("script", entries);
+        assert_eq!(groups.len(), 2);
+        assert!(groups[0].bytes > groups[1].bytes);
     }
 }

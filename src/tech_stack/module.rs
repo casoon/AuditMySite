@@ -56,6 +56,7 @@ mod tests {
             check_mobile: false,
             check_dark_mode: false,
             check_design_quality: false,
+            check_html_conform: false,
             check_ai_transparency: false,
             check_dns: false,
             check_isolate_third_party_impact: false,

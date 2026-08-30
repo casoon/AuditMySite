@@ -7,13 +7,14 @@ use crate::i18n::I18n;
 use crate::output::report_model::{
     AiTransparencyPresentation, AnimationPresentation, CoveragePresentation,
     CriticalChainPresentation, DarkModePresentation, DesignQualityFindingPresentation,
-    DesignQualityPresentation, FrictionPointPresentation, ImageEfficiencyPresentation,
-    ImageProvenanceFindingPresentation, JourneyDimensionPresentation, JourneyPresentation,
-    MinificationPresentation, MobilePresentation, ModuleDetailsBlock, OversizedImageRow,
-    PerformancePresentation, PerformanceViewport, RobotsPresentation, SecurityPresentation,
-    SeoPresentation, SeoProfilePresentation, SignalDetails, ThirdPartyImpactRow,
-    ThirdPartyOriginRow, ThirdPartyPresentation, ThrottledPerfEntry, UxDimensionPresentation,
-    UxIssuePresentation, UxPresentation, VisionDeficiencyModePresentation,
+    DesignQualityPresentation, DuplicateAssetRow, FrictionPointPresentation,
+    HtmlConformPresentation, ImageEfficiencyPresentation, ImageProvenanceFindingPresentation,
+    JourneyDimensionPresentation, JourneyPresentation, MinificationPresentation,
+    MobilePresentation, ModuleDetailsBlock, OversizedImageRow, PerformancePresentation,
+    PerformanceViewport, RobotsPresentation, SecurityPresentation, SeoPresentation,
+    SeoProfilePresentation, SignalDetails, ThirdPartyImpactRow, ThirdPartyOriginRow,
+    ThirdPartyPresentation, ThrottledPerfEntry, UxDimensionPresentation, UxIssuePresentation,
+    UxPresentation, VisionDeficiencyModePresentation,
 };
 use crate::output::search_experience::build_search_experience;
 
@@ -480,6 +481,15 @@ fn build_performance_details(
             css_used_pct: cov.unused_css.used_pct,
             css_total_rules: Some(cov.unused_css.total_rules),
             css_used_rules: Some(cov.unused_css.used_rules),
+            duplicate_assets: cov
+                .duplicate_assets
+                .iter()
+                .map(|g| DuplicateAssetRow {
+                    kind: g.kind.clone(),
+                    kb: g.bytes as f64 / 1024.0,
+                    urls: g.urls.iter().map(|u| truncate_url(u, 60)).collect(),
+                })
+                .collect(),
         });
 
         let animations = p
@@ -1614,6 +1624,43 @@ fn push_optional_ssl_row(rows: &mut Vec<(String, String)>, label: &str, value: O
     }
 }
 
+fn build_html_conform_details(
+    normalized: &AuditContext<'_>,
+    i18n: &I18n,
+) -> Option<HtmlConformPresentation> {
+    let locale = i18n.locale();
+    normalized.raw_html_conform.map(|hc| {
+        let score =
+            normalized_module_score(&normalized.normalized, "HTML Conformance").unwrap_or(hc.score);
+        let severity_label = |severity: &str| match severity {
+            "error" => i18n.t("severity-error"),
+            "warning" => i18n.t("severity-warning"),
+            _ => i18n.t("severity-info"),
+        };
+        HtmlConformPresentation {
+            score,
+            checked: hc.checked,
+            interpretation: module_interpretation(&normalized.normalized, "html_conform", locale),
+            error_count: hc.error_count,
+            warning_count: hc.warning_count,
+            info_count: hc.info_count,
+            findings: hc
+                .findings
+                .iter()
+                .take(20)
+                .map(|f| {
+                    (
+                        f.rule_id.clone(),
+                        severity_label(&f.severity),
+                        f.message.clone(),
+                        f.location.clone().unwrap_or_else(|| "—".to_string()),
+                    )
+                })
+                .collect(),
+        }
+    })
+}
+
 fn build_mobile_details(normalized: &AuditContext<'_>, i18n: &I18n) -> Option<MobilePresentation> {
     let locale = i18n.locale();
     normalized.raw_mobile.map(|m| {
@@ -2109,6 +2156,7 @@ pub(super) fn build_module_details_from_normalized(
     let search_experience = build_search_experience(normalized, i18n);
     let seo = build_seo_details(normalized, i18n);
     let security = build_security_details(normalized, i18n);
+    let html_conform = build_html_conform_details(normalized, i18n);
     let mobile = build_mobile_details(normalized, i18n);
     let dark_mode = build_dark_mode_details(normalized, i18n);
     let design_quality = build_design_quality_details(normalized, i18n);
@@ -2129,6 +2177,7 @@ pub(super) fn build_module_details_from_normalized(
         || search_experience.is_some()
         || seo.is_some()
         || security.is_some()
+        || html_conform.is_some()
         || mobile.is_some()
         || ux.is_some()
         || journey.is_some()
@@ -2148,6 +2197,7 @@ pub(super) fn build_module_details_from_normalized(
         performance,
         seo,
         security,
+        html_conform,
         mobile,
         ux,
         journey,
@@ -2176,6 +2226,7 @@ pub(super) fn pdf_rendered_modules() -> std::collections::BTreeSet<&'static str>
         "performance",
         "seo",
         "security",
+        "html_conform",
         "mobile",
         "ux",
         "journey",

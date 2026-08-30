@@ -508,6 +508,15 @@ fn all_active_modules_report() -> AuditReport {
         protection: Default::default(),
         sourcemap_leaks: Default::default(),
     })
+    .with_html_conform(crate::html_conform::HtmlConformAnalysis {
+        score: 90,
+        checked: true,
+        error_count: 0,
+        warning_count: 1,
+        info_count: 0,
+        findings: vec![],
+        raw_html: None,
+    })
     .with_mobile(MobileFriendliness {
         score: 75,
         viewport: ViewportAnalysis::default(),

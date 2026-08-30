@@ -327,6 +327,7 @@
         "performance": { "type": ["object", "null"] },
         "seo": { "type": ["object", "null"] },
         "security": { "type": ["object", "null"] },
+        "html_conform": { "type": ["object", "null"] },
         "mobile": { "type": ["object", "null"] },
         "ux": { "type": ["object", "null"] },
         "journey": { "type": ["object", "null"] },

@@ -299,6 +299,7 @@ dependencies = [
  "fluent-bundle",
  "futures",
  "hickory-resolver",
+ "html-conform",
  "html5ever",
  "image",
  "insta",
@@ -310,6 +311,7 @@ dependencies = [
  "runemark",
  "serde",
  "serde_json",
+ "sha2 0.10.9",
  "tempfile",
  "thiserror 1.0.69",
  "tokio",
@@ -1254,6 +1256,12 @@ checksum = "ce6e4c961d6cd6c9a86db418387425e8bdeaf05b3c8bc1411e6dca4c252f1453"
 dependencies = [
  "hybrid-array",
 ]
+
+[[package]]
+name = "csp-parse"
+version = "0.1.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "c1cd2527b63dd3d6edbb8a0f251aa31bb52e81cc7ad37dc461d2974084fa5c33"
 
 [[package]]
 name = "csv"
@@ -2375,6 +2383,30 @@ dependencies = [
 ]
 
 [[package]]
+name = "html-conform"
+version = "0.1.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "4ca674d08fbdb82dd89d81252f15a7a8c5f5e87260f685fce4fd822bbc0ccbe8"
+dependencies = [
+ "csp-parse",
+ "encoding_rs",
+ "html5-parser",
+ "media-query-parse",
+ "relax-ng",
+ "schematron-engine",
+ "serde",
+ "serde_json",
+ "url",
+ "xpath-eval",
+]
+
+[[package]]
+name = "html5-parser"
+version = "0.2.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "0e0ecc373c11b5f9e631a259c3025ce01b69797c09e406c59ba7792675cd27d1"
+
+[[package]]
 name = "html5ever"
 version = "0.27.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -3323,6 +3355,12 @@ dependencies = [
  "cfg-if",
  "digest 0.10.7",
 ]
+
+[[package]]
+name = "media-query-parse"
+version = "0.1.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "f93a1e4247a741c4a1d80414a107c4ddae6302e41b783de3eabcfbceca71727c"
 
 [[package]]
 name = "memchr"
@@ -4543,10 +4581,21 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "dc897dd8d9e8bd1ed8cdad82b5966c3e0ecae09fb1907d58efaa013543185d0a"
 
 [[package]]
-name = "renderreport"
-version = "0.4.0"
+name = "relax-ng"
+version = "0.2.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "7a88aeaacefd645f246d26b2cf2dbce7104f2658f8dba8d4773a5a95090d9baf"
+checksum = "c379ffde14c5045576e89c49ba93812aad1f61986485a434198037be3316e17e"
+dependencies = [
+ "regex",
+ "roxmltree 0.21.1",
+ "unicode-ident",
+]
+
+[[package]]
+name = "renderreport"
+version = "0.5.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "b6c95972352896152180bdb0d0554ba2d30cff3c5348fcf10ace27b20fac1b65"
 dependencies = [
  "anyhow",
  "barcoders",
@@ -4868,6 +4917,16 @@ dependencies = [
  "ref-cast",
  "serde",
  "serde_json",
+]
+
+[[package]]
+name = "schematron-engine"
+version = "0.2.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "07c05422a9c10ccc8ca8c5939e191af07a0542578d52f3bbd7558d5c02b0619c"
+dependencies = [
+ "roxmltree 0.21.1",
+ "xpath-eval",
 ]
 
 [[package]]
@@ -7301,6 +7360,12 @@ name = "xmp-writer"
 version = "0.3.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "9440ea3e5aeabb0ac63af70daf835274065238cdd0cec83418f417eae38bacee"
+
+[[package]]
+name = "xpath-eval"
+version = "0.2.2"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "83058fdeec995449ff47adb0bc5773092b56aa91423c4cb257ef4e4e11df542b"
 
 [[package]]
 name = "xz2"

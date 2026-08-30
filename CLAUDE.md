@@ -51,6 +51,7 @@ src/
 ├── security/            # Security header analysis
 ├── mobile/              # Mobile friendliness analysis
 ├── dark_mode/           # Dark mode support detection and contrast
+├── html_conform/        # HTML5 spec-conformance checking via the html-conform crate (scored, part of --full)
 ├── design_quality/      # Opt-in UX/readability heuristics (overflow-clip, line length/height, all-caps, layout transitions) — score-neutral (#528)
 ├── ai_transparency/     # Opt-in C2PA image-provenance check (EU AI Act Art. 50), single-URL only, score-neutral; requires `ai-transparency` Cargo feature
 ├── network/             # Opt-in, score-neutral, host-scoped network checks (#545)
@@ -248,6 +249,31 @@ Bewusste, über alle Phasen hinweg getroffene Entscheidung statt einer nachträg
   Differenzprüfungen** statt gespeicherter Pixel-Baselines erkannt, siehe Phase-5-Eintrag unten.
 
 ## Current State (v1.1.0)
+- **Neues `html_conform`-Modul: HTML5-Spezifikationskonformität via `html-conform`-Crate,
+  2026-08-30:** neues, **standalone** Modul (`src/html_conform/`), das per `html-conform`
+  (crates.io, pure Rust, kein Netzwerk/Subprocess) Browser-artige HTML5-Baumkonstruktion,
+  volle W3C-RelaxNG-Schemavalidierung, Schematron-Co-Constraints sowie Import-Map-/
+  Speculation-Rules-JSON- und CSP-Enforcement-Prüfung durchführt — deutlich tiefer als der
+  bestehende, unverändert belassene `html5ever`-Parse-Fehler-Check in `seo::page_health`
+  (`validate_html_locally`). **Läuft als Teil von `--full`** (`check_html_conform: full_audit`,
+  kein eigener CLI-Flag), nur auf dem Mobile-Viewport-Pass (analog SEO/Mobile/DesignQuality),
+  und **fließt in den Score ein** (nicht score-neutral wie `design_quality`/`ai_transparency`):
+  eigenes `ModuleScoreEntry` mit 10 % Gewicht, finanziert durch eine proportionale Kürzung der
+  fünf bisherigen Gewichte (Accessibility 40→36, Performance 20→18, SEO 20→18, Security 10→9,
+  Mobile 10→9). Wie `security` als eigenständiges Top-Level-Feld auf `AuditReport`
+  (`html_conform: Option<HtmlConformAnalysis>`, URL-/Seiten-Ebene statt Viewport-Experience) und
+  außerhalb des Viewport-Blends auf `overall_score` aufgesetzt (`ScoreBreakdown.html_conform_score/
+  _weight_pct`, analog `security_score`/`security_weight_pct`). `rule_id`/`message` bleiben
+  opakes kanonisch-englisches Passthrough (`html-conform`s Regelmenge ist offen, nicht ein
+  kleines Enum, und die Messages sind Drittanbieter-Fließtext) — bewusst **kein** #406-
+  kind-Enum-Muster, gleiche Präzedenz wie `best_practices::console_errors`/`vulnerable_libs`.
+  Auf einem technischen Setup-Fehler oder HTML-Extraktions-Fehler: `checked: false` / `score: 100`
+  ("nicht gemessen", ausgeschlossen vom gewichteten Overall-Score) statt eines punitiven 0,
+  analog Performance's `metrics_available == 0`-Behandlung. Volle JSON/PDF-Anbindung
+  (`ModuleBlob.html_conform`, `HtmlConformPresentation`, eigener PDF-Renderer mit ScoreCard/
+  MetricStrip/AuditTable). Batch-PDF-Narrativ-Arme (`batch_report/sections.rs`) und
+  URL-Matrix-Spalte bewusst **nicht** Teil dieser Änderung (Score zählt bereits automatisch in
+  jedes Batch-Aggregat ein) — gleiche Präzedenz wie der akzeptierte `commerce`-hat-kein-PDF-Gap.
 - **Neues `ai_transparency`-Modul: C2PA-Bildherkunfts-Check (EU AI Act Art. 50), 2026-07-31:**
   neues, **opt-in** (`--ai-transparency`) und **score-neutrales** Modul, das eingebettete C2PA-
   ("Content Credentials"-)Manifeste auf `<img>`-Elementen der geprüften Seite liest und —

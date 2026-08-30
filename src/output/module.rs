@@ -20,6 +20,7 @@ use crate::commerce::CommerceAnalysis;
 use crate::content_visibility::ContentVisibilityAnalysis;
 use crate::dark_mode::DarkModeAnalysis;
 use crate::design_quality::DesignQualityAnalysis;
+use crate::html_conform::HtmlConformAnalysis;
 #[cfg(feature = "pdf")]
 use crate::i18n::I18n;
 use crate::journey::JourneyAnalysis;
@@ -95,6 +96,19 @@ impl ReportModule for SeoAnalysis {
 impl ReportModule for SecurityAnalysis {
     fn module_key(&self) -> &'static str {
         "security"
+    }
+    fn to_json(&self) -> Value {
+        serde_json::to_value(self).unwrap_or(Value::Null)
+    }
+    #[cfg(feature = "pdf")]
+    fn render_pdf(&self, i18n: &I18n) -> PdfComponents {
+        pdf_marker(self.module_key(), i18n)
+    }
+}
+
+impl ReportModule for HtmlConformAnalysis {
+    fn module_key(&self) -> &'static str {
+        "html_conform"
     }
     fn to_json(&self) -> Value {
         serde_json::to_value(self).unwrap_or(Value::Null)
@@ -307,6 +321,9 @@ pub fn active_modules(report: &AuditReport) -> Vec<(&'static str, Value)> {
     if let Some(ref m) = report.security {
         push(m);
     }
+    if let Some(ref m) = report.html_conform {
+        push(m);
+    }
     if let Some(ref m) = report.experience.mobile {
         push(m);
     }
@@ -370,6 +387,7 @@ pub fn active_report_modules(report: &AuditReport) -> Vec<&dyn ReportModule> {
     push_module!(report.performance);
     push_module!(report.discoverability.seo);
     push_module!(report.security);
+    push_module!(report.html_conform);
     push_module!(report.experience.mobile);
     push_module!(report.ux);
     push_module!(report.journey);

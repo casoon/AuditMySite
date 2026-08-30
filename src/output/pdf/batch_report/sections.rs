@@ -1872,6 +1872,7 @@ pub(super) fn localized_module_name(name: &str, en: bool) -> &str {
         ("Mobile", false) => "Mobile",
         ("Performance", false) => "Performance",
         ("Security", false) => "Security",
+        ("HTML Conformance", false) => "HTML-Konformität",
         ("SEO", false) => "SEO",
         ("UX", false) => "UX",
         ("Journey", false) => "Journey",
@@ -1965,6 +1966,18 @@ pub(super) fn module_effect_sentence(
         ("Mobile", _, false) => {
             "Mobile Probleme können die Nutzung auf kleineren Displays über Seitengruppen erschweren."
         }
+        ("HTML Conformance", 0, true) => {
+            "HTML markup is spec-conformant across the audited pages, which keeps browsers and assistive technology parsing it consistently."
+        }
+        ("HTML Conformance", 0, false) => {
+            "Das HTML-Markup ist über die geprüften Seiten spezifikationskonform, wodurch Browser und assistive Technologien es konsistent interpretieren."
+        }
+        ("HTML Conformance", _, true) => {
+            "HTML conformance issues often come from a shared template and can affect parsing and accessibility tooling across many pages at once."
+        }
+        ("HTML Conformance", _, false) => {
+            "HTML-Konformitätsprobleme stammen häufig aus einem gemeinsamen Template und können die Interpretation durch Browser und assistive Technologien seitenübergreifend beeinträchtigen."
+        }
         (_, 0, true) => "The module is stable across most audited pages.",
         (_, 0, false) => "Das Modul ist über die meisten geprüften Seiten stabil.",
         (_, 1, true) => "The module has a usable foundation with targeted cleanup potential.",
@@ -2052,6 +2065,17 @@ pub(super) fn render_batch_impact_summary(
     builder
 }
 
+/// Extra scored dimensions shown in the URL ranking table, as
+/// `(module_scores name, short column header)`. `BenchmarkRow::with_column`
+/// (renderreport >= 0.5.0) is fully generic — adding a dimension here is the
+/// only change needed; no renderreport-side release is required.
+const RANKING_EXTRA_COLUMNS: &[(&str, &str)] = &[
+    ("SEO", "SEO"),
+    ("Performance", "Perf"),
+    ("Security", "Sec"),
+    ("HTML Conformance", "Konf."),
+];
+
 pub(super) fn render_batch_url_ranking(
     mut builder: renderreport::engine::ReportBuilder,
     pres: &BatchPresentation,
@@ -2070,26 +2094,14 @@ pub(super) fn render_batch_url_ranking(
                 u.critical_violations as u32,
             );
             if let Some(detail) = pres.url_details.iter().find(|detail| detail.url == u.url) {
-                if let Some((_, score)) = detail
-                    .module_scores
-                    .iter()
-                    .find(|(module, _)| module == "SEO")
-                {
-                    row = row.with_seo(*score);
-                }
-                if let Some((_, score)) = detail
-                    .module_scores
-                    .iter()
-                    .find(|(module, _)| module == "Performance")
-                {
-                    row = row.with_performance(*score);
-                }
-                if let Some((_, score)) = detail
-                    .module_scores
-                    .iter()
-                    .find(|(module, _)| module == "Security")
-                {
-                    row = row.with_security(*score);
+                for (module_name, header) in RANKING_EXTRA_COLUMNS {
+                    if let Some((_, score)) = detail
+                        .module_scores
+                        .iter()
+                        .find(|(module, _)| module == module_name)
+                    {
+                        row = row.with_column(*header, *score);
+                    }
                 }
             }
             row

@@ -18,9 +18,9 @@ use super::appendix::build_cli_snapshot_table;
 use super::detail_modules::{
     render_a11y_journey_findings, render_ai_transparency, render_ai_visibility,
     render_best_practices, render_budget_violations, render_content_visibility, render_dark_mode,
-    render_design_quality, render_journey, render_mobile, render_network_dns, render_performance,
-    render_screen_reader_section, render_search_experience, render_security, render_seo,
-    render_source_quality, render_tech_stack, render_ux,
+    render_design_quality, render_html_conform, render_journey, render_mobile, render_network_dns,
+    render_performance, render_screen_reader_section, render_search_experience, render_security,
+    render_seo, render_source_quality, render_tech_stack, render_ux,
 };
 use super::diagnosis::render_diagnosis_section;
 use super::en301549::render_en301549_annex;
@@ -1628,6 +1628,11 @@ fn render_active_module_section(
         "security" => {
             if let Some(ref sec) = vm.module_details.security {
                 return (render_security(builder, sec, is_first, i18n), true);
+            }
+        }
+        "html_conform" => {
+            if let Some(ref hc) = vm.module_details.html_conform {
+                return (render_html_conform(builder, hc, is_first, i18n), true);
             }
         }
         "mobile" => {
