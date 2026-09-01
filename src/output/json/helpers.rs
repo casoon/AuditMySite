@@ -206,32 +206,91 @@ pub(super) fn build_accessibility_score_breakdown(
         .collect()
 }
 
+/// Whether `key` contains `prefix` as the start of a "word" (a run of
+/// alphanumeric characters delimited by any non-alphanumeric character, or
+/// by the string boundary) rather than merely as a substring anywhere.
+/// Prevents e.g. "conformance" (contains "form" mid-word) or "querformat"
+/// (contains "form" mid-word) from being misread as a forms-related match,
+/// while still matching legitimate plurals/compounds like "forms",
+/// "landmarks", "inputs" that genuinely start with the needle (see
+/// score-area-substring-misclassification in the regression corpus).
+fn key_has_word_starting_with(key: &str, prefix: &str) -> bool {
+    key.split(|c: char| !c.is_alphanumeric())
+        .any(|word| word.starts_with(prefix))
+}
+
+/// Removes CSS-selector-shaped spans (a `.class`/`#id` chain glued directly
+/// onto a preceding word, e.g. "div.alt-service-hero-card" or
+/// "a.button.success") from `text`. Several WCAG rules embed the raw
+/// `affected_selectors` CSS selector directly into their finding message
+/// (e.g. `text_spacing.rs`'s "Content is clipped by '{selector}' ..."), and
+/// a selector's class/id name commonly starts with an unrelated area
+/// keyword by coincidence (a class named "alt-service-hero-card" has
+/// nothing to do with image alt text). English prose never glues a `.`/`#`
+/// directly onto a following letter without a space, so this pattern
+/// reliably identifies CSS selector syntax rather than legitimate word
+/// content -- see score-area-substring-misclassification in the regression
+/// corpus. Scoped to `finding.description` only (the one field that embeds
+/// live, page-controlled selector text); rule_id/title are fixed, curated
+/// strings that never contain a real CSS selector.
+fn strip_css_selector_spans(text: &str) -> String {
+    let mut result = String::with_capacity(text.len());
+    let mut chars = text.char_indices().peekable();
+    while let Some((_, c)) = chars.next() {
+        if (c == '.' || c == '#') && chars.peek().is_some_and(|(_, next)| next.is_alphabetic()) {
+            while chars
+                .peek()
+                .is_some_and(|(_, next)| next.is_alphanumeric() || *next == '-' || *next == '_')
+            {
+                chars.next();
+            }
+            result.push(' ');
+        } else {
+            result.push(c);
+        }
+    }
+    result
+}
+
 pub(super) fn score_area_for_finding(
     finding: &crate::audit::normalized::NormalizedFinding,
 ) -> &'static str {
-    let key = format!(
-        "{} {} {} {}",
+    // rule_id/title/description are specific to this one finding; subcategory
+    // is a coarse, shared label covering many unrelated rules (see below).
+    let description = strip_css_selector_spans(&finding.description.to_ascii_lowercase());
+    let specific = format!(
+        "{} {} {}",
         finding.rule_id.to_ascii_lowercase(),
-        finding.subcategory.to_ascii_lowercase(),
         finding.title.to_ascii_lowercase(),
-        finding.description.to_ascii_lowercase()
+        description
     );
-    if (key.contains("form") && !key.contains("format"))
-        || key.contains("label")
-        || key.contains("input")
-    {
+    let key = format!("{specific} {}", finding.subcategory.to_ascii_lowercase());
+    let has = |word: &str| key_has_word_starting_with(&key, word);
+    // "navigation" is checked against `specific` only, deliberately excluding
+    // `subcategory`: the shared `NavigationInteraction` subcategory label
+    // ("Navigation & Operation") covers ~26 unrelated rules (keyboard focus,
+    // timing, click target size, pointer gestures, ...), so matching it
+    // against subcategory text misrouted all of them into "Landmarks / page
+    // structure" (e.g. a11y.target_size_minimum.small, confirmed live in the
+    // 2026-08-31 corpus). "landmark" and "main" don't have this problem --
+    // no subcategory label contains either word -- so they still match
+    // against the full `key`, including the genuinely landmark-related
+    // a11y.bypass_blocks.missing ("Missing bypass navigation" in its own
+    // title) and a11y.landmark_main.missing ("landmark" in its own rule_id).
+    let has_navigation = key_has_word_starting_with(&specific, "navigation");
+    if (has("form") && !has("format")) || has("label") || has("input") {
         "Forms"
-    } else if key.contains("keyboard") || key.contains("tastatur") {
+    } else if has("keyboard") || has("tastatur") {
         "Keyboard"
-    } else if key.contains("focus") || key.contains("fokus") {
+    } else if has("focus") || has("fokus") {
         "Focus management"
-    } else if key.contains("alt") || key.contains("image") || key.contains("bild") {
+    } else if has("alt") || has("image") || has("bild") {
         "Images / alternative text"
-    } else if key.contains("aria") || key.contains("role") {
+    } else if has("aria") || has("role") {
         "ARIA"
-    } else if key.contains("heading") || key.contains("überschrift") || key.contains("h1") {
+    } else if has("heading") || has("überschrift") || has("h1") {
         "Heading structure"
-    } else if key.contains("landmark") || key.contains("main") || key.contains("navigation") {
+    } else if has("landmark") || has("main") || has_navigation {
         "Landmarks / page structure"
     } else {
         "Semantics"
@@ -278,8 +337,13 @@ pub(super) fn build_management_risks(reports: &[NormalizedReport]) -> Vec<Manage
             }
             .to_string(),
             rationale: format!(
-                "Average accessibility score is {avg}/100; performance {:?}, mobile {:?}.",
-                perf, mobile
+                "Average accessibility score is {avg}/100; performance {}, mobile {}.",
+                perf
+                    .map(|score| format!("{score}/100"))
+                    .unwrap_or_else(|| "not measured".to_string()),
+                mobile
+                    .map(|score| format!("{score}/100"))
+                    .unwrap_or_else(|| "not measured".to_string()),
             ),
         },
         ManagementRisk {
@@ -676,6 +740,20 @@ mod tests {
         }
     }
 
+    fn make_finding_with_subcategory(
+        rule_id: &str,
+        subcategory: &str,
+        subcategory_kind: crate::taxonomy::Subcategory,
+        title: &str,
+        description: &str,
+    ) -> NormalizedFinding {
+        let mut finding = make_finding(rule_id, description);
+        finding.subcategory = subcategory.into();
+        finding.subcategory_kind = subcategory_kind;
+        finding.title = title.into();
+        finding
+    }
+
     #[test]
     fn score_area_for_finding_does_not_classify_orientation_lock_as_forms() {
         // Regression: the German description "... (Hoch- oder Querformat)"
@@ -695,5 +773,106 @@ mod tests {
             "Ein Formularfeld hat kein zugeordnetes Label.",
         );
         assert_eq!(score_area_for_finding(&finding), "Forms");
+    }
+
+    #[test]
+    fn score_area_for_finding_does_not_classify_target_size_as_landmarks() {
+        // Regression (sauerstoffzentrum-nordost.de / shop.satower-mosterei.de,
+        // 2026-08-31): a11y.target_size_minimum.small carries the shared
+        // NavigationInteraction subcategory ("Navigation & Operation"), whose
+        // label alone used to satisfy the `contains("navigation")` check and
+        // misattribute click-target-size findings to "Landmarks / page
+        // structure" -- a click target has nothing to do with landmarks.
+        let finding = make_finding_with_subcategory(
+            "a11y.target_size_minimum.small",
+            "Navigation & Operation",
+            crate::taxonomy::Subcategory::NavigationInteraction,
+            "Insufficient click target size",
+            "Interactive elements such as buttons, links, or icons have a clickable area \
+             smaller than 24x24 CSS pixels.",
+        );
+        assert_ne!(
+            score_area_for_finding(&finding),
+            "Landmarks / page structure"
+        );
+    }
+
+    #[test]
+    fn score_area_for_finding_still_classifies_bypass_navigation_as_landmarks() {
+        // The skip-link rule's own title says "navigation" -- unlike the
+        // target-size case above, this must still classify as Landmarks
+        // because the match comes from the finding's own title, not merely
+        // from the shared subcategory label.
+        let finding = make_finding_with_subcategory(
+            "a11y.bypass_blocks.missing",
+            "Navigation & Operation",
+            crate::taxonomy::Subcategory::NavigationInteraction,
+            "Missing bypass navigation",
+            "No skip link or mechanism to bypass repeated blocks.",
+        );
+        assert_eq!(
+            score_area_for_finding(&finding),
+            "Landmarks / page structure"
+        );
+    }
+
+    #[test]
+    fn score_area_for_finding_still_classifies_landmark_main_as_landmarks() {
+        let finding = make_finding_with_subcategory(
+            "a11y.landmark_main.missing",
+            "Navigation & Operation",
+            crate::taxonomy::Subcategory::NavigationInteraction,
+            "Missing main landmark",
+            "The page has no distinct main-content region marked up in the accessibility tree.",
+        );
+        assert_eq!(
+            score_area_for_finding(&finding),
+            "Landmarks / page structure"
+        );
+    }
+
+    #[test]
+    fn score_area_for_finding_does_not_classify_contrast_conformance_note_as_forms() {
+        // Regression (satower-mosterei.de / xn--sfte-loa-com, 2026-08-31): the
+        // contrast rule's evidence text ends with "... (supplementary, not a
+        // conformance gate)". A naive `contains("form")` check misreads
+        // "conformance" as forms-related and misattributes the accessibility
+        // score breakdown's "Forms" area driver to a contrast finding.
+        let finding = make_finding(
+            "a11y.contrast.weak",
+            "Insufficient color contrast ratio: 2.10:1 (text, requires 4.5:1). \
+             APCA Lc 12.3 (supplementary, not a conformance gate).",
+        );
+        assert_ne!(score_area_for_finding(&finding), "Forms");
+    }
+
+    #[test]
+    fn score_area_for_finding_does_not_classify_selector_embedded_alt_as_images() {
+        // Regression (score-area-substring-misclassification corpus entry):
+        // text_spacing.rs embeds the raw CSS selector into its message
+        // ("Content is clipped by '{selector}' ..."). A class name like
+        // "alt-service-hero-card" starts with "alt" purely by coincidence
+        // and has nothing to do with image alternative text.
+        let finding = make_finding(
+            "a11y.text_spacing.clipped",
+            "Content is clipped by 'div.alt-service-hero-card' when WCAG-minimum text \
+             spacing is applied.",
+        );
+        assert_ne!(
+            score_area_for_finding(&finding),
+            "Images / alternative text"
+        );
+    }
+
+    #[test]
+    fn score_area_for_finding_still_classifies_real_alt_text_findings() {
+        let finding = make_finding(
+            "a11y.alt_text.missing",
+            "Image is missing alternative text.",
+        );
+        assert_eq!(
+            score_area_for_finding(&finding),
+            "Images / alternative text"
+        );
     }
 }

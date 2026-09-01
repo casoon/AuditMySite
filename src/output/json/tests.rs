@@ -33,6 +33,39 @@ fn test_single_envelope_shape() {
 }
 
 #[test]
+fn test_management_risks_rationale_has_no_debug_format_leak() {
+    // Regression (all 5 same-day live single-reports, 2026-08-31): perf/mobile
+    // are Option<u32> and were formatted via `{:?}` in build_management_risks,
+    // producing "performance Some(85), mobile Some(85)" literally in the JSON
+    // rationale text instead of clean numbers/a "not measured" fallback.
+    let report = AuditReport::new(
+        "https://example.com".to_string(),
+        WcagLevel::AA,
+        WcagResults::new(),
+        500,
+    );
+    let normalized = normalize(&report);
+    let unified = UnifiedReport::single(&normalized, &report);
+
+    let conversion_risk = unified
+        .summary
+        .management_risks
+        .iter()
+        .find(|r| r.dimension == "Conversion / usability")
+        .expect("Conversion / usability risk must be present");
+    assert!(
+        !conversion_risk.rationale.contains("Some(") && !conversion_risk.rationale.contains("None"),
+        "rationale leaks Rust Option debug format: {}",
+        conversion_risk.rationale
+    );
+    assert!(
+        conversion_risk.rationale.contains("not measured"),
+        "expected a clean fallback for unmeasured performance/mobile scores: {}",
+        conversion_risk.rationale
+    );
+}
+
+#[test]
 fn test_single_summary_fields_present() {
     let report = AuditReport::new(
         "https://example.com".to_string(),

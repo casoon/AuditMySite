@@ -133,9 +133,15 @@ fn acceptable_certificates(
 /// `calculate_certificate`) — catches a certificate/grade computed from a
 /// different (e.g. stale or pre-normalization) score base. `certificate` may
 /// also legitimately be a risk-gated downgrade of the score-based value; see
-/// [`acceptable_certificates`].
+/// [`acceptable_certificates`]. `risk_source` supplies the risk-gate inputs
+/// (`legal_flags`/`blocking_issues`) separately from `node` because a
+/// single-report `summary` only ever carries a flat `risk_level` string, not
+/// the full `risk` object — the caller passes `pages[0]` as `risk_source` in
+/// that case so a `blocking_issues`-driven downgrade (risk_level below
+/// "high") is still recognized as acceptable.
 fn check_grade_and_certificate(
     node: &Value,
+    risk_source: &Value,
     evidence_prefix: &str,
     findings: &mut Vec<LintFinding>,
 ) {
@@ -158,7 +164,7 @@ fn check_grade_and_certificate(
 
     if let Some(certificate) = node.get("certificate").and_then(Value::as_str) {
         let score_based = CERTIFICATE.label(overall as f32, false);
-        let (risk_level, legal_flags, blocking_issues) = risk_gate_inputs(node);
+        let (risk_level, legal_flags, blocking_issues) = risk_gate_inputs(risk_source);
         let acceptable =
             acceptable_certificates(score_based, risk_level, legal_flags, blocking_issues);
         if !acceptable.contains(&certificate) {
@@ -174,12 +180,23 @@ fn check_grade_and_certificate(
 }
 
 fn check_grade_certificate_consistency(report: &Value, findings: &mut Vec<LintFinding>) {
+    let report_type = report
+        .get("report_type")
+        .and_then(Value::as_str)
+        .unwrap_or("");
+    let pages = report.get("pages").and_then(Value::as_array);
+
     if let Some(summary) = report.get("summary") {
-        check_grade_and_certificate(summary, "summary", findings);
+        let risk_source = if report_type == "single" {
+            pages.and_then(|p| p.first()).unwrap_or(summary)
+        } else {
+            summary
+        };
+        check_grade_and_certificate(summary, risk_source, "summary", findings);
     }
-    if let Some(pages) = report.get("pages").and_then(Value::as_array) {
+    if let Some(pages) = pages {
         for (i, page) in pages.iter().enumerate() {
-            check_grade_and_certificate(page, &format!("pages[{i}]"), findings);
+            check_grade_and_certificate(page, page, &format!("pages[{i}]"), findings);
         }
     }
 }
@@ -722,6 +739,31 @@ mod tests {
         assert!(findings
             .iter()
             .any(|f| f.check_id == CHECK_CERTIFICATE_MATCHES_SCORE));
+    }
+
+    #[test]
+    fn certificate_downgraded_by_page_blocking_issues_not_flagged_via_summary() {
+        // Real-world case (satower-mosterei.de, 2026-08-31): risk_level is
+        // only "medium" (not "high"), so gate_certificate_by_risk's own
+        // risk-level check doesn't apply -- the downgrade to "EINGESCHRÄNKT"
+        // is driven purely by pages[0].risk.blocking_issues > 0, which the
+        // summary node itself never carries (only a flat risk_level string).
+        // The summary check must recognize this via pages[0]'s full risk
+        // object, not just its own risk_level.
+        let mut report = clean_single_report();
+        report["summary"]["certificate"] = json!("EINGESCHRÄNKT");
+        report["summary"]["risk_level"] = json!("medium");
+        report["pages"][0]["certificate"] = json!("EINGESCHRÄNKT");
+        report["pages"][0]["risk"] =
+            json!({"level": "medium", "legal_flags": 0, "blocking_issues": 4});
+        let mut findings = Vec::new();
+        run_all_checks(&report, &mut findings);
+        assert!(
+            !findings
+                .iter()
+                .any(|f| f.check_id == CHECK_CERTIFICATE_MATCHES_SCORE),
+            "unexpected findings: {findings:?}"
+        );
     }
 
     #[test]

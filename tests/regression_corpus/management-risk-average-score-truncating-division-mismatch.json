@@ -1,0 +1,12 @@
+{
+  "id": "management-risk-average-score-truncating-division-mismatch",
+  "category": "Explanation",
+  "problem": "The \"average accessibility score\" quoted in summary.management_risks[].rationale (build_management_risks, src/output/json/helpers.rs) is computed by average_accessibility_score() (src/output/json/helpers.rs:449) using integer-truncating division (sum / len), which can disagree with summary.accessibility_score's own rounded value for the same nominal statistic when averaging across multiple pages.",
+  "evidence": "Found by the report-critic skill's dry-run eval against reports/casoon-batch-en301549.json: management_risks[1].rationale literally quoted \"84\" as the average accessibility score while summary.accessibility_score = 85 (85 = round(); 84 = truncating integer division of the same underlying per-page scores) — the JSON PDF text independently computes and shows 85 correctly, so only the raw JSON field is affected. Confirmed not observable for report_type=\"single\" (average of one value can't diverge from truncation); requires a batch/sitemap report with >=2 pages to reproduce.",
+  "expected": "Any two fields both claiming to be \"the average accessibility score\" must use the same rounding rule so they can never silently disagree.",
+  "regression": null,
+  "counter_examples": [
+    "A management_risks rationale for a single-report (exactly one page) is unaffected and must not be flagged, since averaging one value can never diverge under truncation vs. rounding."
+  ],
+  "status": "known_gap"
+}
