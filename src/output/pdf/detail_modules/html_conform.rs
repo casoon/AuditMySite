@@ -7,21 +7,37 @@ pub(in crate::output::pdf) fn render_html_conform(
     i18n: &I18n,
 ) -> renderreport::engine::ReportBuilder {
     let title = i18n.t("section-html-conform");
-    let takeaway = super::first_sentence(&hc.interpretation);
+    // Deliberately not `first_sentence(&hc.interpretation)`: that generic,
+    // score-band-derived text says "Kritisch/Critical" for a 0 score, which
+    // is exactly the misleading framing this module needs to avoid (see the
+    // ScoreCard comment below). Mirrors Dark Mode's bespoke takeaway (#577).
+    let takeaway = if hc.checked {
+        i18n.t("pdf-html-conform-takeaway")
+    } else {
+        i18n.t("pdf-html-conform-not-checked")
+    };
     builder = super::module_chapter_opener(builder, &title, &takeaway, is_first);
 
     if !hc.checked {
         return builder.add_component(Label::new(i18n.t("pdf-html-conform-not-checked")));
     }
 
+    // Score-neutral with a known false-positive gap (RDFa/Open-Graph
+    // attribute unawareness in the vendored HTML5 schema, see
+    // src/audit/normalized.rs) -- unlike every other module's ScoreCard,
+    // this deliberately does NOT use `score_band_label`'s Excellent/Good/
+    // …/Critical compliance language (a page with standard `og:` meta tags
+    // would otherwise show a flat, unqualified "Critical" 0/100 for a false
+    // positive). Mirrors the Dark Mode ScoreCard's precedent (#577) for a
+    // score-neutral, non-compliance-language presentation.
     builder = builder
         .add_component(
             ScoreCard::new(super::module_score_caption(i18n), hc.score)
-                .with_description(super::score_band_label(hc.score, i18n))
+                .with_description(i18n.t("label-limited-reliability"))
                 .with_thresholds(75, 40),
         )
         .add_component(
-            Label::new(hc.interpretation.as_str())
+            Label::new(i18n.t("pdf-html-conform-heuristic-note"))
                 .with_size("10.5pt")
                 .with_color(crate::output::pdf::design::tokens::NEUTRAL),
         )

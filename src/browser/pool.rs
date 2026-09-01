@@ -256,14 +256,62 @@ impl BrowserPool {
         info!("Closing browser pool...");
 
         // Close all pooled pages
-        let mut pages = self.inner.pages.lock().await;
-        for page in pages.drain(..) {
-            if let Err(e) = page.close().await {
-                warn!("Failed to close pooled page: {}", e);
+        {
+            let mut pages = self.inner.pages.lock().await;
+            for page in pages.drain(..) {
+                if let Err(e) = page.close().await {
+                    warn!("Failed to close pooled page: {}", e);
+                }
             }
         }
 
-        // The browser will be closed when the Arc is dropped
+        // Actually close the underlying browser process gracefully instead
+        // of just letting the Arc drop implicitly at the end of this
+        // function. A plain drop only relies on chromiumoxide's
+        // `Browser::drop` "kill_on_drop", which schedules a *background*
+        // task on the Tokio runtime to deliver the kill signal -- fine for
+        // long-running processes, but callers that tear the process down
+        // right after this returns (batch mode returns straight into
+        // `main()`'s `std::process::exit`) don't give that background task
+        // a chance to run, orphaning the Chrome process. Confirmed live
+        // (2026-09-01): the old code logged "Browser pool closed"
+        // successfully every time, yet the Chrome process was still running
+        // afterward every time too -- this was the missing piece, not just
+        // the caller never invoking `close()` at all.
+        //
+        // `Arc::try_unwrap` can still legitimately fail right here: the last
+        // audited page's `PooledPage` was likely just dropped by the caller
+        // moments ago, and `PooledPage::drop` spawns a detached
+        // "return-to-pool" task holding its own clone of this same Arc (see
+        // `PooledPage::drop`) -- that task may not have even been scheduled
+        // yet. Retry briefly (bounded, ~2s total) instead of giving up on
+        // the very first attempt; also confirmed live to be the actual
+        // failure mode (2026-09-01), not a hypothetical.
+        let mut inner = Arc::try_unwrap(self.inner);
+        for _ in 0..20 {
+            if inner.is_ok() {
+                break;
+            }
+            tokio::time::sleep(Duration::from_millis(100)).await;
+            inner = match inner {
+                Ok(i) => Ok(i),
+                Err(arc) => Arc::try_unwrap(arc),
+            };
+        }
+        match inner {
+            Ok(inner) => {
+                if let Err(e) = inner.browser.close().await {
+                    warn!("Failed to close browser: {}", e);
+                }
+            }
+            Err(_) => {
+                warn!(
+                    "Browser pool inner state still had outstanding references after \
+                     waiting; the browser process may not shut down cleanly"
+                );
+            }
+        }
+
         info!("Browser pool closed");
         Ok(())
     }

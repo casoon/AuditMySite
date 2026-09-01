@@ -2203,13 +2203,28 @@ fn build_module_scores(
         // real defect. Paused from the weighted score until that gap is
         // fixed upstream in html-conform; still shown with its own score
         // for visibility. See regression note in CLAUDE.md.
+        //
+        // `measurement_type` corrected from "measured" to "heuristic"
+        // (2026-09-01, report-quality review): "measured" is the same
+        // taxonomy value used for hard compliance numbers like Accessibility/
+        // Performance, so this module rendered with full visual weight (a
+        // flat red 0/100 gauge) with no on-page indication that the score is
+        // currently unreliable and score-neutral -- exactly the false-positive
+        // gap this comment already describes. Deliberately "heuristic", not
+        // "optional": HTML conformance is not a nice-to-have (unlike Dark
+        // Mode) -- the *current measurement* is what's unreliable, which is
+        // the same "treat this number with some skepticism" caveat the other
+        // heuristic indicators (AI Visibility, Source Quality, Content
+        // Visibility, UX, Journey) already carry. Either value would pick up
+        // the shared "(Indicator)"/"(Optional)" suffix qualifier (#577) on
+        // every render surface; "heuristic" is the more accurate one.
         module_scores.push(ModuleScoreEntry {
             name: "HTML Conformance".to_string(),
             score: hc.score,
             grade: AccessibilityScorer::calculate_grade(hc.score as f32).to_string(),
             weight_pct: 0,
             contributes_to_overall: false,
-            measurement_type: "measured".to_string(),
+            measurement_type: "heuristic".to_string(),
         });
     }
     if let Some(ref ux) = report.ux {

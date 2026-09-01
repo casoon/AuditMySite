@@ -17,10 +17,10 @@ use super::design;
 use super::appendix::build_cli_snapshot_table;
 use super::detail_modules::{
     render_a11y_journey_findings, render_ai_transparency, render_ai_visibility,
-    render_best_practices, render_budget_violations, render_content_visibility, render_dark_mode,
-    render_design_quality, render_html_conform, render_journey, render_mobile, render_network_dns,
-    render_performance, render_screen_reader_section, render_search_experience, render_security,
-    render_seo, render_source_quality, render_tech_stack, render_ux,
+    render_best_practices, render_budget_violations, render_commerce, render_content_visibility,
+    render_dark_mode, render_design_quality, render_html_conform, render_journey, render_mobile,
+    render_network_dns, render_performance, render_screen_reader_section, render_search_experience,
+    render_security, render_seo, render_source_quality, render_tech_stack, render_ux,
 };
 use super::diagnosis::render_diagnosis_section;
 use super::en301549::render_en301549_annex;
@@ -177,15 +177,38 @@ fn render_module_split_dashboards(
             "Wo sich Optimierung lohnt"
         }));
     } else if !vm.modules.dashboard.is_empty() {
-        builder = builder.add_component(
-            Label::new(if en {
-                "All audited modules are in good shape — no module needs prioritized optimization."
-            } else {
-                "Alle geprüften Module sind in gutem Zustand — kein Modul erfordert vorrangige Optimierung."
-            })
-            .with_size("10.5pt")
-            .with_color(design::tokens::SUCCESS),
+        // Module *scores* (0-100 per module) are a different axis from the
+        // risk-gated certificate (which can be downgraded to EINGESCHRÄNKT/
+        // NICHT BESTANDEN by blocking operability issues or legal flags even
+        // when every module score is >= 75 -- see gate_certificate_by_risk).
+        // An unconditional "all good" claim here directly contradicted that
+        // downgrade (confirmed live in satower-mosterei.de, 2026-08-31:
+        // certificate EINGESCHRÄNKT / verdict fail / 4 blockers, right next
+        // to "no module needs prioritized optimization"). Qualify the
+        // message instead of suppressing it entirely, so the "module scores
+        // are fine" observation stays but doesn't read as "nothing to fix".
+        let risk_gated = matches!(
+            vm.summary.certificate.as_str(),
+            "EINGESCHRÄNKT" | "NICHT BESTANDEN"
         );
+        let message = if risk_gated {
+            if en {
+                "All module scores are in good shape, but operability/legal risk elsewhere in this report still requires action — see Management Summary."
+            } else {
+                "Alle Modul-Scores sind in gutem Zustand, dennoch besteht an anderer Stelle in diesem Report Bedienbarkeits- oder rechtliches Risiko, das Handeln erfordert — siehe Management-Zusammenfassung."
+            }
+        } else if en {
+            "All audited modules are in good shape — no module needs prioritized optimization."
+        } else {
+            "Alle geprüften Module sind in gutem Zustand — kein Modul erfordert vorrangige Optimierung."
+        };
+        builder = builder.add_component(Label::new(message).with_size("10.5pt").with_color(
+            if risk_gated {
+                design::tokens::WARN_DEEP
+            } else {
+                design::tokens::SUCCESS
+            },
+        ));
     }
     builder
 }
@@ -592,6 +615,17 @@ pub(super) fn render_management_page(
     } else {
         "Gesamturteil"
     }));
+    // Surface a partial/insufficient audit run right here, not only in the
+    // methodology appendix (#575-adjacent review finding, 2026-09-01): a
+    // reader who never reaches the appendix must still see that the scores
+    // above describe a downgraded run.
+    if let Some(note) = &vm.summary.audit_quality_note {
+        builder = builder.add_component(Callout::warning(note).with_title(if en {
+            "Audit Quality"
+        } else {
+            "Audit-Qualität"
+        }));
+    }
     // For a clean automated run (no findings), state the automated-scope
     // caveat directly alongside the headline verdict — not only in the
     // appendix — so "0 findings" doesn't read as a full WCAG conformance
@@ -1633,6 +1667,11 @@ fn render_active_module_section(
         "html_conform" => {
             if let Some(ref hc) = vm.module_details.html_conform {
                 return (render_html_conform(builder, hc, is_first, i18n), true);
+            }
+        }
+        "commerce" => {
+            if let Some(ref c) = vm.module_details.commerce {
+                return (render_commerce(builder, c, is_first, i18n), true);
             }
         }
         "mobile" => {

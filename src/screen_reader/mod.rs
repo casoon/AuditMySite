@@ -143,6 +143,23 @@ fn percentage(passed: usize, total: usize) -> u32 {
     }
 }
 
+/// WCAG 2.1 A/AA criteria this module's analyzer (`analyzer.rs`) can actually
+/// detect issues for -- landmark/heading/name/reading-order structural checks
+/// only. Used to scope `passed_criteria` to the module's real evaluation
+/// coverage instead of claiming all 50 WCAG 2.1 A/AA criteria as "passed"
+/// just because no violation happened to be found for them: this module
+/// never looks at contrast, keyboard operability, timing, forms, parsing,
+/// etc., so those criteria were never evaluated at all, not passed.
+/// Confirmed live in the 2026-08-31 report corpus (sauerstoffzentrum-nordost.de):
+/// 7 real structural issues were detected, all tagged "1.3.6" (deliberately
+/// outside the BFSG A/AA scope, see `push_desert_issue`'s doc comment), so
+/// `violations` was empty and the report claimed all 50 criteria "passed".
+/// Keep this list in sync with the `wcag_criterion: Some("...")` call sites
+/// in `analyzer.rs` that are actually WCAG A/AA (not AAA -- "1.3.6" is
+/// deliberately excluded here for the same reason it's excluded from BFSG
+/// violations).
+const EVALUATED_WCAG_CRITERIA: &[&str] = &["1.3.1", "2.4.1", "2.4.4", "2.4.6", "3.3.2", "4.1.2"];
+
 fn bfsg_compliance(issues: &[SrAuditIssue]) -> BfsgCompliance {
     let violations = issues
         .iter()
@@ -162,10 +179,10 @@ fn bfsg_compliance(issues: &[SrAuditIssue]) -> BfsgCompliance {
         .iter()
         .map(|violation| violation.wcag_criterion.as_str())
         .collect();
-    let passed_criteria = wcag_21_aa_criteria()
+    let passed_criteria = EVALUATED_WCAG_CRITERIA
         .iter()
-        .filter(|criterion| !failed.contains(criterion.wcag))
-        .map(|criterion| criterion.wcag.to_string())
+        .filter(|criterion| !failed.contains(*criterion))
+        .map(|criterion| criterion.to_string())
         .collect();
 
     BfsgCompliance {
@@ -197,6 +214,57 @@ mod tests {
             depth: 0,
             node_id: format!("node-{seq}"),
         }
+    }
+
+    fn issue(wcag_criterion: &str) -> SrAuditIssue {
+        SrAuditIssue {
+            wcag_criterion: Some(wcag_criterion.to_string()),
+            severity: "low".into(),
+            affected_node_ids: vec![],
+            message: "test issue".into(),
+        }
+    }
+
+    #[test]
+    fn bfsg_compliance_does_not_claim_unevaluated_criteria_as_passed() {
+        // Regression (sauerstoffzentrum-nordost.de, 2026-08-31): a page with
+        // 7 real structural issues, all tagged "1.3.6" (deliberately outside
+        // BFSG A/AA scope), previously still produced verdict "compliant"
+        // with all 50 WCAG 2.1 A/AA criteria listed as "passed" -- most of
+        // which (contrast, keyboard, timing, forms, ...) this module never
+        // evaluates at all. passed_criteria must only ever contain this
+        // module's actual evaluation scope.
+        let issues = vec![issue("1.3.6"), issue("1.3.6"), issue("1.3.6")];
+        let compliance = bfsg_compliance(&issues);
+        assert_eq!(compliance.verdict, BfsgVerdict::Compliant);
+        assert!(compliance.violations.is_empty());
+        assert_eq!(
+            compliance.passed_criteria.len(),
+            EVALUATED_WCAG_CRITERIA.len()
+        );
+        for criterion in EVALUATED_WCAG_CRITERIA {
+            assert!(
+                compliance.passed_criteria.contains(&criterion.to_string()),
+                "expected {criterion} in passed_criteria"
+            );
+        }
+        // Never claims a criterion outside its own evaluation scope, e.g. the
+        // contrast/keyboard/forms criteria this module never looks at.
+        assert!(!compliance.passed_criteria.contains(&"1.4.3".to_string()));
+        assert!(!compliance.passed_criteria.contains(&"2.1.1".to_string()));
+    }
+
+    #[test]
+    fn bfsg_compliance_excludes_a_failed_criterion_from_passed_criteria() {
+        let issues = vec![issue("2.4.4")];
+        let compliance = bfsg_compliance(&issues);
+        assert_eq!(compliance.verdict, BfsgVerdict::NonCompliant);
+        assert_eq!(compliance.violations.len(), 1);
+        assert!(!compliance.passed_criteria.contains(&"2.4.4".to_string()));
+        assert_eq!(
+            compliance.passed_criteria.len(),
+            EVALUATED_WCAG_CRITERIA.len() - 1
+        );
     }
 
     #[test]

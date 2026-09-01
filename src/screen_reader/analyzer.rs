@@ -195,19 +195,38 @@ fn detect_skipped_heading_levels(
         .iter()
         .filter(|heading| heading.quality == HeadingQuality::SkippedLevel)
     {
+        // Heading level as "h6" (or "an unknown level" if the AX tree didn't
+        // expose one) -- `heading.level` is `Option<u8>`, so this must not be
+        // formatted with `{:?}`. That previously leaked "Some(6)" verbatim
+        // into the message (confirmed live in the shop.satower-mosterei.de
+        // report, 2026-08-31).
+        let level = heading.level.map(|l| format!("h{l}")).unwrap_or_else(|| {
+            if en {
+                "an unknown level".into()
+            } else {
+                "einer unbekannten Ebene".into()
+            }
+        });
         issues.push(SrAuditIssue {
-            wcag_criterion: Some("2.4.6".into()),
+            // WCAG 2.4.6 (Headings and Labels) is about whether heading TEXT
+            // is descriptive, not heading nesting order -- confirmed against
+            // the W3C Understanding doc. This codebase's main WCAG rule
+            // engine already tags the identical check as 1.3.1 (Info and
+            // Relationships, see check_heading_hierarchy in
+            // src/wcag/rules/headings.rs); mirrored here for consistency
+            // instead of a separate, incorrect 2.4.6 citation.
+            wcag_criterion: Some("1.3.1".into()),
             severity: "medium".into(),
             affected_node_ids: vec![heading.node_id.clone()],
             message: if en {
                 format!(
-                    "Heading level is skipped: {:?} at sequence position {}.",
-                    heading.level, heading.seq
+                    "Heading level is skipped: {level} at sequence position {}.",
+                    heading.seq
                 )
             } else {
                 format!(
-                    "Überschriftenebene wird übersprungen: {:?} an Sequenzposition {}.",
-                    heading.level, heading.seq
+                    "Überschriftenebene wird übersprungen: {level} an Sequenzposition {}.",
+                    heading.seq
                 )
             },
         });
@@ -626,6 +645,37 @@ mod tests {
         assert!(issues
             .iter()
             .any(|issue| issue.message.contains("Überschriftenebene")));
+    }
+
+    #[test]
+    fn skipped_heading_level_is_tagged_1_3_1_not_2_4_6_and_has_no_debug_leak() {
+        // Regression (shop.satower-mosterei.de, 2026-08-31): the message
+        // formatted `heading.level` (Option<u8>) via `{:?}`, leaking
+        // "Some(6)" verbatim, and tagged the issue as WCAG 2.4.6 (which is
+        // about descriptive heading/label *text*, not heading nesting order
+        // -- verified against the W3C Understanding doc). The main WCAG rule
+        // engine's identical check already uses 1.3.1
+        // (src/wcag/rules/headings.rs, check_heading_hierarchy); this module
+        // must match it.
+        let items = vec![
+            item(0, "main", Some("Inhalt"), false, vec![]),
+            item(1, "heading", Some("Start"), false, vec!["level=1"]),
+            item(2, "heading", Some("Deep"), false, vec!["level=3"]),
+        ];
+        let views = navigation_views(&items);
+        let issues = analyze_reading_sequence(&items, &views, "de", true, false);
+
+        let skipped = issues
+            .iter()
+            .find(|issue| issue.message.contains("skipped"))
+            .expect("expected a skipped-heading-level issue");
+        assert_eq!(skipped.wcag_criterion.as_deref(), Some("1.3.1"));
+        assert!(
+            !skipped.message.contains("Some("),
+            "message leaks Option debug format: {}",
+            skipped.message
+        );
+        assert!(skipped.message.contains("h3"));
     }
 
     #[test]

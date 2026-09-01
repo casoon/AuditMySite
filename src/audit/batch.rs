@@ -208,8 +208,32 @@ pub async fn run_concurrent_batch(
         }
     }
 
-    // Close pool - need to unwrap Arc
-    // Note: Pool will be dropped when all Arc references are dropped
+    // Close the pool gracefully — mirrors what single-URL mode already does
+    // with `browser.close().await` (src/cli/runners.rs). Previously this Arc
+    // was just left to drop implicitly, relying on chromiumoxide's
+    // `Browser::drop` "kill_on_drop" to reap the Chrome child process via a
+    // task scheduled on the Tokio runtime in the background -- but `main()`
+    // calls `std::process::exit(exit_code)` immediately after this function
+    // returns, tearing down the whole process (and its runtime) before that
+    // background task gets a chance to run. Confirmed live (2026-09-01):
+    // every batch run left an orphaned `auditmysite-chrome-*` process
+    // running indefinitely, even on a normal, successful exit. By this
+    // point every spawned task's clone of `pool` has already completed and
+    // dropped (the `while` loop above only returns once `in_flight` is
+    // fully drained), so this should be the sole remaining reference.
+    match Arc::try_unwrap(pool) {
+        Ok(pool) => {
+            if let Err(e) = pool.close().await {
+                warn!("Failed to close browser pool: {}", e);
+            }
+        }
+        Err(_) => {
+            warn!(
+                "Browser pool still had outstanding references at batch end; \
+                 the browser process may not shut down cleanly"
+            );
+        }
+    }
 
     let total_duration_ms = start_time.elapsed().as_millis() as u64;
 

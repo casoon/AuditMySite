@@ -474,7 +474,13 @@ async fn run_dom_inspection(page: &Page, url: &str, a: &mut PageHealthAnalysis) 
                 const src = el.src || el.href;
                 try {
                     const o = new URL(src).origin;
-                    if (o !== window.location.origin) extOrigins.add(o);
+                    // data:/blob:/javascript: URLs have an opaque origin that
+                    // serializes to the literal string "null" (WHATWG URL
+                    // spec) -- not a real host, can't take a preconnect hint,
+                    // and reads as a bug when printed in a report ("null" was
+                    // confirmed leaking into säfte.com's preconnect-origins
+                    // list, 2026-08-31).
+                    if (o !== window.location.origin && o !== 'null') extOrigins.add(o);
                 } catch(e) {}
             });
         const missingPreconnect = [...extOrigins].filter(o => !preconnected.has(o));

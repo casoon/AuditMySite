@@ -205,6 +205,11 @@ pub struct SummaryBlock {
     pub executive_lead: String,
     /// When a single rule dominates ≥ 45 % of urgent findings: highlighted note for callout display.
     pub dominant_issue_note: Option<String>,
+    /// Set (localized) when `AuditQualityStatus != Complete` -- surfaced as a
+    /// callout right under the verdict on the management page, not only in
+    /// the methodology appendix, so a downgraded/partial run can't be missed
+    /// by a reader who never reaches the appendix.
+    pub audit_quality_note: Option<String>,
     pub verdict: String,
     pub score_note: Option<String>,
     pub metrics: Vec<MetricItem>,
@@ -480,6 +485,7 @@ pub struct ModuleDetailsBlock {
     pub seo: Option<SeoPresentation>,
     pub security: Option<SecurityPresentation>,
     pub html_conform: Option<HtmlConformPresentation>,
+    pub commerce: Option<CommercePresentation>,
     pub mobile: Option<MobilePresentation>,
     pub ux: Option<UxPresentation>,
     pub journey: Option<JourneyPresentation>,
@@ -1012,6 +1018,32 @@ pub struct SecurityPresentation {
     pub protection: Vec<(String, String)>,
     pub has_waf: bool,
     pub has_cdn: bool,
+}
+
+/// Commerce/shop presentation block. Derive-only, single-page-scoped signal
+/// (product structured-data completeness + mandatory/trust-page link
+/// presence on this one page) — deliberately NOT a checkout/payment/cart
+/// audit (this tool has no cross-page session state; see
+/// `crate::commerce::CommercePageKind`'s doc comment). The PDF renderer
+/// states this scope explicitly so it can't be misread as broader coverage.
+pub struct CommercePresentation {
+    pub page_kind_label: String,
+    pub product: Option<CommerceProductRow>,
+    /// (localized page label, is linked from this page) for each of the 6
+    /// mandatory/trust-page categories.
+    pub trust_pages: Vec<(String, bool)>,
+    /// (localized severity label, localized message) pairs.
+    pub findings: Vec<(String, String)>,
+}
+
+pub struct CommerceProductRow {
+    /// Share of the 5 expected product signals exposed (0-100).
+    pub score: u32,
+    pub price: Option<String>,
+    pub availability: Option<String>,
+    pub has_shipping_details: bool,
+    pub has_return_policy: bool,
+    pub rating: Option<String>,
 }
 
 /// HTML5 spec-conformance presentation block (html-conform crate).

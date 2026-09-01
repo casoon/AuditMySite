@@ -3053,3 +3053,123 @@ pub(super) fn render_batch_appendix(
 
     builder
 }
+
+// ─── Commerce site-wide roll-up ─────────────────────────────────────────────
+
+fn batch_trust_page_label(key: &str, en: bool) -> &'static str {
+    match (key, en) {
+        ("impressum", true) => "Imprint",
+        ("impressum", false) => "Impressum",
+        ("agb", true) => "Terms (AGB)",
+        ("agb", false) => "AGB",
+        ("widerruf", true) => "Right of withdrawal / returns",
+        ("widerruf", false) => "Widerruf / Retoure",
+        ("versand", true) => "Shipping info",
+        ("versand", false) => "Versand / Lieferung",
+        ("zahlungsarten", true) => "Payment methods",
+        ("zahlungsarten", false) => "Zahlungsarten",
+        (_, true) => "Contact",
+        (_, false) => "Kontakt",
+    }
+}
+
+/// Site-wide commerce roll-up: which mandatory/trust pages are linked
+/// *anywhere* in the audited set, and how many product pages were audited.
+/// Only rendered when at least one audited page produced commerce data
+/// (i.e. the site was gated as a shop at all) — `aggregate_site_commerce`
+/// returns `None` otherwise. Deliberately a single-page-scoped signal, not a
+/// checkout/payment/cart audit (this tool has no cross-page session state);
+/// the scope note states this explicitly (product decision, 2026-09-01).
+pub(super) fn render_batch_commerce(
+    mut builder: renderreport::engine::ReportBuilder,
+    batch: &BatchReport,
+    i18n: &I18n,
+) -> renderreport::engine::ReportBuilder {
+    let Some(summary) = crate::commerce::aggregate_site_commerce(
+        batch.reports.iter().filter_map(|r| r.commerce.as_ref()),
+    ) else {
+        return builder;
+    };
+
+    let en = i18n.locale() == "en";
+    builder = builder.add_component(PageBreak::new()).add_component(
+        SectionHeaderSplit::new(
+            "Commerce",
+            if en {
+                "Product structured-data completeness and mandatory-page linking, aggregated across the audited set."
+            } else {
+                "Produkt-Strukturdaten-Vollständigkeit und Pflichtseiten-Verlinkung, aggregiert über das geprüfte Set."
+            },
+        )
+        .with_eyebrow("COMMERCE")
+        .with_level(2),
+    );
+    builder = builder.add_component(
+        Label::new(if en {
+            "Checks product structured data and mandatory-page linking across the audited pages — not a checkout, payment-processing, or cart audit (this tool has no cross-page session state)."
+        } else {
+            "Prüft Produkt-Strukturdaten und die Verlinkung von Pflichtseiten über die geprüften Seiten hinweg — keine Prüfung von Checkout, Zahlungsabwicklung oder Warenkorb (das Tool hat keinen seitenübergreifenden Sitzungszustand)."
+        })
+        .with_size("10.5pt")
+        .with_color(tokens::NEUTRAL),
+    );
+
+    let product_pages_label = if en {
+        format!(
+            "{} product page{} audited",
+            summary.product_pages,
+            if summary.product_pages == 1 { "" } else { "s" }
+        )
+    } else {
+        format!(
+            "{} Produktseite{} geprüft",
+            summary.product_pages,
+            if summary.product_pages == 1 { "" } else { "n" }
+        )
+    };
+    builder = builder.add_component(
+        KeyValueList::new()
+            .with_title(if en { "Overview" } else { "Übersicht" })
+            .add(
+                if en { "Product pages" } else { "Produktseiten" },
+                &product_pages_label,
+            ),
+    );
+
+    let tp = &summary.trust_pages_linked;
+    let rows = [
+        ("impressum", tp.impressum),
+        ("agb", tp.agb),
+        ("widerruf", tp.widerruf),
+        ("versand", tp.versand),
+        ("zahlungsarten", tp.zahlungsarten),
+        ("kontakt", tp.kontakt),
+    ]
+    .into_iter()
+    .map(|(key, linked)| {
+        let status_text = if linked {
+            if en {
+                "Linked"
+            } else {
+                "Verlinkt"
+            }
+        } else if en {
+            "Not linked anywhere in the audited set"
+        } else {
+            "Nirgends im geprüften Set verlinkt"
+        };
+        ChecklistRow::new(batch_trust_page_label(key, en), status_text).with_status(if linked {
+            "good"
+        } else {
+            "warn"
+        })
+    })
+    .collect::<Vec<_>>();
+    builder = builder.add_component(ChecklistPanel::new(rows).with_title(if en {
+        "Mandatory-page linking (site-wide)"
+    } else {
+        "Pflichtseiten-Verlinkung (site-weit)"
+    }));
+
+    builder
+}

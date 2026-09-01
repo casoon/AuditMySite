@@ -66,6 +66,45 @@ fn test_management_risks_rationale_has_no_debug_format_leak() {
 }
 
 #[test]
+fn test_management_risks_reflect_blocking_issues_not_just_legal_flags() {
+    // Regression (satower-mosterei.de, 2026-08-31): overall risk_level
+    // "medium", certificate "EINGESCHRÄNKT", verdict "fail", 4 blocking
+    // interaction issues (buttons without an accessible name, WCAG 4.1.2,
+    // "medium" severity so legal_flags/critical/high all stayed 0) -- yet
+    // every management_risks dimension previously read "low" regardless,
+    // directly contradicting the report's own risk gate. "Legal / BFSG-EAA"
+    // and "Conversion / usability" must escalate once blocking_issues > 0
+    // even when legal_flags/critical/high are all zero.
+    let report = AuditReport::new(
+        "https://example.com".to_string(),
+        WcagLevel::AA,
+        WcagResults::new(),
+        500,
+    );
+    let normalized = normalize(&report);
+    let mut with_blockers = normalized.normalized.clone();
+    with_blockers.risk.blocking_issues = 4;
+    assert_eq!(with_blockers.severity_counts.critical, 0);
+    assert_eq!(with_blockers.severity_counts.high, 0);
+    assert_eq!(with_blockers.risk.legal_flags, 0);
+
+    let risks = helpers::build_management_risks(std::slice::from_ref(&with_blockers));
+
+    let legal = risks
+        .iter()
+        .find(|r| r.dimension == "Legal / BFSG-EAA")
+        .expect("Legal / BFSG-EAA risk must be present");
+    assert_ne!(legal.level, "low", "rationale: {}", legal.rationale);
+    assert!(legal.rationale.contains("4 blocking"));
+
+    let usability = risks
+        .iter()
+        .find(|r| r.dimension == "Conversion / usability")
+        .expect("Conversion / usability risk must be present");
+    assert_ne!(usability.level, "low", "rationale: {}", usability.rationale);
+}
+
+#[test]
 fn test_single_summary_fields_present() {
     let report = AuditReport::new(
         "https://example.com".to_string(),

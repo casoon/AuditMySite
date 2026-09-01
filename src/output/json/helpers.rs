@@ -301,6 +301,17 @@ pub(super) fn build_management_risks(reports: &[NormalizedReport]) -> Vec<Manage
     let legal_flags: usize = reports.iter().map(|r| r.risk.legal_flags).sum();
     let critical: usize = reports.iter().map(|r| r.severity_counts.critical).sum();
     let high: usize = reports.iter().map(|r| r.severity_counts.high).sum();
+    // Buttons/forms without an accessible name (WCAG 4.1.2) -- these can be
+    // "medium" severity (so they don't count toward `legal_flags`, which
+    // requires High/Critical) while still making a control fully inoperable
+    // for keyboard/screen-reader users. Thresholds (>=1 -> at least medium,
+    // >=5 -> high) mirror `compute_risk_assessment`'s canonical risk-level
+    // gating so this dimension can't silently disagree with the report's own
+    // top-level risk_level/certificate. Regression (satower-mosterei.de,
+    // 2026-08-31): overall risk_level "medium", certificate "EINGESCHRÄNKT",
+    // verdict "fail", 4 blocking issues -- yet every management_risks
+    // dimension previously read "low" because this field was never consulted.
+    let blocking_issues: usize = reports.iter().map(|r| r.risk.blocking_issues).sum();
     let avg = average_accessibility_score(reports);
     let seo = average_module_score_from_reports(reports, "SEO");
     let perf = average_module_score_from_reports(reports, "Performance");
@@ -314,36 +325,56 @@ pub(super) fn build_management_risks(reports: &[NormalizedReport]) -> Vec<Manage
     vec![
         ManagementRisk {
             dimension: "Legal / BFSG-EAA".to_string(),
-            level: if legal_flags > 0 || critical > 0 {
+            level: if legal_flags > 0 || critical > 0 || blocking_issues >= 5 {
                 "high"
-            } else if high > 0 {
+            } else if high > 0 || blocking_issues > 0 {
                 "medium"
             } else {
                 "low"
             }
             .to_string(),
-            rationale: format!(
-                "{legal_flags} legal flags, {critical} critical and {high} high WCAG findings detected automatically."
-            ),
+            rationale: if blocking_issues > 0 {
+                format!(
+                    "{legal_flags} legal flags, {critical} critical and {high} high WCAG findings detected automatically; {blocking_issues} blocking interaction {} (missing accessible name/role) also affect BFSG/EAA operability requirements.",
+                    if blocking_issues == 1 { "issue" } else { "issues" }
+                )
+            } else {
+                format!(
+                    "{legal_flags} legal flags, {critical} critical and {high} high WCAG findings detected automatically."
+                )
+            },
         },
         ManagementRisk {
             dimension: "Conversion / usability".to_string(),
-            level: if avg < 60 || critical > 0 || perf.is_some_and(|s| s < 50) {
+            level: if avg < 60
+                || critical > 0
+                || perf.is_some_and(|s| s < 50)
+                || blocking_issues >= 5
+            {
                 "high"
-            } else if avg < 80 || high > 0 || mobile.is_some_and(|s| s < 75) {
+            } else if avg < 80 || high > 0 || mobile.is_some_and(|s| s < 75) || blocking_issues > 0
+            {
                 "medium"
             } else {
                 "low"
             }
             .to_string(),
             rationale: format!(
-                "Average accessibility score is {avg}/100; performance {}, mobile {}.",
-                perf
-                    .map(|score| format!("{score}/100"))
+                "Average accessibility score is {avg}/100; performance {}, mobile {}.{}",
+                perf.map(|score| format!("{score}/100"))
                     .unwrap_or_else(|| "not measured".to_string()),
                 mobile
                     .map(|score| format!("{score}/100"))
                     .unwrap_or_else(|| "not measured".to_string()),
+                if blocking_issues > 0 {
+                    format!(
+                        " {blocking_issues} interactive element{} block{} completion of key actions.",
+                        if blocking_issues == 1 { "" } else { "s" },
+                        if blocking_issues == 1 { "s" } else { "" }
+                    )
+                } else {
+                    String::new()
+                }
             ),
         },
         ManagementRisk {
@@ -363,7 +394,8 @@ pub(super) fn build_management_risks(reports: &[NormalizedReport]) -> Vec<Manage
                 "low"
             }
             .to_string(),
-            rationale: "Accessibility barriers can reduce perceived reliability and inclusiveness.".to_string(),
+            rationale: "Accessibility barriers can reduce perceived reliability and inclusiveness."
+                .to_string(),
         },
         ManagementRisk {
             dimension: "Project risk".to_string(),

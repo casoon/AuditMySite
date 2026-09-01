@@ -16,6 +16,7 @@ use super::helpers::{map_severity, score_quality_color, score_quality_label};
 
 mod accessibility;
 mod ai_transparency;
+mod commerce;
 mod dark_mode;
 mod design_quality;
 mod experience;
@@ -29,6 +30,7 @@ mod seo;
 
 pub(super) use accessibility::{render_a11y_journey_findings, render_screen_reader_section};
 pub(super) use ai_transparency::render_ai_transparency;
+pub(super) use commerce::render_commerce;
 pub(super) use dark_mode::render_dark_mode;
 pub(super) use design_quality::render_design_quality;
 pub(super) use experience::{render_journey, render_ux};
@@ -63,7 +65,11 @@ fn module_customer_context(
     _interpretation: &str,
 ) -> Label {
     let en = is_english(i18n);
-    let weakness = if module_key == "content_visibility" {
+    // html_conform is score-neutral with a known false-positive gap (see
+    // detail_modules/html_conform.rs) -- a generic "clear weakness" sentence
+    // for its score would contradict the module's own heuristic-reliability
+    // disclaimer immediately above it. Same treatment as content_visibility.
+    let weakness = if module_key == "content_visibility" || module_key == "html_conform" {
         None
     } else if score < 50 {
         Some(pick(

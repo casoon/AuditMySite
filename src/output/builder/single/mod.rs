@@ -278,6 +278,36 @@ pub fn build_view_model(normalized: &AuditContext<'_>, config: &ReportConfig) ->
             date: date.clone(),
             executive_lead: audit_summary.verdict_intro.clone(),
             dominant_issue_note: audit_summary.dominant_issue_note.clone(),
+            audit_quality_note: {
+                use crate::audit::AuditQualityStatus;
+                let en = i18n.locale() == "en";
+                match normalized.normalized.execution.quality.status {
+                    AuditQualityStatus::Complete => None,
+                    AuditQualityStatus::Partial => Some(if en {
+                        "This audit run is partial: some measurements hit a stability/retry \
+                         budget and the reported scores describe only the successfully measured \
+                         scope. See the methodology appendix for details."
+                            .to_string()
+                    } else {
+                        "Dieser Prüflauf ist unvollständig: Einzelne Messungen haben ein \
+                         Stabilitäts-/Wiederholungsbudget erreicht; die ausgewiesenen Scores \
+                         beschreiben nur den erfolgreich gemessenen Umfang. Details im \
+                         Methodik-Anhang."
+                            .to_string()
+                    }),
+                    AuditQualityStatus::Insufficient => Some(if en {
+                        "This audit run has insufficient data quality: several measurements \
+                         failed. Scores and findings below may be incomplete or unreliable. \
+                         See the methodology appendix for details."
+                            .to_string()
+                    } else {
+                        "Dieser Prüflauf hat unzureichende Datenqualität: mehrere Messungen sind \
+                         fehlgeschlagen. Scores und Befunde können unvollständig oder \
+                         unzuverlässig sein. Details im Methodik-Anhang."
+                            .to_string()
+                    }),
+                }
+            },
             verdict: build_verdict_text(
                 &i18n,
                 &normalized.normalized.url,
@@ -887,6 +917,48 @@ mod tests {
         report.discoverability.content_visibility = Some(
             crate::content_visibility::analyze_content_visibility(&report),
         );
+        report.commerce = Some(crate::commerce::CommerceAnalysis {
+            page_kind: crate::commerce::CommercePageKind::ProductDetail,
+            product: Some(crate::commerce::ProductCommerce {
+                price: Some(crate::commerce::PriceInfo {
+                    value: "19.99".to_string(),
+                    currency: Some("EUR".to_string()),
+                    valid_until: None,
+                }),
+                availability: Some("InStock".to_string()),
+                delivery_time: None,
+                shipping: crate::commerce::ShippingInfo::default(),
+                returns: crate::commerce::ReturnsInfo::default(),
+                reviews: crate::commerce::ReviewInfo::default(),
+                score: 40,
+            }),
+            trust_pages: crate::commerce::TrustPages {
+                impressum: true,
+                agb: true,
+                widerruf: false,
+                versand: true,
+                zahlungsarten: true,
+                kontakt: true,
+            },
+            findings: vec![
+                crate::commerce::CommerceFinding {
+                    kind: crate::commerce::CommerceFindingKind::MissingShippingDetails,
+                    severity: Severity::Medium,
+                    message: crate::commerce::commerce_finding_text(
+                        crate::commerce::CommerceFindingKind::MissingShippingDetails,
+                        true,
+                    ),
+                },
+                crate::commerce::CommerceFinding {
+                    kind: crate::commerce::CommerceFindingKind::MissingWiderrufLink,
+                    severity: Severity::High,
+                    message: crate::commerce::commerce_finding_text(
+                        crate::commerce::CommerceFindingKind::MissingWiderrufLink,
+                        true,
+                    ),
+                },
+            ],
+        });
         report
     }
 
@@ -1002,6 +1074,12 @@ mod tests {
                 "ModuleDetailsBlock.html_conform must be Some"
             );
         }
+        if active_keys.contains("commerce") {
+            assert!(
+                details.commerce.is_some(),
+                "ModuleDetailsBlock.commerce must be Some"
+            );
+        }
         if active_keys.contains("mobile") {
             assert!(
                 details.mobile.is_some(),
@@ -1071,6 +1149,42 @@ mod tests {
             "Module set mismatch:\n  only in JSON (active_modules): {:?}\n  only in PDF ViewModel (ModuleDetailsBlock): {:?}",
             only_json,
             only_pdf,
+        );
+    }
+
+    /// The commerce PDF chapter is deliberately built only when there is
+    /// substantive content (product decision, 2026-09-01): a shop page with
+    /// `page_kind: Other` and every mandatory/trust page already linked has
+    /// nothing beyond "all six links exist" to add.
+    #[test]
+    fn test_commerce_details_absent_when_nothing_meaningful_to_show() {
+        let mut report = AuditReport::new(
+            "https://example.com".to_string(),
+            WcagLevel::AA,
+            WcagResults::new(),
+            0,
+        );
+        report.commerce = Some(crate::commerce::CommerceAnalysis {
+            page_kind: crate::commerce::CommercePageKind::Other,
+            product: None,
+            trust_pages: crate::commerce::TrustPages {
+                impressum: true,
+                agb: true,
+                widerruf: true,
+                versand: true,
+                zahlungsarten: true,
+                kontakt: true,
+            },
+            findings: vec![],
+        });
+
+        let normalized = normalize(&report);
+        let vm = build_view_model(&normalized, &ReportConfig::default());
+
+        assert!(
+            vm.module_details.commerce.is_none(),
+            "commerce chapter must stay absent when page_kind is Other and every \
+             trust page is already linked"
         );
     }
 

@@ -1318,7 +1318,14 @@ fn test_contributes_to_overall_flags_correct() {
             );
         }
         match m.name.as_str() {
-            "UX" | "Journey" => assert_eq!(m.measurement_type, "heuristic"),
+            // HTML Conformance is score-neutral (contributes_to_overall=false,
+            // see above) due to a known upstream false-positive gap; its
+            // measurement_type must not claim "measured" (the same taxonomy
+            // value as hard compliance numbers) while being paused from the
+            // score for being unreliable (2026-09-01, report-quality review).
+            "UX" | "Journey" | "HTML Conformance" => {
+                assert_eq!(m.measurement_type, "heuristic")
+            }
             _ => assert_eq!(m.measurement_type, "measured"),
         }
     }

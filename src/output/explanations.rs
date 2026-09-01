@@ -300,6 +300,64 @@ static EXPLANATIONS: &[(&str, RuleExplanation)] = &[
             example_decorative: None,
         },
     ),
+    // Rule-specific entry for `keyboard.rs`'s NotTestable finding (axe_id
+    // "keyboard-trap", WCAG 2.1.2). Without this entry, get_explanation()
+    // returns None and the PDF fell back to the raw, English-only
+    // Violation.fix_suggestion text unlocalized — confirmed live leaking
+    // into German reports (shop.satower-mosterei.de, säfte.com, 2026-08-31;
+    // report-quality review, 2026-09-01).
+    (
+        "keyboard-trap",
+        RuleExplanation {
+            customer_title: "Tastaturfalle nicht automatisch prüfbar",
+            customer_title_en: "Keyboard trap cannot be automatically tested",
+            customer_description:
+                "Ob der Tastaturfokus in einem Dialog, Karussell oder individuellen \
+                 JavaScript-Bedienelement hängen bleiben kann, lässt sich nicht automatisiert \
+                 feststellen. Das erfordert manuelles Navigieren ausschließlich mit der \
+                 Tab-Taste.",
+            customer_description_en:
+                "Whether keyboard focus can become permanently trapped inside a dialog, \
+                 carousel, or custom JavaScript widget cannot be determined automatically. \
+                 It requires manually navigating the page using only the Tab key.",
+            user_impact:
+                "Personen, die ausschließlich mit der Tastatur oder einem Screenreader \
+                 navigieren, können in einem Bedienelement stecken bleiben und die Seite \
+                 nicht mehr per Tastatur verlassen.",
+            user_impact_en:
+                "People who navigate exclusively via keyboard or screen reader can become \
+                 stuck inside a component and lose the ability to leave the page by keyboard.",
+            typical_cause:
+                "Individuelle Dialoge, Karussells oder Widgets mit eigener JavaScript-\
+                 Fokusverwaltung, die keinen Weg zurück per Escape-Taste, erreichbarem \
+                 Schließen-Button oder dokumentiertem Tastaturkürzel vorsehen.",
+            typical_cause_en:
+                "Custom dialogs, carousels, or widgets with their own JavaScript focus \
+                 management that provide no way back out via the Escape key, a reachable \
+                 close button, or a documented keyboard shortcut.",
+            recommendation:
+                "Für jeden fokussierbaren Bereich einen Weg zum Verlassen per Tastatur \
+                 sicherstellen: Escape-Taste, ein per Tab erreichbarer, sichtbarer \
+                 Schließen-Button, oder ein dokumentiertes Tastaturkürzel.",
+            recommendation_en:
+                "Ensure every focusable region has a way to leave it by keyboard: the \
+                 Escape key, a visible close button reachable by Tab, or a documented \
+                 keyboard shortcut.",
+            technical_note:
+                "Nur mit Tab/Shift+Tab durch die Seite navigieren und prüfen, ob jeder \
+                 Dialog/jedes Widget verlassen werden kann. Bei eigener Fokusverwaltung: \
+                 Escape-Handler und einen erreichbaren Schließen-Button implementieren.",
+            technical_note_en:
+                "Navigate the page using only Tab/Shift+Tab and verify every dialog/widget \
+                 can be exited. For custom focus management, implement an Escape handler and \
+                 a reachable close button.",
+            responsible_role: Role::Development,
+            effort_estimate: Effort::Medium,
+            example_bad: None,
+            example_good: None,
+            example_decorative: None,
+        },
+    ),
     // Rule-specific override for presentation-semantic-children violations.
     // The WCAG 1.3.1 fallback is too generic (tables/lists/forms) for this case —
     // the actual issue is an ARIA role conflict in navigation markup.
@@ -2003,6 +2061,11 @@ mod tests {
             "a11y.aria_prohibited_attr.invalid",
             "a11y.modern_attributes.invalid",
             "a11y.parsing.invalid",
+            // Regression (2026-08-31/09-01): keyboard.rs's NotTestable
+            // finding had no explanations.rs entry at all, so the PDF fell
+            // back to the raw English Violation.fix_suggestion unlocalized
+            // -- confirmed leaking into German reports.
+            "keyboard-trap",
         ] {
             let expl = get_explanation(rule_id)
                 .unwrap_or_else(|| panic!("missing explanation for {rule_id}"));

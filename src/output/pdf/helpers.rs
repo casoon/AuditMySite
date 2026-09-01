@@ -200,6 +200,22 @@ mod tests {
     }
 
     #[test]
+    fn taxonomy_suffix_marks_html_conformance_as_indicator() {
+        // Regression (2026-09-01, report-quality review): HTML Conformance
+        // is score-neutral due to a known upstream false-positive gap
+        // (src/audit/normalized.rs), but previously reported
+        // measurement_type "measured" -- the same taxonomy value used for
+        // hard compliance numbers -- so it rendered with full visual weight
+        // (a flat, unqualified 0/100 gauge) instead of the same
+        // "(Indicator)" qualifier UX/Journey/AI Visibility/... already carry.
+        let de = crate::i18n::I18n::new("de").expect("i18n");
+        assert_eq!(
+            super::module_name_with_taxonomy_suffix("HTML Conformance", "heuristic", &de),
+            "HTML Conformance (Indikator)"
+        );
+    }
+
+    #[test]
     fn taxonomy_suffix_marks_optional_modules_as_optional() {
         let de = crate::i18n::I18n::new("de").expect("i18n");
         let en = crate::i18n::I18n::new("en").expect("i18n");

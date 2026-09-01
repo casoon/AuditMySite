@@ -295,7 +295,16 @@ pub(super) fn build_methodology(
             ),
             (
                 key("Audit-Qualität", "Audit quality"),
-                format!("{:?}", normalized.execution.quality.status),
+                // Regression: `{:?}` leaked the raw English enum variant name
+                // ("Complete"/"Partial"/"Insufficient") unlocalized into
+                // German reports.
+                match normalized.execution.quality.status {
+                    crate::audit::AuditQualityStatus::Complete => key("Vollständig", "Complete"),
+                    crate::audit::AuditQualityStatus::Partial => key("Teilweise", "Partial"),
+                    crate::audit::AuditQualityStatus::Insufficient => {
+                        key("Unzureichend", "Insufficient")
+                    }
+                },
             ),
             (
                 key("Audit-Hinweise", "Audit notes"),
@@ -564,4 +573,51 @@ fn build_capability_matrix(locale: &str, normalized: &NormalizedReport) -> Vec<C
     }
 
     capabilities
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::audit::normalized::normalize;
+    use crate::audit::AuditQualityStatus;
+    use crate::audit::AuditReport;
+    use crate::cli::WcagLevel;
+    use crate::i18n::I18n;
+    use crate::wcag::WcagResults;
+
+    fn report_with_quality_status(status: AuditQualityStatus) -> NormalizedReport {
+        let raw = AuditReport::new(
+            "https://example.com".to_string(),
+            WcagLevel::AA,
+            WcagResults::new(),
+            500,
+        );
+        let mut normalized = normalize(&raw).normalized;
+        normalized.execution.quality.status = status;
+        normalized
+    }
+
+    #[test]
+    fn audit_quality_status_is_localized_not_debug_formatted() {
+        // Regression: `format!("{:?}", ...status)` leaked the raw English
+        // enum variant name ("Partial") unlocalized into German reports.
+        let normalized = report_with_quality_status(AuditQualityStatus::Partial);
+        let i18n_de = I18n::new("de").expect("de locale loads");
+        let block_de = build_methodology(&i18n_de, &normalized);
+        let (_, value_de) = block_de
+            .audit_facts
+            .iter()
+            .find(|(k, _)| k == "Audit-Qualität")
+            .expect("Audit-Qualität fact present");
+        assert_eq!(value_de, "Teilweise");
+
+        let i18n_en = I18n::new("en").expect("en locale loads");
+        let block_en = build_methodology(&i18n_en, &normalized);
+        let (_, value_en) = block_en
+            .audit_facts
+            .iter()
+            .find(|(k, _)| k == "Audit quality")
+            .expect("Audit quality fact present");
+        assert_eq!(value_en, "Partial");
+    }
 }

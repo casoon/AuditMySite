@@ -7,9 +7,22 @@
 //! `BfsgMapping`) so `BfsgViolation.bfsg_reference` and other consumers are
 //! unaffected.
 //!
-//! `BFSG_PARAGRAPH_WEB` stays local and unverified — it is NOT propagated
-//! into the new `wcag::en301549` module or the EN 301 549 annex; see that
-//! module's doc comment.
+//! `BFSG_PARAGRAPH_WEB` stays local — it is NOT propagated into the new
+//! `wcag::en301549` module or the EN 301 549 annex; see that module's doc
+//! comment.
+//!
+//! Citation corrected 2026-09-01 (from a report-quality review): the prior
+//! value, `"§12 Abs. 1"`, cited the parent Act (BFSG) but the actual
+//! website-accessibility requirement ("Webseiten ... wahrnehmbar, bedienbar,
+//! verständlich und robust") lives in the implementing Ordinance, BFSGV §12
+//! Nr. 3 -- confirmed against the primary source
+//! (<https://www.gesetze-im-internet.de/bfsgv/__12.html>). Still flagged
+//! unverified: confirmed via automated web-fetch summarization, not a legal
+//! review: get a legal review before relying on this exact citation. BFSGV
+//! §19 (electronic-commerce-specific identification/authentication/payment
+//! accessibility) is a distinct, additional requirement for shop pages that
+//! this module has no detection logic for at all -- not incorporated here,
+//! see the report-quality-review plan doc for that follow-up.
 
 use serde::{Deserialize, Serialize};
 
@@ -22,7 +35,7 @@ pub struct BfsgMapping {
     pub fix_required: bool,
 }
 
-pub const BFSG_PARAGRAPH_WEB: &str = "§12 Abs. 1";
+pub const BFSG_PARAGRAPH_WEB: &str = "§ 12 Nr. 3 BFSGV";
 
 pub fn map_to_bfsg(wcag: &str) -> Option<BfsgMapping> {
     wcag_21_aa_criteria()
@@ -62,7 +75,7 @@ mod tests {
     fn maps_required_wcag_examples() {
         let mapping = map_to_bfsg("1.1.1").expect("mapped");
         assert_eq!(mapping.en_301549_clause, "9.1.1.1");
-        assert_eq!(mapping.bfsg_paragraph, "§12 Abs. 1");
+        assert_eq!(mapping.bfsg_paragraph, "§ 12 Nr. 3 BFSGV");
         assert!(mapping.fix_required);
 
         assert_eq!(
