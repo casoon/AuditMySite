@@ -214,7 +214,7 @@ pub(super) fn build_accessibility_score_breakdown(
 /// while still matching legitimate plurals/compounds like "forms",
 /// "landmarks", "inputs" that genuinely start with the needle (see
 /// score-area-substring-misclassification in the regression corpus).
-fn key_has_word_starting_with(key: &str, prefix: &str) -> bool {
+pub(crate) fn key_has_word_starting_with(key: &str, prefix: &str) -> bool {
     key.split(|c: char| !c.is_alphanumeric())
         .any(|word| word.starts_with(prefix))
 }
@@ -233,7 +233,7 @@ fn key_has_word_starting_with(key: &str, prefix: &str) -> bool {
 /// corpus. Scoped to `finding.description` only (the one field that embeds
 /// live, page-controlled selector text); rule_id/title are fixed, curated
 /// strings that never contain a real CSS selector.
-fn strip_css_selector_spans(text: &str) -> String {
+pub(crate) fn strip_css_selector_spans(text: &str) -> String {
     let mut result = String::with_capacity(text.len());
     let mut chars = text.char_indices().peekable();
     while let Some((_, c)) = chars.next() {

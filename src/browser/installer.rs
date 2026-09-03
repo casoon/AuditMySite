@@ -355,10 +355,14 @@ impl BrowserInstaller {
             };
 
             if file.name().ends_with('/') {
-                fs::create_dir_all(&outpath).ok();
+                fs::create_dir_all(&outpath).map_err(|e| AuditError::BrowserLaunchFailed {
+                    reason: format!("Failed to create directory during extraction: {}", e),
+                })?;
             } else {
                 if let Some(p) = outpath.parent() {
-                    fs::create_dir_all(p).ok();
+                    fs::create_dir_all(p).map_err(|e| AuditError::BrowserLaunchFailed {
+                        reason: format!("Failed to create directory during extraction: {}", e),
+                    })?;
                 }
                 let mut outfile =
                     fs::File::create(&outpath).map_err(|e| AuditError::BrowserLaunchFailed {

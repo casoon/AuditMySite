@@ -1,8 +1,8 @@
 //! Modal journey: open dialog, verify focus trap, Escape closes, focus restores.
 
-use chromiumoxide::cdp::js_protocol::runtime::EvaluateParams;
 use chromiumoxide::Page;
 
+use super::eval_bool;
 use crate::audit::normalized::{
     InteractiveFinding, InteractiveFindingKind, InteractiveFindingValues, JourneyStep, JourneyTrace,
 };
@@ -10,16 +10,6 @@ use crate::error::Result;
 use crate::interaction::{focus, keyboard, pointer, stability};
 use crate::patterns::JourneyCandidate;
 use crate::taxonomy::Severity;
-
-async fn eval_bool(page: &Page, js: &str) -> Option<bool> {
-    let params = EvaluateParams::builder()
-        .expression(js.to_string())
-        .return_by_value(true)
-        .build()
-        .ok()?;
-    let result = page.execute(params).await.ok()?;
-    result.result.result.value?.as_bool()
-}
 
 pub async fn test(
     page: &Page,

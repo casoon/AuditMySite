@@ -53,6 +53,23 @@ pub fn truncate_url(s: &str, max_len: usize) -> String {
     format!("{}...", &s[..boundary])
 }
 
+/// Truncate a string for display purposes, ellipsizing with `…` (safe for
+/// multi-byte UTF-8). Distinct from [`truncate_url`], which appends an ASCII
+/// `...` ellipsis instead — this preserves the `…` style the `performance`
+/// modules' finding messages already render.
+pub fn truncate_ellipsis(s: &str, max: usize) -> String {
+    if s.len() <= max {
+        return s.to_string();
+    }
+    let boundary = s
+        .char_indices()
+        .take_while(|(i, _)| *i <= max.saturating_sub(3))
+        .last()
+        .map(|(i, _)| i)
+        .unwrap_or(0);
+    format!("{}…", &s[..boundary])
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -71,6 +88,14 @@ mod tests {
         let result = truncate_url(url, 30);
         assert!(result.len() <= 30);
         assert!(result.ends_with("..."));
+    }
+
+    #[test]
+    fn test_truncate_ellipsis_long_string() {
+        let long = "a".repeat(200);
+        let result = truncate_ellipsis(&long, 120);
+        assert!(result.len() <= 120);
+        assert!(result.ends_with('…'));
     }
 
     #[test]

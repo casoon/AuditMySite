@@ -242,35 +242,47 @@ fn build_score_driver_note(locale: &str, normalized: &NormalizedReport) -> Strin
 }
 
 fn score_area_for_key_point(finding: &crate::audit::normalized::NormalizedFinding) -> &'static str {
+    use crate::output::json::helpers::{key_has_word_starting_with, strip_css_selector_spans};
+
     // Use the German subcategory label and German taxonomy title so the mixed
     // DE/EN token matching below keeps the exact behavior it had before the
     // stored JSON title became canonical English (#406).
     let title_de = crate::taxonomy::RuleLookup::by_id(&finding.rule_id)
         .map(|r| r.title)
         .unwrap_or(finding.title.as_str());
-    let key = format!(
-        "{} {} {} {}",
+    // Word-boundary matching (not bare `contains`) plus CSS-selector
+    // stripping and a navigation/subcategory carve-out — same fix as
+    // `score_area_for_finding` (see score-area-substring-misclassification,
+    // score-area-form-conformance-word-boundary-misclassification and
+    // score-area-navigation-subcategory-misclassification in the regression
+    // corpus); this function had drifted into an unfixed, duplicated copy of
+    // the same classification logic.
+    let description = strip_css_selector_spans(&finding.description.to_ascii_lowercase());
+    let specific = format!(
+        "{} {} {}",
         finding.rule_id.to_ascii_lowercase(),
-        finding.subcategory_kind.label(false).to_ascii_lowercase(),
         title_de.to_ascii_lowercase(),
-        finding.description.to_ascii_lowercase()
+        description
     );
-    if (key.contains("form") && !key.contains("format"))
-        || key.contains("label")
-        || key.contains("input")
-    {
+    let key = format!(
+        "{specific} {}",
+        finding.subcategory_kind.label(false).to_ascii_lowercase()
+    );
+    let has = |word: &str| key_has_word_starting_with(&key, word);
+    let has_navigation = key_has_word_starting_with(&specific, "navigation");
+    if (has("form") && !has("format")) || has("label") || has("input") {
         "Forms"
-    } else if key.contains("keyboard") || key.contains("tastatur") {
+    } else if has("keyboard") || has("tastatur") {
         "Keyboard"
-    } else if key.contains("focus") || key.contains("fokus") {
+    } else if has("focus") || has("fokus") {
         "Focus management"
-    } else if key.contains("alt") || key.contains("image") || key.contains("bild") {
+    } else if has("alt") || has("image") || has("bild") {
         "Images / alternative text"
-    } else if key.contains("aria") || key.contains("role") {
+    } else if has("aria") || has("role") {
         "ARIA"
-    } else if key.contains("heading") || key.contains("überschrift") || key.contains("h1") {
+    } else if has("heading") || has("überschrift") || has("h1") {
         "Heading structure"
-    } else if key.contains("landmark") || key.contains("main") || key.contains("navigation") {
+    } else if has("landmark") || has("main") || has_navigation {
         "Landmarks / page structure"
     } else {
         "Semantics"

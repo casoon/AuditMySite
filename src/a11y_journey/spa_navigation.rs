@@ -14,6 +14,8 @@
 use chromiumoxide::cdp::js_protocol::runtime::EvaluateParams;
 use chromiumoxide::Page;
 
+use super::eval_bool;
+use super::eval_string as eval_str;
 use crate::audit::normalized::{
     InteractiveFinding, InteractiveFindingKind, InteractiveFindingValues, JourneyStep, JourneyTrace,
 };
@@ -82,16 +84,6 @@ const COLLECT_SPA_LINKS_JS: &str = r#"
 })()
 "#;
 
-async fn eval_bool(page: &Page, js: &str) -> Option<bool> {
-    let params = EvaluateParams::builder()
-        .expression(js.to_string())
-        .return_by_value(true)
-        .build()
-        .ok()?;
-    let result = page.execute(params).await.ok()?;
-    result.result.result.value?.as_bool()
-}
-
 async fn eval_int(page: &Page, js: &str) -> Option<i64> {
     let params = EvaluateParams::builder()
         .expression(js.to_string())
@@ -100,16 +92,6 @@ async fn eval_int(page: &Page, js: &str) -> Option<i64> {
         .ok()?;
     let result = page.execute(params).await.ok()?;
     result.result.result.value?.as_i64()
-}
-
-async fn eval_str(page: &Page, js: &str) -> Option<String> {
-    let params = EvaluateParams::builder()
-        .expression(js.to_string())
-        .return_by_value(true)
-        .build()
-        .ok()?;
-    let result = page.execute(params).await.ok()?;
-    result.result.result.value?.as_str().map(|s| s.to_string())
 }
 
 /// Collect candidate SPA links. Returns list of (selector, href) pairs.

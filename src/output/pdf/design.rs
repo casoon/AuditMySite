@@ -57,7 +57,6 @@ pub fn score_color(score: u8) -> &'static str {
     }
 }
 
-#[allow(dead_code)]
 /// Map a coarse status keyword (`"good"` / `"warn"` / `"bad"`) to its hue.
 /// Used by checklist/diagnosis panels that carry a precomputed status.
 pub fn status_color(status: &str) -> &'static str {

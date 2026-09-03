@@ -24,7 +24,7 @@ use crate::output::report_model::{ReportConfig, UrlMatrixRow};
 const SCHEMA_VERSION: &str = "2.0";
 
 mod detail;
-mod helpers;
+pub(crate) mod helpers;
 
 use detail::{build_batch_detail, build_page, DetailContext};
 use helpers::{

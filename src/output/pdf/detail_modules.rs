@@ -217,12 +217,7 @@ fn vital_rating_label(rating: &str, en: bool) -> &'static str {
 }
 
 fn vital_color(rating: &str) -> &'static str {
-    match rating {
-        "good" => "#0f766e",
-        "needs-improvement" => "#d97706",
-        "poor" => "#dc2626",
-        _ => "#2563eb",
-    }
+    crate::output::pdf::design::status_color(vital_status(rating))
 }
 
 fn truncate(value: &str, max_chars: usize) -> String {

@@ -82,7 +82,7 @@ pub async fn apply_throttling(page: &Page, profile: ThrottleProfile) -> Result<(
             .download_throughput(download)
             .upload_throughput(upload)
             .build()
-            .unwrap(),
+            .expect("static network-throttle params are valid"),
     )
     .await
     .map_err(|e| crate::error::AuditError::NavigationFailed {
@@ -152,7 +152,7 @@ pub async fn disable_throttling(page: &Page) -> Result<()> {
             .download_throughput(-1.0_f64)
             .upload_throughput(-1.0_f64)
             .build()
-            .unwrap(),
+            .expect("static network-throttle-disable params are valid"),
     )
     .await
     .map_err(|e| crate::error::AuditError::NavigationFailed {

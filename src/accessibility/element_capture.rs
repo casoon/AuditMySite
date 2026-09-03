@@ -103,15 +103,16 @@ pub async fn capture_element_evidence(
         let backend_id = ax_tree
             .get_node(&violation.node_id)
             .and_then(|n| n.backend_dom_node_id);
-        let selector_fallback = backend_id.is_none()
-            && violation.rule == "1.4.3"
-            && violation.selector.as_deref().is_some_and(is_safe_selector);
+        let safe_selector_fallback = (backend_id.is_none() && violation.rule == "1.4.3")
+            .then_some(violation.selector.as_deref())
+            .flatten()
+            .filter(|s| is_safe_selector(s));
         let captured = if let Some(backend_id) = backend_id {
             capture_one(page, backend_id)
                 .await
                 .map(|bytes| (bytes, false))
-        } else if selector_fallback {
-            capture_one_selector(page, violation.selector.as_deref().unwrap())
+        } else if let Some(selector) = safe_selector_fallback {
+            capture_one_selector(page, selector)
                 .await
                 .map(|bytes| (bytes, true))
         } else {

@@ -68,7 +68,7 @@ pub async fn check_reflow_with_page(page: &Page) -> Vec<Violation> {
         .height(256_i64)
         .device_scale_factor(1.0_f64)
         .build()
-        .unwrap();
+        .expect("static reflow viewport-override params are valid");
 
     if page.execute(narrow).await.is_err() {
         return vec![crate::wcag::technical_rule_failure(

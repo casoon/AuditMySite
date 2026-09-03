@@ -120,10 +120,10 @@ fn path_resolves(schema: &Value, path: &str) -> bool {
             None => (segment, false),
         };
         if name.contains('*') {
-            // Wildcard/glob segment (`*` or `*_score`): we can't validate an
-            // arbitrary or pattern-matched key against `additionalProperties`
-            // cleanly, so resolving the prefix up to here is treated as
-            // sufficient evidence the path is real.
+            // Wildcard/glob segment (`*` or `*_score`): an arbitrary or
+            // pattern-matched key cannot be validated against
+            // `additionalProperties` cleanly, so resolving the prefix up to
+            // this point is treated as sufficient evidence the path is real.
             return true;
         }
         let resolved = resolve_ref(schema, current);

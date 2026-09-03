@@ -1441,16 +1441,24 @@ async fn check_url_canonicalization(url: &str) -> Option<UrlCanonicalizationChec
 
     let (http_status, http_to_https_missing) = if parsed.scheme() == "https" {
         let mut http_variant = parsed.clone();
-        let _ = http_variant.set_scheme("http");
-        let resp = client.head(http_variant.as_str()).send().await.ok();
-        let status = resp.as_ref().map(|r| r.status().as_u16());
-        let location = resp
-            .and_then(|r| r.headers().get("location").cloned())
-            .and_then(|v| v.to_str().ok().map(String::from))
-            .unwrap_or_default();
-        let redirects_to_https = matches!(status, Some(301) | Some(302) | Some(307) | Some(308))
-            && location.starts_with("https://");
-        (status, !redirects_to_https)
+        if http_variant.set_scheme("http").is_ok() {
+            let resp = client.head(http_variant.as_str()).send().await.ok();
+            let status = resp.as_ref().map(|r| r.status().as_u16());
+            let location = resp
+                .and_then(|r| r.headers().get("location").cloned())
+                .and_then(|v| v.to_str().ok().map(String::from))
+                .unwrap_or_default();
+            let redirects_to_https =
+                matches!(status, Some(301) | Some(302) | Some(307) | Some(308))
+                    && location.starts_with("https://");
+            (status, !redirects_to_https)
+        } else {
+            // Scheme swap failed (should not happen for https → http, both
+            // are special schemes with defined ports) — skip rather than
+            // probe the unchanged https URL and misreport it as a missing
+            // HTTP→HTTPS redirect.
+            (None, false)
+        }
     } else {
         (None, false)
     };

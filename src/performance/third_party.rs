@@ -11,6 +11,7 @@ use url::Url;
 
 use crate::browser::BrowserManager;
 use crate::error::{AuditError, Result};
+use crate::util::truncate_ellipsis as truncate;
 
 use super::vitals::{extract_web_vitals, prepare_vitals_collection};
 
@@ -401,19 +402,6 @@ fn classify_origin(host: &str) -> (Option<String>, Option<String>) {
         return (None, None);
     };
     (Some(pair.0.to_string()), Some(pair.1.to_string()))
-}
-
-fn truncate(s: &str, max: usize) -> String {
-    if s.len() <= max {
-        return s.to_string();
-    }
-    let boundary = s
-        .char_indices()
-        .take_while(|(i, _)| *i <= max.saturating_sub(3))
-        .last()
-        .map(|(i, _)| i)
-        .unwrap_or(0);
-    format!("{}…", &s[..boundary])
 }
 
 #[cfg(test)]

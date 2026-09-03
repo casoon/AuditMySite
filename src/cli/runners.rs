@@ -466,8 +466,7 @@ pub async fn run_batch_mode(
     ));
     presenter.start(total_urls, "Auditing URLs");
 
-    #[allow(clippy::type_complexity)]
-    let progress: Option<Arc<dyn Fn(usize, usize, &str, Option<&str>) + Send + Sync>> = {
+    let progress: Option<auditmysite::audit::ProgressCallback> = {
         let presenter = Arc::clone(&presenter);
         Some(Arc::new(
             move |current, _total, url: &str, error: Option<&str>| {

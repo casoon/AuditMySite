@@ -33,12 +33,26 @@ pub enum StabilityStatus {
     ReadySignal,
     #[default]
     BudgetExhausted,
+    /// The budget expired, but the ongoing DOM mutations were confined to a
+    /// small, stable set of elements with no real content growth (and/or a
+    /// native animation was observed running) — consistent with an
+    /// intentional, continuously running page animation rather than an
+    /// unsettled/still-loading page. Does not count as a quality issue.
+    OngoingAnimation,
     Fallback,
 }
 
 /// Wait until the DOM has been quiet for 200 ms, an application-provided
 /// `window.__AUDITMYSITE_READY__ === true` signal is present, or the bounded
 /// budget is exhausted. This deliberately does not wait for network idle.
+///
+/// When the budget is exhausted, a heuristic distinguishes a genuinely
+/// unsettled page from one with a legitimate, continuously running
+/// animation (e.g. a marquee, ticker, or carousel): if mutations stayed
+/// confined to a small set of elements without real content growth — or a
+/// native CSS/Web Animation is still running — the page is reported as
+/// `OngoingAnimation` instead of `BudgetExhausted`, so it is not treated as
+/// a data-quality problem.
 pub async fn wait_for_page_stability(
     page: &Page,
     viewport: &str,
@@ -49,6 +63,8 @@ pub async fn wait_for_page_stability(
         r#"new Promise(resolve => {{
             const started = performance.now();
             let mutations = 0;
+            let addedElementNodes = 0;
+            const targets = new Set();
             let quietTimer;
             let done = false;
             const finish = (status, reason) => {{
@@ -61,11 +77,32 @@ pub async fn wait_for_page_stability(
             }};
             const observer = new MutationObserver(records => {{
                 mutations += records.length;
+                for (const r of records) {{
+                    if (targets.size < 25) targets.add(r.target);
+                    if (r.type === 'childList') {{
+                        for (const n of r.addedNodes) {{
+                            if (n.nodeType === 1) addedElementNodes++;
+                        }}
+                    }}
+                }}
                 clearTimeout(quietTimer);
                 quietTimer = setTimeout(() => finish('stable', null), 200);
             }});
             observer.observe(document.documentElement, {{subtree:true, childList:true, attributes:true, characterData:true}});
-            const budgetTimer = setTimeout(() => finish('budget_exhausted', 'DOM did not remain quiet within the configured budget'), {budget_ms});
+            const budgetTimer = setTimeout(() => {{
+                let hasRunningAnimation = false;
+                try {{
+                    hasRunningAnimation = typeof document.getAnimations === 'function' &&
+                        document.getAnimations({{subtree:true}}).some(a => a.playState === 'running');
+                }} catch (e) {{}}
+                const boundedTargets = targets.size > 0 && targets.size <= 6;
+                const noContentGrowth = addedElementNodes === 0;
+                if (boundedTargets && (noContentGrowth || hasRunningAnimation)) {{
+                    finish('ongoing_animation', 'DOM mutations stayed confined to a small, stable set of elements without content growth, consistent with a running animation');
+                }} else {{
+                    finish('budget_exhausted', 'DOM did not remain quiet within the configured budget');
+                }}
+            }}, {budget_ms});
             if (window.__AUDITMYSITE_READY__ === true || document.documentElement.dataset.auditReady === 'true') {{
                 finish('ready_signal', null);
             }} else {{
@@ -96,6 +133,7 @@ pub async fn wait_for_page_stability(
             let status = match value.get("status").and_then(serde_json::Value::as_str) {
                 Some("stable") => StabilityStatus::Stable,
                 Some("ready_signal") => StabilityStatus::ReadySignal,
+                Some("ongoing_animation") => StabilityStatus::OngoingAnimation,
                 _ => StabilityStatus::BudgetExhausted,
             };
             StabilityProvenance {

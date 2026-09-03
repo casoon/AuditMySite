@@ -155,24 +155,28 @@ pub async fn check_meaningful_sequence_with_page(page: &Page) -> Vec<Violation> 
             let selector = entry.get("selector").and_then(|v| v.as_str())?;
             let raw_children = entry.get("children").and_then(|v| v.as_array())?;
 
-            let child_selectors: Vec<&str> = raw_children
-                .iter()
-                .filter_map(|c| c.get("selector").and_then(|v| v.as_str()))
-                .collect();
-            let child_orders: Vec<ChildOrder> = raw_children
-                .iter()
-                .enumerate()
-                .filter_map(|(i, c)| {
-                    let order = c.get("order").and_then(|v| v.as_i64())? as i32;
-                    Some(ChildOrder {
-                        dom_index: i,
-                        order,
-                    })
-                })
-                .collect();
+            // Built in lockstep so `dom_index` is always a valid index into
+            // `child_selectors` by construction — independently filtering
+            // the two vectors (dropping a child missing only one of
+            // `selector`/`order`) could otherwise leave them the same
+            // length but misaligned, causing an out-of-bounds index below.
+            let mut child_selectors: Vec<&str> = Vec::with_capacity(raw_children.len());
+            let mut child_orders: Vec<ChildOrder> = Vec::with_capacity(raw_children.len());
+            for c in raw_children {
+                let Some(selector) = c.get("selector").and_then(|v| v.as_str()) else {
+                    continue;
+                };
+                let Some(order) = c.get("order").and_then(|v| v.as_i64()) else {
+                    continue;
+                };
+                child_orders.push(ChildOrder {
+                    dom_index: child_selectors.len(),
+                    order: order as i32,
+                });
+                child_selectors.push(selector);
+            }
 
-            if child_orders.len() != child_selectors.len() || !is_visually_reordered(&child_orders)
-            {
+            if !is_visually_reordered(&child_orders) {
                 return None;
             }
 

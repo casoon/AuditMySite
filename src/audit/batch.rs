@@ -568,11 +568,10 @@ fn build_crawl_depth_diagnostics(
     unreachable_pages.truncate(MAX_CRAWL_DEPTH_LIST);
 
     // A batch smaller than the full discovered sitemap — whether via
-    // `--max-pages` sampling or per-page audit failures — means some pages'
-    // outbound links are unknown, so depth/reachability here is only a
-    // partial view of the real site-wide graph. Surfaced as an explicit
-    // report caveat rather than silently presenting a partial graph as
-    // complete (#548's own acceptance criterion).
+    // `--max-pages` sampling or per-page audit failures — leaves some
+    // pages' outbound links unknown, so this depth/reachability view is
+    // partial, not site-wide. Reported as an explicit caveat instead of
+    // presenting a partial graph as complete (#548 acceptance criterion).
     let partial_batch = reports.len() < sitemap_urls.len();
 
     Some(CrawlDepthDiagnostics {

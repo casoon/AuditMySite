@@ -10,6 +10,7 @@ use serde::{Deserialize, Serialize};
 use tracing::info;
 
 use crate::error::{AuditError, Result};
+use crate::util::truncate_ellipsis as truncate;
 
 /// A single node in the critical request chain.
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -130,8 +131,14 @@ pub async fn analyze_critical_chain(page: &Page) -> Result<CriticalChain> {
         })
         .collect();
 
-    // Sort by start time so we can process in order
-    nodes.sort_by(|a, b| a.start_ms.partial_cmp(&b.start_ms).unwrap());
+    // Sort by start time so we can process in order. `start_ms` is always
+    // `.max(0.0)`-sanitized above, and `f64::max` returns the non-NaN
+    // operand when one side is NaN, so `start_ms` is never NaN here.
+    nodes.sort_by(|a, b| {
+        a.start_ms
+            .partial_cmp(&b.start_ms)
+            .expect("start_ms is never NaN, see comment above")
+    });
 
     let chains = build_chains(&nodes);
 
@@ -256,19 +263,6 @@ struct RawResource {
     #[serde(rename = "transferSize")]
     transfer_size: u64,
     duration: f64,
-}
-
-fn truncate(s: &str, max: usize) -> String {
-    if s.len() <= max {
-        return s.to_string();
-    }
-    let boundary = s
-        .char_indices()
-        .take_while(|(i, _)| *i <= max.saturating_sub(3))
-        .last()
-        .map(|(i, _)| i)
-        .unwrap_or(0);
-    format!("{}…", &s[..boundary])
 }
 
 #[cfg(test)]

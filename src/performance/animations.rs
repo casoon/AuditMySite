@@ -19,6 +19,7 @@ use serde::{Deserialize, Serialize};
 use tracing::info;
 
 use crate::error::{AuditError, Result};
+use crate::util::truncate_ellipsis as truncate;
 
 /// A single non-composited animation or transition finding.
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -192,19 +193,6 @@ struct RawFinding {
     name: String,
     property: String,
     source: String,
-}
-
-fn truncate(s: &str, max: usize) -> String {
-    if s.len() <= max {
-        return s.to_string();
-    }
-    let boundary = s
-        .char_indices()
-        .take_while(|(i, _)| *i <= max.saturating_sub(3))
-        .last()
-        .map(|(i, _)| i)
-        .unwrap_or(0);
-    format!("{}…", &s[..boundary])
 }
 
 #[cfg(test)]

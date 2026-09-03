@@ -12,9 +12,9 @@
 //! `a11y_journey::run`) to a detected shop's product-detail page under
 //! `--interactive full` only.
 
-use chromiumoxide::cdp::js_protocol::runtime::EvaluateParams;
 use chromiumoxide::Page;
 
+use super::{eval_bool, eval_string};
 use crate::audit::normalized::{
     InteractiveFinding, InteractiveFindingKind, InteractiveFindingValues, JourneyStep, JourneyTrace,
 };
@@ -22,26 +22,6 @@ use crate::error::Result;
 use crate::interaction::{pointer, stability};
 use crate::patterns::JourneyCandidate;
 use crate::taxonomy::Severity;
-
-async fn eval_string(page: &Page, js: &str) -> Option<String> {
-    let params = EvaluateParams::builder()
-        .expression(js.to_string())
-        .return_by_value(true)
-        .build()
-        .ok()?;
-    let result = page.execute(params).await.ok()?;
-    result.result.result.value?.as_str().map(|s| s.to_string())
-}
-
-async fn eval_bool(page: &Page, js: &str) -> Option<bool> {
-    let params = EvaluateParams::builder()
-        .expression(js.to_string())
-        .return_by_value(true)
-        .build()
-        .ok()?;
-    let result = page.execute(params).await.ok()?;
-    result.result.result.value?.as_bool()
-}
 
 /// Joined, non-empty text content of all live-region/status elements — used
 /// to detect whether an announcement appeared or changed after the click.

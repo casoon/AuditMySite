@@ -50,6 +50,7 @@ use tokio::sync::Mutex;
 use tracing::{info, warn};
 
 use crate::error::{AuditError, Result};
+use crate::util::truncate_ellipsis as truncate;
 
 /// Minimum size (bytes) a fetched script/stylesheet source must have to be
 /// considered for duplicate-content detection (#551) — mirrors the same
@@ -589,19 +590,6 @@ fn sha256_hex(text: &str) -> String {
         .iter()
         .map(|b| format!("{b:02x}"))
         .collect()
-}
-
-fn truncate(s: &str, max: usize) -> String {
-    if s.len() <= max {
-        return s.to_string();
-    }
-    let boundary = s
-        .char_indices()
-        .take_while(|(i, _)| *i <= max.saturating_sub(3))
-        .last()
-        .map(|(i, _)| i)
-        .unwrap_or(0);
-    format!("{}…", &s[..boundary])
 }
 
 #[cfg(test)]

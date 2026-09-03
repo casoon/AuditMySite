@@ -13,6 +13,7 @@
 use chromiumoxide::cdp::js_protocol::runtime::EvaluateParams;
 use chromiumoxide::Page;
 
+use super::{eval_bool, eval_string};
 use crate::audit::normalized::{
     InteractiveFinding, InteractiveFindingKind, InteractiveFindingValues, JourneyStep, JourneyTrace,
 };
@@ -20,16 +21,6 @@ use crate::error::Result;
 use crate::interaction::{focus, pointer, stability};
 use crate::patterns::JourneyCandidate;
 use crate::taxonomy::Severity;
-
-async fn eval_bool(page: &Page, js: &str) -> Option<bool> {
-    let params = EvaluateParams::builder()
-        .expression(js.to_string())
-        .return_by_value(true)
-        .build()
-        .ok()?;
-    let result = page.execute(params).await.ok()?;
-    result.result.result.value?.as_bool()
-}
 
 async fn eval_int(page: &Page, js: &str) -> Option<i64> {
     let params = EvaluateParams::builder()
@@ -39,16 +30,6 @@ async fn eval_int(page: &Page, js: &str) -> Option<i64> {
         .ok()?;
     let result = page.execute(params).await.ok()?;
     result.result.result.value?.as_i64()
-}
-
-async fn eval_string(page: &Page, js: &str) -> Option<String> {
-    let params = EvaluateParams::builder()
-        .expression(js.to_string())
-        .return_by_value(true)
-        .build()
-        .ok()?;
-    let result = page.execute(params).await.ok()?;
-    result.result.result.value?.as_str().map(|s| s.to_string())
 }
 
 /// Check whether a live announcement appeared after submit.

@@ -87,7 +87,7 @@ struct CaseDiff {
 }
 
 #[tokio::test]
-#[ignore]
+#[ignore = "corpus is empty until #556 populates it; run manually once seeded"]
 async fn detection_corpus_matches_real_audit_run() {
     let corpus_dir = detection_corpus_dir();
     let cases = load_corpus_dir(&corpus_dir);

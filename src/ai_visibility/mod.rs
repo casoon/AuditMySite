@@ -576,7 +576,10 @@ pub fn analyze_ai_visibility_batch(reports: &[AuditReport]) -> AiVisibilityAnaly
     let avg_score = analyses.iter().map(|a| a.score).sum::<u32>() / analyses.len() as u32;
 
     // Use the first report's detailed analysis as template, with averaged scores
-    let mut result = analyses.into_iter().next().unwrap();
+    let mut result = analyses
+        .into_iter()
+        .next()
+        .expect("analyses is non-empty: reports is non-empty, checked above");
     result.score = avg_score;
     result.grade = module_score_grade(avg_score).to_string();
 

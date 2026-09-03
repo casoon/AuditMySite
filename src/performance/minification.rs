@@ -15,6 +15,7 @@ use serde::{Deserialize, Serialize};
 use tracing::info;
 
 use crate::error::{AuditError, Result};
+use crate::util::truncate_ellipsis as truncate;
 
 /// A single JS or CSS resource that appears to be unminified.
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -260,19 +261,6 @@ fn legacy_wasted_bytes(decoded_bytes: u64, transfer_bytes: u64) -> u64 {
     } else {
         transfer_bytes
     }
-}
-
-fn truncate(s: &str, max: usize) -> String {
-    if s.len() <= max {
-        return s.to_string();
-    }
-    let boundary = s
-        .char_indices()
-        .take_while(|(i, _)| *i <= max.saturating_sub(3))
-        .last()
-        .map(|(i, _)| i)
-        .unwrap_or(0);
-    format!("{}…", &s[..boundary])
 }
 
 #[cfg(test)]
