@@ -2384,9 +2384,9 @@ dependencies = [
 
 [[package]]
 name = "html-conform"
-version = "0.1.1"
+version = "0.2.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "4ca674d08fbdb82dd89d81252f15a7a8c5f5e87260f685fce4fd822bbc0ccbe8"
+checksum = "dd1ae18aabec3d49f2a04b812224199a601f4badb4892997503f1e00c486eb27"
 dependencies = [
  "csp-parse",
  "encoding_rs",
@@ -2402,9 +2402,9 @@ dependencies = [
 
 [[package]]
 name = "html5-parser"
-version = "0.2.0"
+version = "0.3.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "0e0ecc373c11b5f9e631a259c3025ce01b69797c09e406c59ba7792675cd27d1"
+checksum = "5b851f35c29d28aaba06e9b0022d2110e5339bf34b343766821e5d65dc49be2c"
 
 [[package]]
 name = "html5ever"
