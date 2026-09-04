@@ -29,6 +29,7 @@ Cargo.lock
 !tests/lint_fixtures/*.json
 !tests/regression_corpus/*.json
 !tests/fixtures/detection_corpus/*.json
+!tests/fixtures/detection_corpus_nonwcag/*/*.json
 !scripts/package-lock.json
 
 # Logs

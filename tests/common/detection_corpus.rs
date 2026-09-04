@@ -47,6 +47,11 @@ pub struct ExpectedCase {
     pub source_file: Option<PathBuf>,
     #[serde(default)]
     pub expectations: Vec<Expectation>,
+    /// Security-domain corpus only (#558): HTTP response headers the
+    /// fixture server should return for this case. Empty/absent for the
+    /// HTML-based WCAG corpus, which has no equivalent concept.
+    #[serde(default)]
+    pub response_headers: std::collections::BTreeMap<String, String>,
 }
 
 #[derive(Debug, Clone, Deserialize)]
@@ -60,6 +65,22 @@ pub fn detection_corpus_dir() -> PathBuf {
         .join("tests")
         .join("fixtures")
         .join("detection_corpus")
+}
+
+/// Same format, separate namespace for the non-WCAG detection corpus (#558):
+/// `tests/fixtures/detection_corpus_nonwcag/<domain>/`, one subdirectory per
+/// enumerable non-WCAG check family (`security`, `vulnerable_libs`,
+/// `schema_rules`, ...). Kept apart from `detection_corpus_dir()` rather than
+/// merged into one flat directory — `rule_id` values across domains aren't
+/// from the same namespace (a security check id and a WCAG axe_id could
+/// collide by coincidence) and the completeness check needs to diff each
+/// domain against its own separate canonical inventory.
+pub fn nonwcag_detection_corpus_dir(domain: &str) -> PathBuf {
+    PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+        .join("tests")
+        .join("fixtures")
+        .join("detection_corpus_nonwcag")
+        .join(domain)
 }
 
 /// Parse one `<case>.expected.json` file's contents.

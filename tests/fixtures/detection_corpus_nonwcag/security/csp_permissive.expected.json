@@ -1,0 +1,17 @@
+{
+  "case": "csp_permissive",
+  "response_headers": {
+    "Content-Security-Policy": "default-src *; script-src 'unsafe-inline' 'unsafe-eval' *; style-src 'unsafe-inline'"
+  },
+  "expectations": [
+    { "rule_id": "Content-Security-Policy:missing_header", "verdict": "pass" },
+    { "rule_id": "Content-Security-Policy:unsafe_inline_script", "verdict": "violation" },
+    { "rule_id": "Content-Security-Policy:unsafe_eval_script", "verdict": "violation" },
+    { "rule_id": "Content-Security-Policy:wildcard_script_source", "verdict": "violation" },
+    { "rule_id": "Content-Security-Policy:unsafe_inline_style", "verdict": "violation" },
+    { "rule_id": "Content-Security-Policy:wildcard_source", "verdict": "violation" },
+    { "rule_id": "Content-Security-Policy:missing_object-src", "verdict": "violation" },
+    { "rule_id": "Content-Security-Policy:missing_base-uri", "verdict": "violation" },
+    { "rule_id": "Content-Security-Policy:missing_frame-ancestors", "verdict": "violation" }
+  ]
+}

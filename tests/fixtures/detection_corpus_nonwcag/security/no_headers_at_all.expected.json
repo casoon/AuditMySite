@@ -1,0 +1,14 @@
+{
+  "case": "no_headers_at_all",
+  "response_headers": {},
+  "expectations": [
+    { "rule_id": "HTTPS:missing_https", "verdict": "violation" },
+    { "rule_id": "Content-Security-Policy:missing_header", "verdict": "violation" },
+    { "rule_id": "X-Content-Type-Options:missing_header", "verdict": "violation" },
+    { "rule_id": "X-Frame-Options:missing_header", "verdict": "violation" },
+    { "rule_id": "Referrer-Policy:missing_header", "verdict": "violation" },
+    { "rule_id": "Permissions-Policy:missing_header", "verdict": "violation" },
+    { "rule_id": "Cross-Origin-Opener-Policy:missing_header", "verdict": "violation" },
+    { "rule_id": "Cross-Origin-Resource-Policy:missing_header", "verdict": "violation" }
+  ]
+}

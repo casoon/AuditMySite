@@ -1,0 +1,10 @@
+{
+  "case": "permissions_policy_permissive",
+  "response_headers": {
+    "Permissions-Policy": ""
+  },
+  "expectations": [
+    { "rule_id": "Permissions-Policy:missing_header", "verdict": "pass" },
+    { "rule_id": "Permissions-Policy:permissions_policy_permissive", "verdict": "violation" }
+  ]
+}

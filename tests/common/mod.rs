@@ -9,4 +9,5 @@
 #![allow(dead_code)]
 
 pub mod detection_corpus;
+pub mod nonwcag_rule_inventory;
 pub mod rule_inventory;
