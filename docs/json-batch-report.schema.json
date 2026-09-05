@@ -9,6 +9,7 @@
     "schema_version": { "type": "string", "const": "2.0" },
     "report_type": { "type": "string", "const": "batch" },
     "tool_version": { "type": "string" },
+    "build_id": { "type": "string", "description": "Build-time git short-SHA of the binary that produced this report; \"unknown\" when built without a .git directory." },
     "metadata": { "$ref": "#/$defs/metadata" },
     "audit_scope": { "type": "object" },
     "execution_environment": { "type": "object" },

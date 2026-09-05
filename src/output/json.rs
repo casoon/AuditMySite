@@ -71,6 +71,10 @@ pub struct UnifiedReport {
     pub report_type: &'static str,
     /// Top-level tool version — duplicated from `metadata.tool` for ease of consumption.
     pub tool_version: &'static str,
+    /// Build-time git short-SHA of the binary that produced this report (`"unknown"`
+    /// when built without a `.git` directory, e.g. `cargo install` from crates.io).
+    /// Lets two reports sharing the same `tool_version` be told apart by exact fix-state.
+    pub build_id: &'static str,
     pub metadata: ReportMetadata,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub audit_scope: Option<crate::audit::AuditScope>,
@@ -1056,6 +1060,7 @@ impl UnifiedReport {
             schema_version: SCHEMA_VERSION,
             report_type: "batch",
             tool_version: env!("CARGO_PKG_VERSION"),
+            build_id: env!("AUDITMYSITE_BUILD_SHA"),
             metadata: ReportMetadata {
                 tool: format!("auditmysite v{}", env!("CARGO_PKG_VERSION")),
                 timestamp: batch_report_timestamp(batch_report),
@@ -1192,6 +1197,7 @@ impl UnifiedReport {
             schema_version: SCHEMA_VERSION,
             report_type: "single",
             tool_version: env!("CARGO_PKG_VERSION"),
+            build_id: env!("AUDITMYSITE_BUILD_SHA"),
             metadata: ReportMetadata {
                 tool: format!("auditmysite v{}", env!("CARGO_PKG_VERSION")),
                 timestamp: ctx.normalized.timestamp,
@@ -1287,6 +1293,7 @@ impl UnifiedReport {
             schema_version: SCHEMA_VERSION,
             report_type: "single",
             tool_version: env!("CARGO_PKG_VERSION"),
+            build_id: env!("AUDITMYSITE_BUILD_SHA"),
             metadata: ReportMetadata {
                 tool: format!("auditmysite v{}", env!("CARGO_PKG_VERSION")),
                 timestamp: normalized.timestamp,
