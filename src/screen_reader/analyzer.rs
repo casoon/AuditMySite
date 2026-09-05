@@ -30,6 +30,7 @@ pub fn analyze_reading_sequence(
     let mut issues = Vec::new();
 
     detect_non_descriptive_interactive_names(items, &stopwords, en, &mut issues);
+    detect_duplicated_accessible_name(items, &stopwords, en, &mut issues);
     detect_icon_font_contamination(items, en, &mut issues);
     detect_duplicate_link_texts(views, en, &mut issues);
     detect_announcement_deserts(items, en, &mut issues);
@@ -98,6 +99,81 @@ fn detect_non_descriptive_interactive_names(
             });
         }
     }
+}
+
+/// Detects an accessible name whose words split exactly into two identical
+/// halves back-to-back, e.g. "Kontakt Kontakt" or "AGB AGB" (confirmed live
+/// on shop.satower-mosterei.de, 2026-09-04: a screen reader announces such
+/// names twice in a row, which reads as a glitch rather than a real repeated
+/// word). This operates on the already-resolved AXTree `name` -- not on the
+/// DOM's `aria-label`/visible-text pair -- so it only fires when the *final*
+/// accessible name actually contains the duplication (e.g. produced by
+/// name-from-content concatenating a labelled icon's name with adjacent
+/// visible text). An `aria-label` that simply repeats the visible text (e.g.
+/// `aria-label="Kontakt"` on `<a>Kontakt</a>`) never reaches this check: per
+/// the accessible-name computation, `aria-label` replaces content text
+/// rather than concatenating with it, so the resolved name is "Kontakt"
+/// once, not twice.
+///
+/// Two guardrails avoid flagging harmless repetition: the repeated phrase
+/// must be at least 2 characters (excludes single icon glyphs, already
+/// covered by `detect_icon_font_contamination`), and it must not be a
+/// generic stopword (reuses the same localized `linktext-generic-stopwords`
+/// list as `detect_non_descriptive_interactive_names` -- a doubled generic
+/// word like "Mehr Mehr" is already covered by that check and is a weaker,
+/// less actionable signal than a doubled real word).
+fn detect_duplicated_accessible_name(
+    items: &[ReadingItem],
+    stopwords: &HashSet<String>,
+    en: bool,
+    issues: &mut Vec<SrAuditIssue>,
+) {
+    for item in items.iter().filter(|item| {
+        matches!(item.role.as_deref(), Some("button" | "link")) && !is_empty_name(&item.name)
+    }) {
+        let name = item.name.as_deref().unwrap_or_default();
+        let Some(half) = duplicated_half(name) else {
+            continue;
+        };
+        let normalized_half = normalize_text(&half);
+        if normalized_half.chars().count() < 2 || stopwords.contains(&normalized_half) {
+            continue;
+        }
+        issues.push(SrAuditIssue {
+            wcag_criterion: Some("2.4.4".into()),
+            severity: "medium".into(),
+            affected_node_ids: vec![item.node_id.clone()],
+            message: if en {
+                format!(
+                    "Accessible name \"{name}\" repeats \"{half}\" twice in a row. \
+                     A screen reader announces it as \"{name}\", which sounds like a glitch."
+                )
+            } else {
+                format!(
+                    "Zugänglicher Name \"{name}\" wiederholt \"{half}\" zweimal hintereinander. \
+                     Ein Screenreader kündigt ihn als \"{name}\" an, was wie ein Fehler wirkt."
+                )
+            },
+        });
+    }
+}
+
+/// Returns the repeated phrase when `name`'s whitespace-separated words split
+/// into two identical (case-insensitive) halves back-to-back, e.g.
+/// "Kontakt Kontakt" -> `Some("Kontakt")`. `None` for an odd word count or
+/// fewer than 2 words, or when the two halves differ.
+fn duplicated_half(name: &str) -> Option<String> {
+    let words: Vec<&str> = name.split_whitespace().collect();
+    if words.len() < 2 || !words.len().is_multiple_of(2) {
+        return None;
+    }
+    let mid = words.len() / 2;
+    let (first, second) = words.split_at(mid);
+    let is_duplicate = first
+        .iter()
+        .zip(second.iter())
+        .all(|(a, b)| a.to_lowercase() == b.to_lowercase());
+    is_duplicate.then(|| first.join(" "))
 }
 
 fn detect_duplicate_link_texts(views: &NavigationViews, en: bool, issues: &mut Vec<SrAuditIssue>) {
@@ -874,5 +950,76 @@ mod tests {
             i.wcag_criterion.as_deref() == Some("1.3.1")
                 && (i.message.contains("erste Überschrift") || i.message.contains("H1 erscheint"))
         }));
+    }
+
+    #[test]
+    fn detects_duplicated_accessible_name_on_footer_style_link() {
+        // Regression fixture resembling the confirmed live bug
+        // (shop.satower-mosterei.de, 2026-09-04): a footer link's resolved
+        // accessible name is the visible text repeated twice back-to-back
+        // (e.g. a labelled icon glyph concatenated with adjacent visible
+        // text via name-from-content), so a screen reader announces
+        // "Kontakt Kontakt".
+        let items = vec![
+            item(0, "banner", Some("Header"), false, vec![]),
+            item(1, "navigation", Some("Nav"), false, vec![]),
+            item(2, "main", Some("Inhalt"), false, vec![]),
+            item(3, "contentinfo", Some("Footer"), false, vec![]),
+            item(4, "link", Some("Kontakt Kontakt"), true, vec![]),
+            item(5, "link", Some("AGB AGB"), true, vec![]),
+        ];
+        let views = navigation_views(&items);
+        let issues = analyze_reading_sequence(&items, &views, "de", false, false);
+
+        let duplicated: Vec<_> = issues
+            .iter()
+            .filter(|i| i.message.contains("wiederholt"))
+            .collect();
+        assert_eq!(
+            duplicated.len(),
+            2,
+            "expected a duplicated-name issue for both links, got: {:?}",
+            issues.iter().map(|i| &i.message).collect::<Vec<_>>()
+        );
+        assert!(duplicated
+            .iter()
+            .all(|i| i.wcag_criterion.as_deref() == Some("2.4.4")));
+        assert!(duplicated
+            .iter()
+            .any(|i| i.affected_node_ids == vec!["node-4".to_string()]));
+        assert!(duplicated
+            .iter()
+            .any(|i| i.affected_node_ids == vec!["node-5".to_string()]));
+    }
+
+    #[test]
+    fn does_not_flag_generic_stopword_repeated_as_duplicated_name() {
+        // FP guardrail: a doubled *generic* word (already covered, more
+        // usefully, by the non-descriptive-name check) must not also fire
+        // the duplicated-name check -- "Mehr" is in the German
+        // linktext-generic-stopwords list.
+        let items = vec![
+            item(0, "main", Some("Inhalt"), false, vec![]),
+            item(1, "link", Some("Mehr Mehr"), true, vec![]),
+        ];
+        let views = navigation_views(&items);
+        let issues = analyze_reading_sequence(&items, &views, "de", false, false);
+
+        assert!(!issues.iter().any(|i| i.message.contains("wiederholt")));
+    }
+
+    #[test]
+    fn does_not_flag_non_duplicate_name_with_shared_prefix() {
+        // FP guardrail: names must split into two *identical* halves, not
+        // merely share a word -- "Kontakt Kontaktformular" is a normal,
+        // non-repeating name and must not be flagged.
+        let items = vec![
+            item(0, "main", Some("Inhalt"), false, vec![]),
+            item(1, "link", Some("Kontakt Kontaktformular"), true, vec![]),
+        ];
+        let views = navigation_views(&items);
+        let issues = analyze_reading_sequence(&items, &views, "de", false, false);
+
+        assert!(!issues.iter().any(|i| i.message.contains("wiederholt")));
     }
 }
