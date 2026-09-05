@@ -122,13 +122,17 @@ pub(super) fn build_methodology(
     let disclaimer = if en {
         "This report represents an automated technical analysis. It does not replace a complete \
          WCAG 2.1 conformance assessment. A legally defensible accessibility statement requires a \
-         comprehensive manual audit by experts."
+         comprehensive manual audit by experts. Accessibility is not a one-time achievable state: \
+         it is an ongoing process, and every new component or piece of content needs to be \
+         re-audited when it is added."
             .to_string()
     } else {
         "Dieser Report stellt eine automatisierte technische Analyse dar. \
          Er ersetzt keine vollständige Konformitätsbewertung nach WCAG 2.1. \
          Für eine rechtsverbindliche Aussage zur Barrierefreiheit ist eine \
-         umfassende manuelle Prüfung durch Experten erforderlich."
+         umfassende manuelle Prüfung durch Experten erforderlich. Barrierefreiheit ist kein \
+         einmalig erreichbarer Zustand, sondern ein fortlaufender Prozess: Jede neue Komponente \
+         und jeder neue Inhalt muss bei Einführung erneut geprüft werden."
             .to_string()
     };
 

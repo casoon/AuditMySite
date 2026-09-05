@@ -249,6 +249,17 @@ Bewusste, über alle Phasen hinweg getroffene Entscheidung statt einer nachträg
   Differenzprüfungen** statt gespeicherter Pixel-Baselines erkannt, siehe Phase-5-Eintrag unten.
 
 ## Current State (v1.1.0)
+- **plan/14: "Prozess statt Zertifikat"-Satz im Disclaimer ergänzt, 2026-09-06:** Prüfung ergab,
+  dass der Scope-Vorbehalt selbst ("kein vollständiger Konformitätsnachweis", "ersetzt keine
+  manuelle Prüfung") bereits im bestehenden `disclaimer`-Text (`build_methodology`,
+  `src/output/builder/single/methodology.rs`) und im Cover-Label ("WCAG-Vorkommen" statt
+  pauschal "Accessibility-Befunde") vorhanden war — beide Fundstellen unverändert gelassen.
+  Fehlend war die im Artikel betonte Prozess-Aussage: Barrierefreiheit als fortlaufende Aufgabe,
+  nicht einmalig erreichbarer Zustand. Ein Satz an den bestehenden `disclaimer` angehängt (DE+EN,
+  keine neue Callout-Komponente, keine Änderung an `gate_certificate_by_risk`/`CERTIFICATE`-
+  Schwellen). Bewusst nicht auf dem Cover platziert — das ist eine feste, knappe Dashboard-Seite
+  (renderreport `CoverPage`), Scope-/Rechtstexte leben in diesem Projekt durchgehend im
+  Methodology-Kapitel, nicht auf dem Cover.
 - **plan/13 (Drei-Stufen-Konfidenz-Kennzeichnung) als bereits erfüllt geschlossen, 2026-09-06:**
   der aus einem Insights-Artikel abgeleitete Plan-Punkt wollte ein neues `DetectionConfidence`-
   Enum (`Certain`/`HeuristicSuspicion`/`ManualOnly`) plus Registry-Klassifikation pro `rule_id`
