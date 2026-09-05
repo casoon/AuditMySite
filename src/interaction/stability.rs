@@ -177,7 +177,18 @@ pub async fn wait_for_stable(page: &Page, duration_ms: u64) -> Result<()> {
         .map_err(|e| AuditError::InteractionFailed {
             reason: format!("settle build failed: {e}"),
         })?;
-    if page.execute(params).await.is_err() {
+    // Bounded, like `wait_for_page_stability`'s own CDP call below — without
+    // this, a concurrent batch run can leave this awaitPromise command
+    // pending on chromiumoxide's side well past its intended budget (up to
+    // its internal command timeout), which silently eats into the calling
+    // page's overall per-audit timeout budget under concurrency (#url-file
+    // batch hang investigation).
+    let outcome = tokio::time::timeout(
+        Duration::from_millis(duration_ms + 500),
+        page.execute(params),
+    )
+    .await;
+    if !matches!(outcome, Ok(Ok(_))) {
         tokio::time::sleep(Duration::from_millis(duration_ms)).await;
     }
     Ok(())

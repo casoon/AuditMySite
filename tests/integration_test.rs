@@ -1054,3 +1054,56 @@ async fn test_ai_transparency_module_ssrf_guard_and_score_isolation() {
         "certificate must be identical whether ai_transparency is on or off"
     );
 }
+
+/// Regression test for a batch-mode hang investigation: `wait_for_stable`
+/// (called from `set_viewport` before every navigation, twice per audited
+/// page) issued an `awaitPromise: true` `Runtime.evaluate` CDP command with
+/// no timeout wrapper of its own — unlike its sibling `wait_for_page_stability`
+/// in the same file, which already bounds the equivalent call. A live batch
+/// run against real concurrent pages sharing one `BrowserManager` showed one
+/// page's `wait_for_stable` call staying pending for ~30s (matching
+/// chromiumoxide's internal command timeout) while sibling pages progressed
+/// normally — silently eating into that page's overall per-audit timeout
+/// budget under concurrency (`--url-file`/`--sitemap` batch mode with
+/// concurrency >= 2). `wait_for_stable` now wraps its CDP call in
+/// `tokio::time::timeout(duration_ms + 500ms, ..)`, matching the existing
+/// pattern. This test asserts N concurrent `wait_for_stable` calls across
+/// separate pages of the same browser complete well within that bound
+/// instead of being allowed to silently run unbounded.
+#[tokio::test]
+#[ignore]
+async fn test_concurrent_wait_for_stable_stays_within_its_timeout_budget() {
+    use std::sync::Arc;
+    use std::time::{Duration, Instant};
+
+    let manager = Arc::new(ci_browser().await);
+    let duration_ms: u64 = 150;
+
+    let mut tasks = Vec::new();
+    for _ in 0..3 {
+        let manager = Arc::clone(&manager);
+        tasks.push(tokio::spawn(async move {
+            let page = manager.new_page().await.expect("New page failed");
+            let start = Instant::now();
+            auditmysite::interaction::stability::wait_for_stable(&page, duration_ms)
+                .await
+                .expect("wait_for_stable failed");
+            start.elapsed()
+        }));
+    }
+
+    // Bounded generously above wait_for_stable's own `duration_ms + 500ms`
+    // ceiling (650ms here), well under the ~30s worst case this regression
+    // test guards against.
+    let budget = Duration::from_millis(duration_ms + 500 + 4_000);
+    for task in tasks {
+        let elapsed = tokio::time::timeout(budget, task)
+            .await
+            .expect("wait_for_stable exceeded its bounded timeout under concurrency")
+            .expect("task panicked");
+        assert!(
+            elapsed < budget,
+            "wait_for_stable took {elapsed:?}, expected well under {budget:?}"
+        );
+    }
+}
