@@ -146,9 +146,10 @@ pub use link_purpose_link_only::check_link_purpose_link_only;
 pub use list_structure::check_list_structure;
 pub use location::check_location_with_page;
 pub use meaningful_sequence::check_meaningful_sequence_with_page;
-pub use media_alternative::check_media_alternative;
+pub use media_alternative::check_media_alternative_with_page;
 pub use media_rules::{
     check_frame_tested_with_page, check_frame_title_with_page, check_media_rules,
+    check_video_caption_tracks_with_page,
 };
 pub use meta_viewport_large::check_meta_viewport_large_with_page;
 pub use modern_attributes::check_modern_attributes_with_page;

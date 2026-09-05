@@ -97,10 +97,93 @@ pub fn tab_walk(trace: &JourneyTrace, snapshots: &[FocusSnapshot]) -> Vec<Intera
                     ..Default::default()
                 },
             ));
+        } else if snap.media_control_missing_name {
+            findings.push(InteractiveFinding::new(
+                "MediaControls",
+                InteractiveFindingKind::MediaControlsMissingName,
+                None,
+                Severity::Medium,
+                trace.journey.clone(),
+                None,
+                step.snapshot_label.clone(),
+                InteractiveFindingValues {
+                    selector: Some(selector.clone()),
+                    ..Default::default()
+                },
+            ));
         }
     }
 
     findings
+}
+
+/// Returns `true` when a DOM-order selector string denotes a native
+/// `<video>` element — matches `__amsCssSelector`'s tag-first segment format
+/// (e.g. `"video#hero"` or `"main > video:nth-of-type(1)"`).
+fn is_video_selector(selector: &str) -> bool {
+    selector
+        .rsplit(" > ")
+        .next()
+        .is_some_and(|seg| seg.starts_with("video"))
+}
+
+/// Evaluate whether every native `<video controls>` element found in the
+/// pre-walk DOM order was actually reached by the tab walk.
+///
+/// Only trusted when the walk stopped because it detected a natural repeat
+/// (`focus_stuck`, see `tab_walk::record`) rather than simply running out of
+/// its step budget — otherwise a video positioned late in a long page could
+/// be falsely flagged as unreachable merely because the walk never got that
+/// far. Pure function — takes the evidence from the tab-walk runner.
+pub fn video_controls_reachability(
+    trace: &JourneyTrace,
+    dom_order: &[String],
+) -> Vec<InteractiveFinding> {
+    let stopped_naturally =
+        trace.steps.last().and_then(|s| s.result.as_deref()) == Some("focus_stuck");
+    if !stopped_naturally {
+        return Vec::new();
+    }
+
+    let focused: std::collections::HashSet<&str> = trace
+        .steps
+        .iter()
+        .filter_map(|s| s.focus.as_deref())
+        .collect();
+
+    let unreachable: Vec<String> = dom_order
+        .iter()
+        .filter(|sel| is_video_selector(sel) && !focused.contains(sel.as_str()))
+        .cloned()
+        .collect();
+
+    if unreachable.is_empty() {
+        return Vec::new();
+    }
+
+    let count = unreachable.len();
+    let examples = unreachable
+        .iter()
+        .take(3)
+        .cloned()
+        .collect::<Vec<_>>()
+        .join(", ");
+
+    vec![InteractiveFinding::new(
+        "MediaControls",
+        InteractiveFindingKind::MediaControlsNotReachable,
+        None,
+        Severity::High,
+        trace.journey.clone(),
+        None,
+        None,
+        InteractiveFindingValues {
+            count: Some(count as u32),
+            examples: Some(examples),
+            truncated: Some(count > 3),
+            ..Default::default()
+        },
+    )]
 }
 
 /// Evaluate tab order against the DOM order of focusable elements.

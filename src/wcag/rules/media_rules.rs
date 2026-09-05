@@ -4,7 +4,10 @@
 //! and that decorative elements are not spuriously named.
 
 use chromiumoxide::Page;
+use reqwest::Client;
+use std::time::Duration;
 use tracing::warn;
+use url::Url;
 
 use crate::accessibility::{AXNode, AXTree};
 use crate::cli::WcagLevel;
@@ -60,9 +63,15 @@ pub const RULE_META_FRAME_TITLE: RuleMetadata = RuleMetadata {
 };
 
 /// Run all media-related WCAG checks
+///
+/// 1.2.2 (captions) is **not** handled here — the always-"manual review"
+/// notice this function used to emit for any `role="Video"` AXTree node was
+/// replaced by [`check_video_caption_tracks_with_page`], which inspects the
+/// live DOM (`<track kind="captions"|"subtitles">`) and, for a same-origin
+/// track file, actually probes whether it resolves before deciding between
+/// a confirmed pass and a manual-review notice (#video-caption-checks).
 pub fn check_media_rules(tree: &AXTree) -> WcagResults {
     let mut results = WcagResults::new();
-    let mut video_element_count = 0usize;
 
     for node in tree.iter() {
         if node.ignored {
@@ -77,20 +86,7 @@ pub fn check_media_rules(tree: &AXTree) -> WcagResults {
 
         match role {
             "application" => {
-                video_element_count += 1;
                 check_application_has_name(node, &mut results);
-            }
-            // A real <video> element's actual Chrome AX role (confirmed live
-            // — capitalized "Video", not "video"/"VideoElement" as
-            // media_alternative.rs's own role list assumes; that check
-            // appears to have the same latent mismatch, not fixed here).
-            // Never "application" (that's reserved for custom canvas-based
-            // players wrapped in an app-like container). Only counted toward
-            // the manual-review caption notice below;
-            // check_application_has_name's accessible-name requirement is
-            // specific to the custom-player case (#564).
-            "Video" => {
-                video_element_count += 1;
             }
             "img" => {
                 // SVG images and other img-role elements
@@ -103,39 +99,289 @@ pub fn check_media_rules(tree: &AXTree) -> WcagResults {
         }
     }
 
-    // 1.2.2 Caption quality cannot be verified automatically — the AXTree
-    // reveals that a media element is present, but whether captions are
-    // accurate, complete, and synchronized requires human review.
-    if video_element_count > 0 {
-        results.add_violation(
-            Violation::new(
-                RULE_META_CAPTIONS.id,
-                RULE_META_CAPTIONS.name,
+    results
+}
+
+/// Hosts of known third-party video-embed players. Captions on these are
+/// controlled by the platform's own player and are invisible to a DOM/network
+/// probe from this tool — pages embedding one of these get a distinct
+/// manual-review message rather than being silently ignored.
+const VIDEO_EMBED_HOSTS: &[&str] = &[
+    "youtube.com",
+    "youtube-nocookie.com",
+    "vimeo.com",
+    "player.vimeo.com",
+    "dailymotion.com",
+    "wistia.com",
+    "wistia.net",
+];
+
+fn is_video_embed_host(src: &str) -> bool {
+    let Ok(url) = Url::parse(src) else {
+        return false;
+    };
+    let Some(host) = url.host_str() else {
+        return false;
+    };
+    VIDEO_EMBED_HOSTS
+        .iter()
+        .any(|h| host == *h || host.ends_with(&format!(".{h}")))
+}
+
+fn track_kind_is_caption_like(kind: &str) -> bool {
+    matches!(kind.to_ascii_lowercase().as_str(), "captions" | "subtitles")
+}
+
+/// A `<track>` file counts as a verified caption/subtitle source only when it
+/// resolves (checked by the caller) AND looks like a real caption format —
+/// by file extension or declared content-type. A bare 2xx alone isn't
+/// enough: a misconfigured server can return 200 for any path (e.g. an SPA
+/// catch-all), which would otherwise be misread as "captions exist".
+fn looks_like_caption_file(content_type: Option<&str>, url: &str) -> bool {
+    let path = url
+        .split(['?', '#'])
+        .next()
+        .unwrap_or(url)
+        .to_ascii_lowercase();
+    if path.ends_with(".vtt") || path.ends_with(".srt") {
+        return true;
+    }
+    content_type
+        .map(|ct| ct.to_ascii_lowercase().contains("vtt"))
+        .unwrap_or(false)
+}
+
+/// Same-origin HTTP HEAD probe (mirrors the pattern in
+/// `security::sourcemap::audit_source_maps`): only fetches when the track
+/// URL's origin (scheme + host + port) matches the audited page's origin, so
+/// this never becomes an arbitrary-URL fetch driven by page content.
+async fn track_resolves_same_origin(
+    client: &Client,
+    base_origin: Option<&url::Origin>,
+    track_src: &str,
+) -> bool {
+    let Ok(track_url) = Url::parse(track_src) else {
+        return false;
+    };
+    if base_origin != Some(&track_url.origin()) {
+        return false;
+    }
+    let Ok(resp) = client.head(track_url.as_str()).send().await else {
+        return false;
+    };
+    if !resp.status().is_success() {
+        return false;
+    }
+    let content_type = resp
+        .headers()
+        .get(reqwest::header::CONTENT_TYPE)
+        .and_then(|v| v.to_str().ok());
+    looks_like_caption_file(content_type, track_url.as_str())
+}
+
+/// Caps how many `<track>` files get an HTTP HEAD probe, bounding worst-case
+/// latency on a page with many videos/tracks.
+const MAX_TRACKS_CHECKED: usize = 10;
+
+const VIDEO_TRACK_SCAN_JS: &str = r#"
+var videos = [];
+Array.prototype.forEach.call(document.querySelectorAll('video'), function(v) {
+  var tracks = [];
+  Array.prototype.forEach.call(v.querySelectorAll('track'), function(t) {
+    tracks.push({
+      kind: (t.getAttribute('kind') || '').toLowerCase(),
+      src: t.src || '',
+      srclang: t.getAttribute('srclang') || '',
+      label: t.getAttribute('label') || ''
+    });
+  });
+  videos.push({ selector: __amsCssSelector(v), tracks: tracks });
+});
+var embeds = [];
+Array.prototype.forEach.call(document.querySelectorAll('iframe[src]'), function(f) {
+  embeds.push({ selector: __amsCssSelector(f), src: f.src || '' });
+});
+return { videos: videos, embeds: embeds };
+"#;
+
+/// 1.2.2 Captions (Prerecorded) — DOM + network deepening (#video-caption-checks).
+///
+/// Emits a confirmed pass (`FindingKind::Positive`) only when every native
+/// `<video>` element on the page has a `<track kind="captions"|"subtitles">`
+/// whose `src` actually resolves same-origin as a real caption file.
+/// Anything short of that (no track, an unresolving track, or only
+/// third-party video embeds whose captions this tool cannot see) stays a
+/// `NotTestable` manual-review notice, same as before — this only narrows
+/// when a Pass is claimed, it never invents a stronger negative verdict.
+pub async fn check_video_caption_tracks_with_page(page: &Page) -> Vec<Violation> {
+    let js = [
+        "(function() {",
+        crate::accessibility::js_helpers::CSS_SELECTOR_JS,
+        VIDEO_TRACK_SCAN_JS,
+        "})()",
+    ]
+    .concat();
+
+    let result = match page.evaluate(js.as_str()).await {
+        Ok(r) => r,
+        Err(e) => {
+            warn!("video-caption-track DOM JS failed: {}", e);
+            return vec![crate::wcag::technical_rule_failure_for(
+                RULE_META_CAPTIONS.axe_id,
                 RULE_META_CAPTIONS.level,
-                Severity::High,
-                format!(
-                    "{video_element_count} media {} detected. \
-                     Caption presence and accuracy cannot be verified automatically — \
-                     review each video for correct, synchronized captions.",
-                    if video_element_count == 1 {
-                        "element"
-                    } else {
-                        "elements"
-                    }
-                ),
-                "page",
-            )
-            .with_fix(
-                "Ensure all prerecorded video with audio has synchronized captions. \
-                 Use the <track kind=\"captions\"> element or a captioning service.",
-            )
-            .with_help_url(RULE_META_CAPTIONS.help_url)
-            .with_rule_id(RULE_META_CAPTIONS.axe_id)
-            .with_kind(FindingKind::NotTestable),
-        );
+                "page_evaluation_failed",
+            )];
+        }
+    };
+    let Some(value) = result.value() else {
+        return vec![crate::wcag::technical_rule_failure_for(
+            RULE_META_CAPTIONS.axe_id,
+            RULE_META_CAPTIONS.level,
+            "missing_evaluation_value",
+        )];
+    };
+
+    let videos = value
+        .get("videos")
+        .and_then(|v| v.as_array())
+        .cloned()
+        .unwrap_or_default();
+    let embed_count = value
+        .get("embeds")
+        .and_then(|v| v.as_array())
+        .map(|arr| {
+            arr.iter()
+                .filter_map(|e| e.get("src").and_then(|s| s.as_str()))
+                .filter(|src| is_video_embed_host(src))
+                .count()
+        })
+        .unwrap_or(0);
+
+    if videos.is_empty() && embed_count == 0 {
+        return Vec::new();
     }
 
-    results
+    let base_origin = page
+        .url()
+        .await
+        .ok()
+        .flatten()
+        .and_then(|u| Url::parse(&u).ok())
+        .map(|u| u.origin());
+
+    let client = Client::builder()
+        .timeout(Duration::from_secs(5))
+        .user_agent("auditmysite-probe/1.0")
+        .build()
+        .ok();
+
+    let native_count = videos.len();
+    let mut captioned_count = 0usize;
+    let mut any_track_found = false;
+    let mut any_track_unresolved = false;
+    let mut checked = 0usize;
+
+    for video in &videos {
+        let tracks = video
+            .get("tracks")
+            .and_then(|t| t.as_array())
+            .cloned()
+            .unwrap_or_default();
+        let mut this_video_captioned = false;
+        for track in &tracks {
+            let kind = track.get("kind").and_then(|k| k.as_str()).unwrap_or("");
+            if !track_kind_is_caption_like(kind) {
+                continue;
+            }
+            let src = track.get("src").and_then(|s| s.as_str()).unwrap_or("");
+            if src.is_empty() {
+                continue;
+            }
+            any_track_found = true;
+            if checked >= MAX_TRACKS_CHECKED {
+                continue;
+            }
+            checked += 1;
+            let Some(client) = client.as_ref() else {
+                continue;
+            };
+            if track_resolves_same_origin(client, base_origin.as_ref(), src).await {
+                this_video_captioned = true;
+            } else {
+                any_track_unresolved = true;
+            }
+        }
+        if this_video_captioned {
+            captioned_count += 1;
+        }
+    }
+
+    if native_count > 0 && captioned_count == native_count {
+        return vec![Violation::new(
+            RULE_META_CAPTIONS.id,
+            RULE_META_CAPTIONS.name,
+            RULE_META_CAPTIONS.level,
+            Severity::Low,
+            format!(
+                "{native_count} video element{} with a resolving <track kind=\"captions\"> or \
+                 <track kind=\"subtitles\"> file detected. Caption presence and format are \
+                 technically confirmed — a manual check of synchronization and transcription \
+                 accuracy is still recommended.",
+                if native_count == 1 { "" } else { "s" }
+            ),
+            "page",
+        )
+        .with_fix(
+            "Verify caption timing and transcription accuracy against the video's audio track.",
+        )
+        .with_help_url(RULE_META_CAPTIONS.help_url)
+        .with_rule_id(RULE_META_CAPTIONS.axe_id)
+        .as_positive()];
+    }
+
+    let message =
+        if native_count > 0 && any_track_found {
+            format!(
+                "{captioned_count} of {native_count} video elements have a verified, resolving \
+             caption/subtitle track. The rest could not be automatically confirmed{} — review \
+             each remaining video for correct, synchronized captions.",
+                if any_track_unresolved {
+                    " (a <track> src was found but did not resolve)"
+                } else {
+                    ""
+                }
+            )
+        } else if native_count > 0 {
+            format!(
+            "{native_count} video {} detected without a resolving <track kind=\"captions\"> or \
+             <track kind=\"subtitles\"> element. Caption presence and accuracy cannot be \
+             verified automatically — review each video for correct, synchronized captions.",
+            if native_count == 1 { "element" } else { "elements" }
+        )
+        } else {
+            format!(
+                "{embed_count} embedded video player{} detected (e.g. a YouTube/Vimeo-style \
+             iframe). Caption availability depends on the platform's own player and cannot be \
+             verified automatically — check the embed's caption/subtitle settings manually.",
+                if embed_count == 1 { "" } else { "s" }
+            )
+        };
+
+    vec![Violation::new(
+        RULE_META_CAPTIONS.id,
+        RULE_META_CAPTIONS.name,
+        RULE_META_CAPTIONS.level,
+        Severity::High,
+        message,
+        "page",
+    )
+    .with_fix(
+        "Ensure all prerecorded video with audio has synchronized captions. \
+         Use the <track kind=\"captions\"> element or a captioning service.",
+    )
+    .with_help_url(RULE_META_CAPTIONS.help_url)
+    .with_rule_id(RULE_META_CAPTIONS.axe_id)
+    .with_kind(FindingKind::NotTestable)]
 }
 
 /// DOM check for iframe accessible names. Iframes are not always represented
@@ -539,31 +785,65 @@ mod tests {
     }
 
     #[test]
-    fn test_real_video_element_triggers_caption_review_notice() {
+    fn test_role_video_no_longer_triggers_check_media_rules() {
+        // 1.2.2 caption detection moved to check_video_caption_tracks_with_page
+        // (DOM + network, #video-caption-checks) — check_media_rules (AXTree-only)
+        // no longer treats a role="Video" node specially at all.
         let nodes = vec![make_node("1", "Video", None)];
         let tree = AXTree::from_nodes(nodes);
         let results = check_media_rules(&tree);
-        assert!(
-            results
-                .not_testables
-                .iter()
-                .any(|v| v.message.contains("media element") && v.message.contains("caption")),
-            "expected a manual-review caption notice for a role=\"video\" element: {:?}",
-            results.not_testables
-        );
-    }
-
-    #[test]
-    fn test_real_video_element_does_not_require_its_own_accessible_name() {
-        // check_application_has_name is specific to custom role="application"
-        // players — a native <video> shouldn't be forced through it (#564).
-        let nodes = vec![make_node("1", "Video", None)];
-        let tree = AXTree::from_nodes(nodes);
-        let results = check_media_rules(&tree);
+        assert!(results.not_testables.is_empty());
         assert!(!results
             .violations
             .iter()
             .any(|v| v.message.contains("Video element may lack")));
+    }
+
+    #[test]
+    fn test_is_video_embed_host_matches_known_platforms() {
+        assert!(is_video_embed_host("https://www.youtube.com/embed/abc123"));
+        assert!(is_video_embed_host(
+            "https://www.youtube-nocookie.com/embed/abc123"
+        ));
+        assert!(is_video_embed_host("https://player.vimeo.com/video/42"));
+        assert!(!is_video_embed_host("https://example.com/video.html"));
+        assert!(!is_video_embed_host("not a url"));
+    }
+
+    #[test]
+    fn test_looks_like_caption_file_by_extension() {
+        assert!(looks_like_caption_file(
+            None,
+            "https://example.com/captions.vtt"
+        ));
+        assert!(looks_like_caption_file(
+            None,
+            "https://example.com/captions.srt?v=2"
+        ));
+        assert!(!looks_like_caption_file(
+            None,
+            "https://example.com/index.html"
+        ));
+    }
+
+    #[test]
+    fn test_looks_like_caption_file_by_content_type() {
+        assert!(looks_like_caption_file(
+            Some("text/vtt; charset=utf-8"),
+            "https://example.com/dynamic-captions"
+        ));
+        assert!(!looks_like_caption_file(
+            Some("text/html"),
+            "https://example.com/dynamic-captions"
+        ));
+    }
+
+    #[test]
+    fn test_track_kind_is_caption_like() {
+        assert!(track_kind_is_caption_like("captions"));
+        assert!(track_kind_is_caption_like("Subtitles"));
+        assert!(!track_kind_is_caption_like("chapters"));
+        assert!(!track_kind_is_caption_like("descriptions"));
     }
 
     #[test]

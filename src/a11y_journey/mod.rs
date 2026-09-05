@@ -128,6 +128,10 @@ pub async fn run(ctx: RunContext<'_>) -> Result<Option<RunOutput>> {
                 .extend(evaluate::tab_walk(&record.trace, &record.snapshots));
             out.findings
                 .extend(evaluate::tab_walk_order(&record.trace, &record.dom_order));
+            out.findings.extend(evaluate::video_controls_reachability(
+                &record.trace,
+                &record.dom_order,
+            ));
             out.journey.focus_evidence = record.snapshots;
             out.journey.traces.push(record.trace);
             out.journey.execution.completed += 1;

@@ -770,6 +770,8 @@ pub enum InteractiveFindingKind {
     LandmarkMissingMain,
     LandmarkNavWithoutLabels,
     LandmarkDuplicateUnique,
+    MediaControlsMissingName,
+    MediaControlsNotReachable,
 }
 
 /// The interpolated values an [`InteractiveFinding`] message may reference.
@@ -1643,6 +1645,64 @@ pub fn interactive_finding_text(
                 )
             }),
         ),
+        MediaControlsMissingName => (
+            if en {
+                format!(
+                    "Native video player ({selector}) is reachable via keyboard but has no \
+                     accessible name (no aria-label, aria-labelledby, or title). Screen reader \
+                     users cannot identify which video the control refers to."
+                )
+            } else {
+                format!(
+                    "Der native Video-Player ({selector}) ist per Tastatur erreichbar, hat aber \
+                     keinen zugänglichen Namen (kein aria-label, aria-labelledby oder title). \
+                     Screenreader-Nutzer können nicht erkennen, um welches Video es sich handelt."
+                )
+            },
+            Some(if en {
+                "Add an aria-label, aria-labelledby, or title attribute to the video element \
+                 describing its content."
+                    .to_string()
+            } else {
+                "Ein aria-label-, aria-labelledby- oder title-Attribut mit einer Beschreibung \
+                 des Videoinhalts zum video-Element hinzufügen."
+                    .to_string()
+            }),
+        ),
+        MediaControlsNotReachable => {
+            let suffix = if truncated { " (…)" } else { "" };
+            let (de_adj, de_noun) = if count == 1 {
+                ("natives", "Video-Element")
+            } else {
+                ("native", "Video-Elemente")
+            };
+            (
+                if en {
+                    format!(
+                        "{count} native video {} with visible controls could not be reached \
+                         via keyboard Tab navigation: {examples}{suffix}. Keyboard users may be \
+                         unable to operate playback.",
+                        if count == 1 { "element" } else { "elements" }
+                    )
+                } else {
+                    format!(
+                        "{count} {de_adj} {de_noun} mit sichtbaren Steuerelementen waren beim \
+                         Tastatur-Tab-Durchlauf nicht erreichbar: {examples}{suffix}. \
+                         Tastaturnutzer können die Wiedergabe möglicherweise nicht bedienen."
+                    )
+                },
+                Some(if en {
+                    "Verify no earlier element traps focus and that the video element itself \
+                     is not removed from the tab sequence (tabindex=\"-1\")."
+                        .to_string()
+                } else {
+                    "Prüfen, ob ein vorheriges Element den Fokus einfängt und ob das \
+                     video-Element selbst nicht per tabindex=\"-1\" aus der Tab-Reihenfolge \
+                     entfernt wurde."
+                        .to_string()
+                }),
+            )
+        }
     };
 
     (message, fix)
@@ -3426,6 +3486,8 @@ mod tests {
             LandmarkMissingMain,
             LandmarkNavWithoutLabels,
             LandmarkDuplicateUnique,
+            MediaControlsMissingName,
+            MediaControlsNotReachable,
         ];
         for kind in all_kinds {
             let (message, fix) = interactive_finding_text(kind, &sample_values, true);

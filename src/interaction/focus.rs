@@ -62,6 +62,26 @@ const ACTIVE_ELEMENT_JS: &str = r#"
         style.visibility === 'hidden' ||
         parseFloat(style.opacity) === 0;
     var inViewport = rect.right > 0 && rect.bottom > 0 && rect.left < vw && rect.top < vh;
+    // Native <video controls> is keyboard-focusable as a whole (Chrome gives
+    // it tabIndex 0 by default) — check it has an accessible name the same
+    // way axe-core/HTML-AAM would: aria-label, aria-labelledby, then title.
+    var mediaControlMissingName = false;
+    if (el.tagName === 'VIDEO' && el.hasAttribute('controls')) {
+        var name = (el.getAttribute('aria-label') || '').trim();
+        if (!name) {
+            var labelledBy = (el.getAttribute('aria-labelledby') || '').trim();
+            if (labelledBy) {
+                name = labelledBy.split(/\s+/).map(function (id) {
+                    var ref = document.getElementById(id);
+                    return ref ? ref.textContent.trim() : '';
+                }).join(' ').trim();
+            }
+        }
+        if (!name) {
+            name = (el.getAttribute('title') || '').trim();
+        }
+        mediaControlMissingName = !name;
+    }
     return {
         selector: selectorFor(el),
         x: rect.x, y: rect.y, w: rect.width, h: rect.height,
@@ -69,6 +89,7 @@ const ACTIVE_ELEMENT_JS: &str = r#"
         inertChain: inertChain,
         hiddenByStyle: hiddenByStyle,
         inViewport: inViewport,
+        mediaControlMissingName: mediaControlMissingName,
     };
 })()
 "#;
@@ -107,7 +128,7 @@ const COLLECT_FOCUSABLES_JS: &str = r#"
         return parts.join(' > ');
     }
     var sel = 'a[href], button, input:not([type="hidden"]), select, textarea, ' +
-              '[tabindex], [contenteditable=""], [contenteditable="true"]';
+              '[tabindex], [contenteditable=""], [contenteditable="true"], video[controls]';
     var els = Array.from(document.querySelectorAll(sel)).filter(function (el) {
         if (el.disabled) return false;
         if (typeof el.tabIndex === 'number' && el.tabIndex < 0) return false;
@@ -245,6 +266,10 @@ pub async fn capture_focus(page: &Page) -> Result<FocusSnapshot> {
         .get("inViewport")
         .and_then(Value::as_bool)
         .unwrap_or(false);
+    let media_control_missing_name = value
+        .get("mediaControlMissingName")
+        .and_then(Value::as_bool)
+        .unwrap_or(false);
 
     // visible = element has non-zero box and is not hidden by style.
     let has_area = bbox.is_some_and(|b| b.width > 0.0 && b.height > 0.0);
@@ -264,5 +289,6 @@ pub async fn capture_focus(page: &Page) -> Result<FocusSnapshot> {
         aria_hidden_chain,
         inert_chain,
         hidden_by_style,
+        media_control_missing_name,
     })
 }

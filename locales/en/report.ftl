@@ -1020,6 +1020,7 @@ module-tech-stack = Tech Stack
 linktext-generic-stopwords = read more,learn more,click here,here,more,details,link,view,open,see more,find out more,discover
 alt-text-boilerplate-prefixes = image of,picture of,photo of,photograph of,graphic of,icon of,this is an image of,this is a picture of
 topic-stopwords = with,your,about,into,that,this,from,content,cloud,page,pages,site,web,website,websites
+video-transcript-keywords = transcript
 sr-no-name = (no name)
 sr-role-button = button
 sr-role-link = link

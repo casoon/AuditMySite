@@ -1107,3 +1107,188 @@ async fn test_concurrent_wait_for_stable_stays_within_its_timeout_budget() {
         );
     }
 }
+
+// ── Video caption / transcript / keyboard-operability deepening ───────────
+// (video-caption-checks plan): 1.2.1/1.2.2 track resolution, 1.2.8
+// transcript-link enrichment, and native <video controls> keyboard
+// operability via the tab-walk journey.
+
+#[tokio::test]
+#[ignore]
+async fn test_video_caption_track_resolving_is_a_confirmed_pass() {
+    let (url, shutdown) = serve_fixture("video_captions_resolving.html");
+    let manager = ci_browser().await;
+    let page = manager.new_page().await.expect("New page failed");
+    manager
+        .navigate(&page, &url)
+        .await
+        .expect("Navigation failed");
+
+    let findings = auditmysite::wcag::rules::check_video_caption_tracks_with_page(&page).await;
+
+    shutdown.store(true, std::sync::atomic::Ordering::Relaxed);
+
+    assert_eq!(
+        findings.len(),
+        1,
+        "expected exactly one finding: {findings:?}"
+    );
+    assert_eq!(
+        findings[0].kind,
+        auditmysite::wcag::types::FindingKind::Positive,
+        "a resolving <track kind=\"captions\"> file should confirm a pass: {:?}",
+        findings[0]
+    );
+    assert!(findings[0].message.contains("resolving"));
+}
+
+#[tokio::test]
+#[ignore]
+async fn test_video_without_track_stays_manual_review() {
+    let (url, shutdown) = serve_fixture("video_no_track.html");
+    let manager = ci_browser().await;
+    let page = manager.new_page().await.expect("New page failed");
+    manager
+        .navigate(&page, &url)
+        .await
+        .expect("Navigation failed");
+
+    let findings = auditmysite::wcag::rules::check_video_caption_tracks_with_page(&page).await;
+
+    shutdown.store(true, std::sync::atomic::Ordering::Relaxed);
+
+    assert_eq!(
+        findings.len(),
+        1,
+        "expected exactly one finding: {findings:?}"
+    );
+    assert_eq!(
+        findings[0].kind,
+        auditmysite::wcag::types::FindingKind::NotTestable,
+        "a video with no track element must stay a manual-review notice, not a violation \
+         or a false pass: {:?}",
+        findings[0]
+    );
+    assert!(findings[0].message.contains("without a resolving"));
+}
+
+#[tokio::test]
+#[ignore]
+async fn test_video_embed_iframe_gets_platform_specific_manual_review_message() {
+    let (url, shutdown) = serve_fixture("video_embed_iframe.html");
+    let manager = ci_browser().await;
+    let page = manager.new_page().await.expect("New page failed");
+    manager
+        .navigate(&page, &url)
+        .await
+        .expect("Navigation failed");
+
+    let findings = auditmysite::wcag::rules::check_video_caption_tracks_with_page(&page).await;
+
+    shutdown.store(true, std::sync::atomic::Ordering::Relaxed);
+
+    assert_eq!(
+        findings.len(),
+        1,
+        "expected exactly one finding: {findings:?}"
+    );
+    assert_eq!(
+        findings[0].kind,
+        auditmysite::wcag::types::FindingKind::NotTestable
+    );
+    assert!(
+        findings[0].message.contains("embedded video player"),
+        "a YouTube-style embed with no native <video> should get its own message: {:?}",
+        findings[0]
+    );
+}
+
+#[tokio::test]
+#[ignore]
+async fn test_media_alternative_enriches_message_with_nearby_transcript_link() {
+    let (url, shutdown) = serve_fixture("video_transcript_link.html");
+    let manager = ci_browser().await;
+    let page = manager.new_page().await.expect("New page failed");
+    manager
+        .navigate(&page, &url)
+        .await
+        .expect("Navigation failed");
+
+    let findings = auditmysite::wcag::rules::check_media_alternative_with_page(&page).await;
+
+    shutdown.store(true, std::sync::atomic::Ordering::Relaxed);
+
+    assert_eq!(
+        findings.len(),
+        1,
+        "expected exactly one finding: {findings:?}"
+    );
+    assert_eq!(
+        findings[0].kind,
+        auditmysite::wcag::types::FindingKind::NotTestable,
+        "presence of a transcript link is evidence, not a confirmed pass: {:?}",
+        findings[0]
+    );
+    assert!(
+        findings[0].message.contains("Read the full transcript"),
+        "expected the found transcript link text in the message: {:?}",
+        findings[0]
+    );
+}
+
+#[tokio::test]
+#[ignore]
+async fn test_media_alternative_default_message_without_transcript_link() {
+    let (url, shutdown) = serve_fixture("video_no_track.html");
+    let manager = ci_browser().await;
+    let page = manager.new_page().await.expect("New page failed");
+    manager
+        .navigate(&page, &url)
+        .await
+        .expect("Navigation failed");
+
+    let findings = auditmysite::wcag::rules::check_media_alternative_with_page(&page).await;
+
+    shutdown.store(true, std::sync::atomic::Ordering::Relaxed);
+
+    assert_eq!(
+        findings.len(),
+        1,
+        "expected exactly one finding: {findings:?}"
+    );
+    assert!(findings[0]
+        .message
+        .contains("Verify that a full text alternative"));
+}
+
+#[tokio::test]
+#[ignore]
+async fn test_video_controls_missing_name_flagged_during_tab_walk() {
+    let (url, shutdown) = serve_fixture("video_controls_keyboard.html");
+    let manager = ci_browser().await;
+    let page = manager.new_page().await.expect("New page failed");
+    manager
+        .navigate(&page, &url)
+        .await
+        .expect("Navigation failed");
+
+    let record = auditmysite::a11y_journey::tab_walk::record(&page, 5)
+        .await
+        .expect("tab walk failed");
+    let findings = auditmysite::a11y_journey::evaluate::tab_walk(&record.trace, &record.snapshots);
+
+    shutdown.store(true, std::sync::atomic::Ordering::Relaxed);
+
+    let media_finding = findings
+        .iter()
+        .find(|f| f.category == "MediaControls")
+        .unwrap_or_else(|| {
+            panic!(
+                "expected a MediaControls finding for the nameless <video controls>: {findings:?}"
+            )
+        });
+    assert_eq!(
+        media_finding.kind,
+        auditmysite::audit::normalized::InteractiveFindingKind::MediaControlsMissingName
+    );
+}

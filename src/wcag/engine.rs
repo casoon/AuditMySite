@@ -27,10 +27,10 @@ use super::rules::{
     check_landmark_main_present, check_landmark_no_duplicate_banner,
     check_landmark_no_duplicate_contentinfo, check_landmark_no_duplicate_main,
     check_landmark_unique, check_landmarks, check_language, check_link_purpose,
-    check_link_purpose_link_only, check_list_structure, check_media_alternative, check_media_rules,
-    check_page_titled, check_parsing, check_region, check_section_headings, check_skip_link,
-    check_status_messages, check_summary_name, check_svg_rules, check_table_extended,
-    check_table_rules, check_text_alternatives, check_unusual_words, check_widget_rules,
+    check_link_purpose_link_only, check_list_structure, check_media_rules, check_page_titled,
+    check_parsing, check_region, check_section_headings, check_skip_link, check_status_messages,
+    check_summary_name, check_svg_rules, check_table_extended, check_table_rules,
+    check_text_alternatives, check_unusual_words, check_widget_rules,
 };
 use super::types::WcagResults;
 use crate::accessibility::AXTree;
@@ -461,8 +461,9 @@ fn run_level_aaa_rules(tree: &AXTree, results: &mut WcagResults, filter: &RuleFi
         tree
     );
 
-    // 1.2.8 Media Alternative (Prerecorded) (Level AAA)
-    run_if_allowed!(filter, "media-alt", check_media_alternative, results, tree);
+    // 1.2.8 Media Alternative (Prerecorded) (Level AAA) — moved to the
+    // page-rule table as check_media_alternative_with_page (DOM + transcript
+    // detection needs live page access, not just the AXTree).
 
     // 3.1.3 Unusual Words (Level AAA)
     run_if_allowed!(filter, "unusual-words", check_unusual_words, results, tree);

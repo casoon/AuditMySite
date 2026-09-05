@@ -66,6 +66,11 @@ pub struct FocusSnapshot {
     /// have been removed from the tab sequence.
     #[serde(default)]
     pub hidden_by_style: bool,
+    /// The focused element is a native `<video controls>` player with no
+    /// accessible name (no `aria-label`, `aria-labelledby`, or `title`).
+    /// Screen reader users reaching it via Tab cannot tell which video it is.
+    #[serde(default)]
+    pub media_control_missing_name: bool,
 }
 
 /// Detection of a visible focus indicator.

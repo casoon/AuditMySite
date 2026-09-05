@@ -35,9 +35,9 @@ use super::{
     check_image_input_rules_with_page, check_invalid_aria_attribute_name_with_page,
     check_invalid_role_with_page, check_label_in_name_with_page, check_landmarks_with_page,
     check_language_extended_with_page, check_language_of_parts_with_page, check_location_with_page,
-    check_meaningful_sequence_with_page, check_meta_viewport_large_with_page,
-    check_modern_attributes_with_page, check_motion_actuation_with_page,
-    check_no_interruptions_with_page, check_no_timing_with_page,
+    check_meaningful_sequence_with_page, check_media_alternative_with_page,
+    check_meta_viewport_large_with_page, check_modern_attributes_with_page,
+    check_motion_actuation_with_page, check_no_interruptions_with_page, check_no_timing_with_page,
     check_non_text_contrast_css_with_page, check_on_focus_with_page, check_on_input_with_page,
     check_orientation_with_page, check_page_titled_with_page, check_parsing_with_page,
     check_pause_stop_hide_with_page, check_pointer_cancellation_with_page,
@@ -48,7 +48,8 @@ use super::{
     check_tab_selected_state_with_page, check_table_headers_attr_with_page,
     check_target_size_enhanced_with_page, check_target_size_minimum_with_page,
     check_text_spacing_with_page, check_timeouts_with_page, check_timing_with_page,
-    check_use_of_color_with_page, check_visual_presentation_with_page,
+    check_use_of_color_with_page, check_video_caption_tracks_with_page,
+    check_visual_presentation_with_page,
 };
 use crate::wcag::engine::check_click_handlers_with_page;
 
@@ -100,6 +101,12 @@ pub const PAGE_RULES: &[PageRuleEntry] = &[
         name: "frame-tested",
         min_level: WcagLevel::A,
         check_fn: |p| Box::pin(check_frame_tested_with_page(p)),
+    },
+    PageRuleEntry {
+        rule_id: "1.2.2/video-caption-track",
+        name: "video-caption-track",
+        min_level: WcagLevel::A,
+        check_fn: |p| Box::pin(check_video_caption_tracks_with_page(p)),
     },
     PageRuleEntry {
         rule_id: "iframe/same-origin-content",
@@ -353,6 +360,12 @@ pub const PAGE_RULES: &[PageRuleEntry] = &[
         check_fn: |p| Box::pin(check_background_audio_with_page(p)),
     },
     PageRuleEntry {
+        rule_id: "1.2.8/media-alternative",
+        name: "media-alternative",
+        min_level: WcagLevel::AAA,
+        check_fn: |p| Box::pin(check_media_alternative_with_page(p)),
+    },
+    PageRuleEntry {
         rule_id: "1.4.8/visual-presentation",
         name: "visual-presentation",
         min_level: WcagLevel::AAA,
@@ -459,7 +472,9 @@ mod tests {
         // + meaningful-sequence (1.3.2, WCAG 2.1 A) = 33
         // + pause-stop-hide (2.2.2, WCAG 2.1 A) = 34
         // + aria-valid-attr DOM supplement (#567) = 35
-        assert_eq!(count, 35);
+        // + video-caption-track (1.2.2, DOM+network caption-track deepening,
+        //   #video-caption-checks) = 36
+        assert_eq!(count, 36);
     }
 
     #[test]
@@ -477,7 +492,8 @@ mod tests {
         // + pause-stop-hide (2.2.2, WCAG 2.1 A, counted here too since AA >= A) = 44.
         // + conservative language-of-parts heuristic (3.1.2) = 45.
         // + aria-valid-attr DOM supplement (#567, Level A, counted here too since AA >= A) = 46.
-        assert_eq!(count, 46);
+        // + video-caption-track (1.2.2, Level A, counted here too since AA >= A) = 47.
+        assert_eq!(count, 47);
     }
 
     #[test]
