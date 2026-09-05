@@ -103,4 +103,38 @@ for (const el of interactiveEls) {
     }
 }
 
-return { textCandidates: textCandidates, clipCandidates: clipCandidates };
+// ── Image alt-text candidates (alt-text quality heuristics, #06) ───────────
+const altCandidates = [];
+const imgsWithAlt = document.querySelectorAll('img[alt]');
+let altChecked = 0;
+for (const img of imgsWithAlt) {
+    if (altCandidates.length >= MAX_CANDIDATES || altChecked >= 500) break;
+    altChecked++;
+    const alt = (img.getAttribute('alt') || '').trim();
+    if (!alt) continue; // empty alt = deliberately decorative, out of scope
+    if (__amsIsVisuallyHidden(img)) continue;
+    if (__amsIsAriaHidden(img)) continue;
+
+    // Immediately adjacent visible text/caption, for the redundancy check.
+    let adjacentText = '';
+    const figure = img.closest('figure');
+    if (figure) {
+        const figcaption = figure.querySelector('figcaption');
+        if (figcaption) adjacentText = figcaption.textContent.trim();
+    }
+    if (!adjacentText) {
+        const next = img.nextElementSibling;
+        if (next && /^(FIGCAPTION|SMALL|SPAN|P)$/.test(next.tagName)) {
+            adjacentText = next.textContent.trim();
+        }
+    }
+
+    altCandidates.push({
+        cssPath: __amsCssSelector(img),
+        snippet: truncate(img.outerHTML, 200),
+        alt: truncate(alt, 300),
+        adjacentText: truncate(adjacentText, 300)
+    });
+}
+
+return { textCandidates: textCandidates, clipCandidates: clipCandidates, altCandidates: altCandidates };
