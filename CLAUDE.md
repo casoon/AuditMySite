@@ -249,6 +249,30 @@ Bewusste, über alle Phasen hinweg getroffene Entscheidung statt einer nachträg
   Differenzprüfungen** statt gespeicherter Pixel-Baselines erkannt, siehe Phase-5-Eintrag unten.
 
 ## Current State (v1.1.0)
+- **#406-Fix: NotTestable/Warning-Findings zeigten rohen Englisch-Text im PDF (plan/20,
+  2026-09-05):** live in DE-Reports bestätigter Lokalisierungs-Verstoß (casoon-de,
+  satower-mosterei-de, inros-lackner-de) — `render_assessment_and_execution_notes`
+  (`src/output/pdf/single_report.rs`) rief für `wcag.not_testables` nur
+  `get_explanation(rule_id)` auf (axe_id-Lookup, z. B. `"video-caption"`) und fiel bei
+  fehlendem Treffer auf den rohen kanonisch-englischen `finding.fix_suggestion` zurück statt
+  auf den sicheren lokalisierten Fallback-Satz; `wcag.warnings` (Kontrast bei Bild-/Gradient-
+  Hintergrund, 1.4.3) versuchte gar keinen `get_explanation`-Lookup. Fix: zweistufiger Lookup
+  (`rule_id` zuerst, dann `rule`/WCAG-ID als Fallback — deckt sowohl axe-id-Override-Einträge
+  wie `"region"` als auch die neuen WCAG-ID-Einträge ab) in beiden Schleifen, mit dem
+  bestehenden lokalisierten Fallback-Satz als letztem Schritt statt `finding.fix_suggestion`.
+  Vier neue `explanations.rs`-Einträge für die zuvor komplett fehlende 1.2.x-Video-Familie
+  (1.2.1, 1.2.2, 1.2.3, 1.2.8). **Realer, dabei entdeckter Nebeneffekt behoben:**
+  `wcag::bik_guide::derive_bik_chapters`s "Videos"-Kapitel zeigte `NoFindingsDetected`, obwohl
+  ein echter, PDF-sichtbarer 1.2.2-Fund existierte — `findings[]` (`NormalizedFinding`) wird
+  ausschließlich aus `wcag_results.violations` gebaut (`audit::normalized::normalize`), nie aus
+  `warnings`/`not_testables`, und Video-Checks resolven fast immer zu genau diesen beiden Kinds.
+  `derive_bik_chapters` nimmt jetzt zusätzlich `&[AccessibilityAssessment]`
+  (`NormalizedReport.accessibility_assessments`, bereits vorhandener Träger für genau diese
+  Daten, in jedem Report-Pfad verfügbar) und speist das Videos-Kapitel zusätzlich daraus;
+  `normalize_assessments` dafür von privat auf `pub(crate)` angehoben. Neue Regressionstests:
+  EN/DE-Fallback-Guard in `src/output/pdf/tests.rs` (fiktive Regel ohne `explanations.rs`-
+  Eintrag) sowie zwei neue `bik_guide`-Tests (manual-review-only Fund erscheint im
+  Videos-Kapitel; unrelated-Kriterium leakt nicht rein).
 - **Neues `html_conform`-Modul: HTML5-Spezifikationskonformität via `html-conform`-Crate,
   2026-08-30:** neues, **standalone** Modul (`src/html_conform/`), das per `html-conform`
   (crates.io, pure Rust, kein Netzwerk/Subprocess) Browser-artige HTML5-Baumkonstruktion,

@@ -878,18 +878,19 @@ fn render_assessment_and_execution_notes(
     if !wcag.warnings.is_empty() || !wcag.not_testables.is_empty() {
         let mut rows = Vec::new();
         for finding in wcag.not_testables.iter().take(20) {
-            let recommendation = crate::output::explanations::get_explanation(
-                finding.rule_id.as_deref().unwrap_or(&finding.rule),
-            )
-            .map(|explanation| explanation.recommendation_for(i18n.locale()).to_string())
-            .or_else(|| finding.fix_suggestion.clone())
-            .unwrap_or_else(|| {
-                if en {
-                    "Verify this criterion manually on the rendered page.".to_string()
-                } else {
-                    "Dieses Kriterium manuell an der gerenderten Seite prüfen.".to_string()
-                }
-            });
+            let recommendation = finding
+                .rule_id
+                .as_deref()
+                .and_then(crate::output::explanations::get_explanation)
+                .or_else(|| crate::output::explanations::get_explanation(&finding.rule))
+                .map(|explanation| explanation.recommendation_for(i18n.locale()).to_string())
+                .unwrap_or_else(|| {
+                    if en {
+                        "Verify this criterion manually on the rendered page.".to_string()
+                    } else {
+                        "Dieses Kriterium manuell an der gerenderten Seite prüfen.".to_string()
+                    }
+                });
             rows.push(
                 ChecklistRow::new(
                     format!(
@@ -911,13 +912,19 @@ fn render_assessment_and_execution_notes(
             .iter()
             .take(20usize.saturating_sub(rows.len()))
         {
-            let text = finding.fix_suggestion.clone().unwrap_or_else(|| {
-                if en {
-                    "Confirm this heuristic signal manually.".to_string()
-                } else {
-                    "Dieses heuristische Signal manuell bestätigen.".to_string()
-                }
-            });
+            let text = finding
+                .rule_id
+                .as_deref()
+                .and_then(crate::output::explanations::get_explanation)
+                .or_else(|| crate::output::explanations::get_explanation(&finding.rule))
+                .map(|explanation| explanation.recommendation_for(i18n.locale()).to_string())
+                .unwrap_or_else(|| {
+                    if en {
+                        "Confirm this heuristic signal manually.".to_string()
+                    } else {
+                        "Dieses heuristische Signal manuell bestätigen.".to_string()
+                    }
+                });
             rows.push(
                 ChecklistRow::new(
                     format!(

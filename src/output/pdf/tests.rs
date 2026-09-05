@@ -198,6 +198,90 @@ mod tests {
         }
     }
 
+    /// Regression test for the #406-violating fallback in
+    /// `render_assessment_and_execution_notes` (`single_report.rs`): a
+    /// NotTestable/Warning finding whose `rule_id` has no `explanations.rs`
+    /// entry used to fall straight through to the raw, canonical-English
+    /// `fix_suggestion` text instead of the localized generic fallback
+    /// sentence — confirmed live in DE-locale reports (1.2.2 video-caption
+    /// and 1.4.3 image-background-contrast findings). A fixture rule with a
+    /// deliberately unknown `rule_id`/`rule` (no `explanations.rs` entry
+    /// exists for either) must render the safe localized fallback, never the
+    /// English `fix_suggestion` text, in both loops (`not_testables` and
+    /// `warnings`).
+    #[test]
+    fn test_assessment_notes_unknown_rule_uses_localized_fallback_not_raw_english_fix() {
+        let mut results = WcagResults::new();
+        results.add_violation(
+            Violation::new(
+                "9.9.9",
+                "Fictional Rule",
+                WcagLevel::A,
+                Severity::Medium,
+                "Fictional not-testable finding",
+                "node-1",
+            )
+            .with_fix("This raw English fix text must never leak into a German report.")
+            .with_rule_id("fictional-not-testable-rule")
+            .with_kind(crate::wcag::FindingKind::NotTestable),
+        );
+        results.add_violation(
+            Violation::new(
+                "9.9.8",
+                "Fictional Warning Rule",
+                WcagLevel::A,
+                Severity::Low,
+                "Fictional warning finding",
+                "node-2",
+            )
+            .with_fix("This raw English warning text must never leak into a German report.")
+            .with_rule_id("fictional-warning-rule")
+            .with_kind(crate::wcag::FindingKind::Warning),
+        );
+        let report = AuditReport::new(
+            "https://example.com".to_string(),
+            WcagLevel::AA,
+            results,
+            1_200,
+        );
+
+        for (locale, expected_not_testable_fallback, expected_warning_fallback) in [
+            (
+                "de",
+                "Dieses Kriterium manuell an der gerenderten Seite prüfen.",
+                "Dieses heuristische Signal manuell bestätigen.",
+            ),
+            (
+                "en",
+                "Verify this criterion manually on the rendered page.",
+                "Confirm this heuristic signal manually.",
+            ),
+        ] {
+            let typ = generate_typ(
+                &report,
+                &ReportConfig {
+                    level: ReportLevel::Standard,
+                    locale: locale.to_string(),
+                    ..ReportConfig::default()
+                },
+            )
+            .expect("Typst source should render");
+
+            assert!(
+                typ.contains(expected_not_testable_fallback),
+                "[{locale}] expected localized not-testable fallback in Typst source"
+            );
+            assert!(
+                typ.contains(expected_warning_fallback),
+                "[{locale}] expected localized warning fallback in Typst source"
+            );
+            assert!(
+                !typ.contains("must never leak into a German report"),
+                "[{locale}] raw English fix_suggestion text leaked into Typst source"
+            );
+        }
+    }
+
     /// Build a report where a single WCAG A/AA rule recurs `count` times on
     /// the one audited page — enough to cross the `occurrence_count >= 10`
     /// threshold that promotes a finding into the "systemic"

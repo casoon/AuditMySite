@@ -198,6 +198,194 @@ static EXPLANATIONS: &[(&str, RuleExplanation)] = &[
         },
     ),
     (
+        "1.2.1",
+        RuleExplanation {
+            customer_title: "Video/Audio ohne Alternative nicht automatisch geprüft",
+            customer_title_en: "Video/audio without an alternative not automatically verified",
+            customer_description:
+                "Auf der Seite wurde ein reines Video- oder Audio-Element gefunden. Ob dafür eine \
+                 gleichwertige Textalternative (z. B. ein Transkript) existiert, kann ein Scanner \
+                 nicht zuverlässig aus dem HTML ableiten — das erfordert eine inhaltliche Prüfung.",
+            customer_description_en:
+                "A video-only or audio-only element was found on the page. Whether an equivalent \
+                 text alternative (e.g. a transcript) exists cannot be reliably determined from \
+                 the HTML alone — this requires a manual content check.",
+            user_impact:
+                "Menschen, die das Video nicht sehen oder das Audio nicht hören können, erhalten \
+                 ohne Textalternative keinen Zugang zum vermittelten Inhalt.",
+            user_impact_en:
+                "People who cannot see the video or hear the audio have no access to the \
+                 conveyed content without a text alternative.",
+            typical_cause:
+                "Eingebettete Video-/Audio-Player (nativ oder als Drittanbieter-Embed), für die \
+                 keine Transkript-Seite oder kein Textäquivalent verlinkt ist.",
+            typical_cause_en:
+                "Embedded video/audio players (native or third-party) with no linked transcript \
+                 page or text equivalent.",
+            recommendation:
+                "Für jedes reine Video-/Audio-Element manuell prüfen, ob ein Transkript oder eine \
+                 gleichwertige Textalternative vorhanden und vollständig ist.",
+            recommendation_en:
+                "For every video-only or audio-only element, manually verify that a transcript or \
+                 equivalent text alternative exists and is complete.",
+            technical_note:
+                "Ein Textlink zum Transkript in der Nähe des Medienelements platzieren, z. B. \
+                 direkt unterhalb des Players.",
+            technical_note_en:
+                "Place a text link to the transcript near the media element, e.g. directly below \
+                 the player.",
+            responsible_role: Role::Editorial,
+            effort_estimate: Effort::Medium,
+            example_bad: None,
+            example_good: None,
+            example_decorative: None,
+        },
+    ),
+    (
+        "1.2.2",
+        RuleExplanation {
+            customer_title: "Untertitel bei Video nicht bestätigt",
+            customer_title_en: "Captions on video not confirmed",
+            customer_description:
+                "Für ein Video auf der Seite konnte keine auflösbare Untertitel-/Caption-Datei \
+                 (`<track kind=\"captions\">`) technisch bestätigt werden, oder das Video ist ein \
+                 eingebetteter Drittanbieter-Player, dessen Untertitel-Einstellungen sich nicht \
+                 von außen prüfen lassen.",
+            customer_description_en:
+                "For a video on the page, a resolving caption/subtitle file \
+                 (`<track kind=\"captions\">`) could not be technically confirmed, or the video is \
+                 a third-party embedded player whose caption settings cannot be checked from the \
+                 outside.",
+            user_impact:
+                "Gehörlose und schwerhörige Nutzer erhalten ohne Untertitel keinen Zugang zum \
+                 gesprochenen Inhalt des Videos.",
+            user_impact_en:
+                "Deaf and hard-of-hearing users have no access to the video's spoken content \
+                 without captions.",
+            typical_cause:
+                "Video ohne `<track kind=\"captions\">`-Element, ein Track, dessen Datei nicht \
+                 erreichbar ist, oder ein eingebetteter Player (YouTube, Vimeo u. ä.), dessen \
+                 Untertitel-Status vom eigentlichen Betreiber der Seite konfiguriert wird.",
+            typical_cause_en:
+                "Video without a `<track kind=\"captions\">` element, a track whose file is \
+                 unreachable, or an embedded player (YouTube, Vimeo, etc.) whose caption status is \
+                 configured by the platform, not the audited page.",
+            recommendation:
+                "Sicherstellen, dass jedes vorab aufgezeichnete Video mit Ton synchronisierte \
+                 Untertitel hat. Bei eingebetteten Playern die Untertitel-Einstellungen manuell im \
+                 Player prüfen.",
+            recommendation_en:
+                "Ensure every prerecorded video with audio has synchronized captions. For embedded \
+                 players, manually verify the caption settings within the player itself.",
+            technical_note:
+                "Natives `<video>`: `<track kind=\"captions\" src=\"...\" srclang=\"de\">` \
+                 hinzufügen, Datei muss erreichbar sein. Bei Embeds die Caption-Funktion der \
+                 Plattform aktivieren.",
+            technical_note_en:
+                "Native `<video>`: add `<track kind=\"captions\" src=\"...\" srclang=\"en\">`, the \
+                 file must resolve. For embeds, enable the platform's caption feature.",
+            responsible_role: Role::Development,
+            effort_estimate: Effort::Medium,
+            example_bad: Some("<video src=\"clip.mp4\"></video>"),
+            example_good: Some(
+                "<video src=\"clip.mp4\"><track kind=\"captions\" src=\"clip.vtt\" srclang=\"de\"></video>",
+            ),
+            example_decorative: None,
+        },
+    ),
+    (
+        "1.2.3",
+        RuleExplanation {
+            customer_title: "Audiodeskription oder Textalternative nicht automatisch geprüft",
+            customer_title_en: "Audio description or text alternative not automatically verified",
+            customer_description:
+                "Ob ein vorab aufgezeichnetes Video mit visuell vermittelten Informationen \
+                 (z. B. Handlungen, Ortswechsel) eine Audiodeskription oder eine vollständige \
+                 Textalternative besitzt, kann ein Scanner nicht aus dem HTML allein feststellen.",
+            customer_description_en:
+                "Whether a prerecorded video with visually conveyed information (e.g. actions, \
+                 scene changes) has an audio description or a complete text alternative cannot be \
+                 determined from the HTML alone.",
+            user_impact:
+                "Blinde und sehbeeinträchtigte Nutzer verpassen visuell vermittelte Informationen, \
+                 die nicht im normalen Ton des Videos genannt werden.",
+            user_impact_en:
+                "Blind and visually impaired users miss visually conveyed information that is not \
+                 mentioned in the video's regular audio track.",
+            typical_cause:
+                "Video mit wichtigen visuellen Inhalten (Diagramme, Handlungsabläufe, Textein-\
+                 blendungen), ohne separate Audiodeskriptionsspur und ohne Textalternative.",
+            typical_cause_en:
+                "Video with important visual content (diagrams, actions, on-screen text) without a \
+                 separate audio description track and without a text alternative.",
+            recommendation:
+                "Videos mit relevanten visuellen Inhalten manuell prüfen: Existiert eine \
+                 Audiodeskription oder eine vollständige Textalternative, die diese Inhalte \
+                 abdeckt?",
+            recommendation_en:
+                "Manually check videos with relevant visual content: does an audio description or \
+                 a complete text alternative exist that covers this content?",
+            technical_note:
+                "Audiodeskription per `<track kind=\"descriptions\">` oder separater Tonspur \
+                 einbinden, alternativ eine vollständige Textalternative verlinken.",
+            technical_note_en:
+                "Add an audio description via `<track kind=\"descriptions\">` or a separate audio \
+                 track, or alternatively link a complete text alternative.",
+            responsible_role: Role::Editorial,
+            effort_estimate: Effort::Medium,
+            example_bad: None,
+            example_good: None,
+            example_decorative: None,
+        },
+    ),
+    (
+        "1.2.8",
+        RuleExplanation {
+            customer_title: "Vollständige Textalternative für Video nicht bestätigt",
+            customer_title_en: "Full text alternative for video not confirmed",
+            customer_description:
+                "Für vorab aufgezeichnete Video-/Audio-Inhalte konnte nicht automatisch bestätigt \
+                 werden, dass eine vollständige Textalternative (Transkript inkl. relevanter \
+                 visueller Informationen) existiert.",
+            customer_description_en:
+                "For prerecorded video/audio content, it could not be automatically confirmed that \
+                 a complete text alternative (a transcript including relevant visual information) \
+                 exists.",
+            user_impact:
+                "Taubblinde Nutzer und Nutzer, die weder Bild noch Ton wahrnehmen können, sind auf \
+                 eine vollständige Textalternative angewiesen, um auf den Inhalt zuzugreifen.",
+            user_impact_en:
+                "Deafblind users and users who can perceive neither image nor sound depend on a \
+                 complete text alternative to access the content.",
+            typical_cause:
+                "Video-/Audio-Element ohne verlinktes Transkript, oder ein in der Nähe gefundener \
+                 Link deutet zwar auf ein Transkript hin, dessen Vollständigkeit ist aber nicht \
+                 automatisch prüfbar.",
+            typical_cause_en:
+                "Video/audio element with no linked transcript, or a nearby link suggests a \
+                 transcript exists but its completeness cannot be verified automatically.",
+            recommendation:
+                "Für jedes vorab aufgezeichnete Video-/Audio-Element ein vollständiges Transkript \
+                 bereitstellen und manuell auf Vollständigkeit prüfen (inkl. gesprochenem Dialog \
+                 und relevanten visuellen Informationen).",
+            recommendation_en:
+                "Provide a complete transcript for every prerecorded video/audio element and \
+                 manually verify its completeness (including spoken dialogue and relevant visual \
+                 information).",
+            technical_note:
+                "Transkript als Text auf der Seite oder verlinkt bereitstellen, `<track \
+                 kind=\"descriptions\">` für Audiodeskription ergänzen, wo zutreffend.",
+            technical_note_en:
+                "Provide the transcript as text on the page or via a link, add `<track \
+                 kind=\"descriptions\">` for audio description where applicable.",
+            responsible_role: Role::Editorial,
+            effort_estimate: Effort::Medium,
+            example_bad: None,
+            example_good: None,
+            example_decorative: None,
+        },
+    ),
+    (
         "1.3.1",
         RuleExplanation {
             customer_title: "Fehlende semantische Struktur",
