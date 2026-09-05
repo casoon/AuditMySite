@@ -844,6 +844,7 @@ pdf-cv-overview-title = Content-Sichtbarkeit — Überblick
 pdf-cv-overview-body = Aggregierter Indikator aus SEO-, Quellenqualitäts- und KI-Sichtbarkeitssignalen. Umfasst organische Indexierbarkeit, E-E-A-T-Autoritätssignale, lokale Geschäftspräsenz, Inhaltstiefe und topische Relevanz-Heuristiken. Heuristischer Schätzwert — kein direkt gemessener Wert.
 pdf-cv-signals-analyzed = { $signals } Signale analysiert, { $problems } Hinweise auf Optimierungsbedarf.
 pdf-cv-manual-review-title = Manuell prüfen
+pdf-cv-success = Alle Content-Visibility-Signale sind in Ordnung. Kein Optimierungsbedarf.
 pdf-bp-score-title = Best Practices Score
 pdf-bp-success = Keine Konsolfehler und keine anfälligen Bibliotheken erkannt.
 pdf-bp-console-errors-title = Konsolenfehler

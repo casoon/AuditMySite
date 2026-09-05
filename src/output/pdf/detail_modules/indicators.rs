@@ -441,6 +441,17 @@ pub(in crate::output::pdf) fn render_content_visibility(
         ),
     ];
 
+    // Mirrors the `score >= 80` early-return idiom used by the sibling
+    // source_quality/ai_visibility renderers in this file: once the module is
+    // clean, don't spend a page per passing signal — a single confirmation
+    // line replaces the per-area callout+evidence cards. NotTestable signals
+    // still populate the "manual review" checklist below regardless, since
+    // that's a genuinely separate concern from "everything passed".
+    let cv_clean = score >= 80;
+    if cv_clean {
+        builder = builder.add_component(Callout::success(i18n.t("pdf-cv-success")));
+    }
+
     let mut not_testable_rows: Vec<ChecklistRow> = Vec::new();
 
     for (area_name, signals) in &areas {
@@ -458,7 +469,7 @@ pub(in crate::output::pdf) fn render_content_visibility(
             not_testable_rows.push(ChecklistRow::new(&title, &detail).with_status("info"));
         }
 
-        if visible.is_empty() {
+        if cv_clean || visible.is_empty() {
             continue;
         }
 
