@@ -96,6 +96,10 @@ pub struct TechnicalSeo {
     /// www / non-www redirect check result
     #[serde(skip_serializing_if = "Option::is_none")]
     pub www_redirect: Option<WwwRedirectCheck>,
+    /// og:image is present without an og:image:alt description.
+    pub og_image_missing_alt: bool,
+    /// twitter:image is present without a twitter:image:alt description.
+    pub twitter_image_missing_alt: bool,
     /// Issues found
     pub issues: Vec<TechnicalIssue>,
 }
@@ -419,6 +423,16 @@ pub async fn analyze_technical_seo(page: &Page, url: &str) -> Result<TechnicalSe
             issues: Array.from(new Set(ampIssues))
         };
 
+        // Social-preview image alt text (og:image:alt / twitter:image:alt)
+        const ogImageEl = document.querySelector('meta[property="og:image"]');
+        const ogImageAltEl = document.querySelector('meta[property="og:image:alt"]');
+        result.hasOgImage = !!ogImageEl;
+        result.hasOgImageAlt = !!(ogImageAltEl && (ogImageAltEl.getAttribute('content') || '').trim());
+        const twitterImageEl = document.querySelector('meta[name="twitter:image"]');
+        const twitterImageAltEl = document.querySelector('meta[name="twitter:image:alt"]');
+        result.hasTwitterImage = !!twitterImageEl;
+        result.hasTwitterImageAlt = !!(twitterImageAltEl && (twitterImageAltEl.getAttribute('content') || '').trim());
+
         // Favicon
         const faviconEl = document.querySelector(
             'link[rel="icon"], link[rel="shortcut icon"], link[rel="apple-touch-icon"]'
@@ -546,6 +560,10 @@ pub async fn analyze_technical_seo(page: &Page, url: &str) -> Result<TechnicalSe
     let storage_items = parse_storage_items(&parsed["storageItems"]);
     let has_zaraz_global = parsed["hasZarazGlobal"].as_bool().unwrap_or(false);
     let has_favicon = parsed["hasFavicon"].as_bool().unwrap_or(false);
+    let has_og_image = parsed["hasOgImage"].as_bool().unwrap_or(false);
+    let has_og_image_alt = parsed["hasOgImageAlt"].as_bool().unwrap_or(false);
+    let has_twitter_image = parsed["hasTwitterImage"].as_bool().unwrap_or(false);
+    let has_twitter_image_alt = parsed["hasTwitterImageAlt"].as_bool().unwrap_or(false);
     let web_manifest_url = parsed["webManifestUrl"].as_str().map(String::from);
     let theme_color = parsed["themeColor"].as_str().map(String::from);
     let service_worker_supported = parsed["serviceWorkerSupported"].as_bool().unwrap_or(false);
@@ -637,6 +655,8 @@ pub async fn analyze_technical_seo(page: &Page, url: &str) -> Result<TechnicalSe
         zaraz,
         has_favicon,
         www_redirect,
+        og_image_missing_alt: has_og_image && !has_og_image_alt,
+        twitter_image_missing_alt: has_twitter_image && !has_twitter_image_alt,
         issues: Vec::new(),
     };
 
@@ -894,6 +914,34 @@ pub fn collect_technical_issues(t: &TechnicalSeo, en: bool) -> Vec<TechnicalIssu
             } else {
                 Severity::Medium
             },
+        });
+    }
+
+    if t.og_image_missing_alt {
+        issues.push(TechnicalIssue {
+            issue_type: "og_image_missing_alt".to_string(),
+            message: if en {
+                "og:image is set without an og:image:alt description for the preview image"
+                    .to_string()
+            } else {
+                "og:image ist gesetzt, aber ohne og:image:alt-Beschreibung für das Vorschaubild"
+                    .to_string()
+            },
+            severity: Severity::Low,
+        });
+    }
+
+    if t.twitter_image_missing_alt {
+        issues.push(TechnicalIssue {
+            issue_type: "twitter_image_missing_alt".to_string(),
+            message: if en {
+                "twitter:image is set without a twitter:image:alt description for the preview image"
+                    .to_string()
+            } else {
+                "twitter:image ist gesetzt, aber ohne twitter:image:alt-Beschreibung für das Vorschaubild"
+                    .to_string()
+            },
+            severity: Severity::Low,
         });
     }
 
@@ -2107,5 +2155,53 @@ mod tests {
         assert!(issues
             .iter()
             .any(|issue| issue.issue_type == "pagination_duplicate_prev_next"));
+    }
+
+    #[test]
+    fn test_collect_technical_issues_flags_missing_social_image_alt() {
+        let technical = TechnicalSeo {
+            og_image_missing_alt: true,
+            twitter_image_missing_alt: true,
+            https: true,
+            has_lang: true,
+            canonical_url: Some("https://example.com/".to_string()),
+            word_count: 500,
+            internal_links: 1,
+            ..TechnicalSeo::default()
+        };
+
+        let issues = collect_technical_issues(&technical, true);
+
+        assert!(issues
+            .iter()
+            .any(|issue| issue.issue_type == "og_image_missing_alt"
+                && issue.severity == Severity::Low));
+        assert!(issues
+            .iter()
+            .any(|issue| issue.issue_type == "twitter_image_missing_alt"
+                && issue.severity == Severity::Low));
+    }
+
+    #[test]
+    fn test_collect_technical_issues_no_finding_when_social_image_absent_or_alt_present() {
+        let technical = TechnicalSeo {
+            og_image_missing_alt: false,
+            twitter_image_missing_alt: false,
+            https: true,
+            has_lang: true,
+            canonical_url: Some("https://example.com/".to_string()),
+            word_count: 500,
+            internal_links: 1,
+            ..TechnicalSeo::default()
+        };
+
+        let issues = collect_technical_issues(&technical, true);
+
+        assert!(!issues
+            .iter()
+            .any(|issue| issue.issue_type == "og_image_missing_alt"));
+        assert!(!issues
+            .iter()
+            .any(|issue| issue.issue_type == "twitter_image_missing_alt"));
     }
 }
