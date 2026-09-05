@@ -12,6 +12,7 @@
 mod accordion;
 mod add_to_cart;
 mod disclosure_menu;
+pub(crate) mod easy_language;
 mod form;
 mod main_navigation;
 mod modal_dialog;

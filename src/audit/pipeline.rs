@@ -954,7 +954,14 @@ pub async fn audit_page(
     // Pattern violations come from the AXTree and reference real DOM nodes, so
     // they can be enriched with selectors just like WCAG violations. Running this
     // here (rather than inside aggregate_report) gives us access to the live page.
-    let pattern_analysis = crate::patterns::analyze(&primary_snap.ax_tree);
+    let mut pattern_analysis = crate::patterns::analyze(&primary_snap.ax_tree);
+    // Easy-language ("Leichte Sprache") availability needs raw DOM access
+    // (CSS class names, <link hreflang> in <head>) not present in the
+    // AXTree, so it runs as a separate async pass against the live page
+    // rather than from the synchronous `analyze()` above (plan
+    // 09-easy-language-detection.md).
+    crate::patterns::easy_language::detect(page, &primary_snap.ax_tree, &mut pattern_analysis)
+        .await;
     let mut pattern_violations = pattern_analysis.violations.clone();
     enrich_violations_with_page(page, &mut pattern_violations, &primary_snap.ax_tree).await;
     let (kept_patterns, demoted_patterns): (Vec<_>, Vec<_>) = pattern_violations

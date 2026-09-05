@@ -1050,3 +1050,7 @@ sr-state-disabled = disabled
 sr-state-pressed = pressed
 sr-state-not-pressed = not pressed
 sr-state-tab-stop = focusable
+
+# Plan 09: easy-language ("Leichte Sprache") link-text markers, comma-separated,
+# merged with the German list regardless of report language (sites mix languages).
+easy-language-linktext-markers = easy language,easy-to-read,easy to read,plain language

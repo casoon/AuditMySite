@@ -30,11 +30,22 @@ pub(super) fn build_positive_signals(
                         (false, "SkipLink") => "Skip-Link",
                         (true, "Accordion") => "Accordion",
                         (false, "Accordion") => "Accordion",
+                        (true, "EasyLanguage") => "Easy-language version",
+                        (false, "EasyLanguage") => "Leichte-Sprache-Version",
                         (_, other) => other,
+                    };
+                    // #406: every other pattern's `message` is a raw English
+                    // passthrough (pre-existing, out of scope here) — only
+                    // EasyLanguage's description is re-derived per locale,
+                    // since it's the one new message this task adds.
+                    let description = if r.pattern == "EasyLanguage" {
+                        crate::patterns::easy_language::message_text(en).to_string()
+                    } else {
+                        r.message.clone()
                     };
                     PositiveSignal {
                         title: title.to_string(),
-                        description: r.message.clone(),
+                        description,
                         strong: matches!(r.confidence, crate::patterns::PatternConfidence::Strong),
                     }
                 })
