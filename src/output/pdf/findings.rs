@@ -11,7 +11,9 @@ use crate::output::report_model::*;
 use crate::util::truncate_url;
 use crate::wcag::ViolationEvidence;
 
-use super::helpers::{effort_label_i18n, priority_label_i18n, role_label_i18n};
+use super::helpers::{
+    effort_label_i18n, manual_recheck_instruction, priority_label_i18n, role_label_i18n,
+};
 
 /// Extract the first sentence from a text (up to first period + space, or full text).
 /// Skips common German abbreviations like "z. B.", "d. h.", "u. a.".
@@ -403,7 +405,9 @@ pub(super) fn render_finding_technical(
     let expected_impact =
         crate::audit::normalized::expected_impact_text(&group.expected_impact_kind, en);
     let complexity_reason = crate::audit::normalized::complexity_text(group.complexity_kind, en);
-    if !expected_impact.is_empty() || !complexity_reason.is_empty() {
+    let recheck_instruction = manual_recheck_instruction(&group.wcag_criterion, en);
+    if !expected_impact.is_empty() || !complexity_reason.is_empty() || recheck_instruction.is_some()
+    {
         builder = builder.add_component(section_caption(if i18n.locale() == "en" {
             "Action assessment"
         } else {
@@ -442,6 +446,16 @@ pub(super) fn render_finding_technical(
                 } else {
                     "Manuelle Prüfung empfohlen"
                 },
+            );
+        }
+        if let Some(instruction) = recheck_instruction {
+            assessment = assessment.add(
+                if i18n.locale() == "en" {
+                    "Self-test"
+                } else {
+                    "Selbsttest"
+                },
+                instruction,
             );
         }
         builder = builder.add_component(assessment);

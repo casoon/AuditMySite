@@ -249,6 +249,24 @@ Bewusste, über alle Phasen hinweg getroffene Entscheidung statt einer nachträg
   Differenzprüfungen** statt gespeicherter Pixel-Baselines erkannt, siehe Phase-5-Eintrag unten.
 
 ## Current State (v1.1.0)
+- **plan/16: konkrete AT-Selbsttest-Anleitungen statt generischem "manuell prüfen", 2026-09-06:**
+  neue `manual_recheck_instruction(wcag_criterion, en)` (`src/output/pdf/helpers.rs`), keyed nach
+  WCAG-Kriterium, mit VoiceOver-Rotor-/NVDA-Elementliste-Tastenkürzeln für die vier Kriterien, bei
+  denen ein Laie einen Verdacht in wenigen Minuten selbst nachprüfen kann: 1.3.6/1.3.1
+  (Landmarken/Überschriften via Rotor VO+U bzw. Insert+F7), 3.3.2 (Formularfeld-Labels via
+  VO+Cmd+J/NVDA F), 4.1.3 (Fehlermeldungs-Ansage — Meldung auslösen, prüfen ob automatisch ohne
+  Fokus-Sprung angesagt). Bewusst keine neue JSON-Struktur/kein kind-Enum — reiner
+  PDF-Präsentationstext (analog `render_manual_only_criteria_note`, plan/15), an drei bereits
+  bestehenden Stellen angehängt statt eines neuen, vom Finding losgelösten Anhangs: der
+  Screenreader-Befunde-Tabelle (`detail_modules/accessibility.rs`, keyed auf `issue.wcag_criterion`),
+  der WCAG-Violation-Finding-Karte (`findings.rs`, neue "Selbsttest"-Zeile im
+  Maßnahmenbewertungs-Block, keyed auf `group.wcag_criterion`) und der
+  Manuelle-Prüfpunkte-Checklist (`single_report.rs`, an den `recommendation`/`text`-String
+  angehängt, keyed auf `finding.rule`). `1.3.1` deckt bewusst sowohl Heading- als auch
+  Landmark-Duplikat-Funde mit einem gemeinsamen Text ab (beide Sub-Fälle teilen dieselbe
+  `wcag_criterion`-Konstante im Code und werden im selben VoiceOver-Rotor/NVDA-Elementliste-Tool
+  geprüft, keine künstliche Trennung nötig). Live gegen casoon.de verifiziert (`--debug-typ`): die
+  Landmarken-Anleitung erscheint korrekt an jedem 1.3.6-Screenreader-Befund.
 - **plan/15: feste "Strukturell nur manuell prüfbare Kriterien"-Liste im PDF, 2026-09-06:** neue
   `render_manual_only_criteria_note` (`src/output/pdf/single_report.rs`), direkt nach der
   WCAG-Coverage-Sektion, unconditional (kein `--annex`-Flag, gleiches Report-Level-Gate wie die

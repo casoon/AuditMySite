@@ -12,7 +12,9 @@ use crate::i18n::I18n;
 use crate::output::localized::{is_english, pick};
 use crate::output::report_model::*;
 
-use super::helpers::{map_severity, score_quality_color, score_quality_label};
+use super::helpers::{
+    manual_recheck_instruction, map_severity, score_quality_color, score_quality_label,
+};
 
 mod accessibility;
 mod ai_transparency;

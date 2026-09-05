@@ -3,6 +3,58 @@
 use crate::i18n::I18n;
 use crate::output::report_model::*;
 
+/// Concrete VoiceOver/NVDA self-verification instructions (plan/16) for the
+/// handful of WCAG criteria where a non-expert can personally confirm a
+/// suspected screen-reader issue in a few minutes, rather than trusting a
+/// generic "manual review" hint. Shared across the screen-reader findings
+/// table, WCAG violation finding cards, and the not-testable/warning
+/// checklist — the same criterion can surface through any of those three
+/// paths. Keyboard shortcuts themselves stay identical across locales; only
+/// the surrounding explanation is translated. Returns `None` for criteria
+/// with no documented self-test (most of them — this is deliberately not a
+/// general-purpose annotation).
+pub(super) fn manual_recheck_instruction(wcag_criterion: &str, en: bool) -> Option<&'static str> {
+    match wcag_criterion {
+        "1.3.6" => Some(if en {
+            "Self-check: open VoiceOver's Rotor (VO+U, macOS) or NVDA's Elements List \
+             (Insert+F7) and switch to \"Landmarks\" — listen whether the areas you'd expect \
+             (header, navigation, footer) are actually announced."
+        } else {
+            "Selbsttest: VoiceOver-Rotor (VO+U, macOS) oder NVDA-Elementliste (Einfg+F7) öffnen \
+             und auf „Landmarken\" umschalten — anhören, ob die erwarteten Bereiche (Header, \
+             Navigation, Footer) tatsächlich angekündigt werden."
+        }),
+        "1.3.1" => Some(if en {
+            "Self-check: use VoiceOver's Rotor (VO+U) or NVDA's Elements List (Insert+F7) and \
+             check both the \"Headings\" and \"Landmarks\" views — confirm the order/uniqueness \
+             you hear matches what this finding describes."
+        } else {
+            "Selbsttest: VoiceOver-Rotor (VO+U) oder NVDA-Elementliste (Einfg+F7) nutzen und \
+             sowohl „Überschriften\" als auch „Landmarken\" prüfen — abgleichen, ob \
+             Reihenfolge/Eindeutigkeit dem hier beschriebenen Befund entspricht."
+        }),
+        "3.3.2" => Some(if en {
+            "Self-check: tab into the form with VoiceOver (VO+Cmd+J jumps between form \
+             controls) or NVDA (F jumps between fields) and listen whether every field \
+             announces a name — not just a generic \"edit text\"."
+        } else {
+            "Selbsttest: mit VoiceOver (VO+Cmd+J springt zwischen Formularfeldern) oder NVDA \
+             (F springt zwischen Feldern) durch das Formular tabben und hören, ob jedes Feld \
+             einen Namen ansagt — nicht nur ein generisches „Textfeld\"."
+        }),
+        "4.1.3" => Some(if en {
+            "Self-check: trigger the message (e.g. submit the form with an invalid value) \
+             while VoiceOver or NVDA is running and confirm it is announced automatically, \
+             without moving keyboard focus to it."
+        } else {
+            "Selbsttest: die Meldung auslösen (z. B. Formular mit ungültigem Wert absenden), \
+             während VoiceOver oder NVDA läuft, und prüfen, ob sie automatisch angesagt wird, \
+             ohne dass der Tastaturfokus dorthin springt."
+        }),
+        _ => None,
+    }
+}
+
 pub(super) fn extract_domain(url: &str) -> String {
     let without_scheme = url
         .trim_start_matches("https://")

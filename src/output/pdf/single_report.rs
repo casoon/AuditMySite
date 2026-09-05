@@ -26,7 +26,9 @@ use super::detail_modules::{
 use super::diagnosis::render_diagnosis_section;
 use super::en301549::render_en301549_annex;
 use super::findings::render_finding_technical;
-use super::helpers::{map_severity, priority_label_i18n, role_label_i18n};
+use super::helpers::{
+    manual_recheck_instruction, map_severity, priority_label_i18n, role_label_i18n,
+};
 use super::wcag_coverage::render_wcag_coverage_section;
 use crate::audit::AuditReport;
 use crate::cli::{AnnexKind, ReportLevel};
@@ -960,7 +962,7 @@ fn render_assessment_and_execution_notes(
     if !wcag.warnings.is_empty() || !wcag.not_testables.is_empty() {
         let mut rows = Vec::new();
         for finding in wcag.not_testables.iter().take(20) {
-            let recommendation = finding
+            let mut recommendation = finding
                 .rule_id
                 .as_deref()
                 .and_then(crate::output::explanations::get_explanation)
@@ -973,6 +975,10 @@ fn render_assessment_and_execution_notes(
                         "Dieses Kriterium manuell an der gerenderten Seite prüfen.".to_string()
                     }
                 });
+            if let Some(instruction) = manual_recheck_instruction(&finding.rule, en) {
+                recommendation.push(' ');
+                recommendation.push_str(instruction);
+            }
             rows.push(
                 ChecklistRow::new(
                     format!(
@@ -994,7 +1000,7 @@ fn render_assessment_and_execution_notes(
             .iter()
             .take(20usize.saturating_sub(rows.len()))
         {
-            let text = finding
+            let mut text = finding
                 .rule_id
                 .as_deref()
                 .and_then(crate::output::explanations::get_explanation)
@@ -1007,6 +1013,10 @@ fn render_assessment_and_execution_notes(
                         "Dieses heuristische Signal manuell bestätigen.".to_string()
                     }
                 });
+            if let Some(instruction) = manual_recheck_instruction(&finding.rule, en) {
+                text.push(' ');
+                text.push_str(instruction);
+            }
             rows.push(
                 ChecklistRow::new(
                     format!(

@@ -307,11 +307,19 @@ pub(in crate::output::pdf) fn render_screen_reader_section(
             "Screenreader-Befunde"
         });
         for (issue, count) in deduped {
-            let msg = if count > 1 {
+            let mut msg = if count > 1 {
                 format!("{} ({}×)", issue.message, count)
             } else {
                 issue.message.clone()
             };
+            if let Some(instruction) = issue
+                .wcag_criterion
+                .as_deref()
+                .and_then(|c| manual_recheck_instruction(c, en))
+            {
+                msg.push(' ');
+                msg.push_str(instruction);
+            }
             table = table.add_row(vec![msg, sev_label(&issue.severity).to_string()]);
         }
         builder = builder.add_component(table);
