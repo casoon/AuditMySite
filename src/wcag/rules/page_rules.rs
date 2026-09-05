@@ -29,12 +29,13 @@ use super::{
     check_aria_prohibited_attr_with_page, check_aria_relationships_with_page,
     check_aria_valid_attr_value_with_page, check_background_audio_with_page,
     check_checked_state_with_page, check_content_on_hover_with_page,
-    check_focus_not_obscured_enhanced_with_page, check_focus_not_obscured_minimum_with_page,
-    check_focus_visible_css_with_page, check_form_no_submit_with_page,
-    check_frame_tested_with_page, check_frame_title_with_page, check_identify_purpose_with_page,
-    check_image_input_rules_with_page, check_invalid_aria_attribute_name_with_page,
-    check_invalid_role_with_page, check_label_in_name_with_page, check_landmarks_with_page,
-    check_language_extended_with_page, check_language_of_parts_with_page, check_location_with_page,
+    check_fake_navigation_link_with_page, check_focus_not_obscured_enhanced_with_page,
+    check_focus_not_obscured_minimum_with_page, check_focus_visible_css_with_page,
+    check_form_no_submit_with_page, check_frame_tested_with_page, check_frame_title_with_page,
+    check_identify_purpose_with_page, check_image_input_rules_with_page,
+    check_invalid_aria_attribute_name_with_page, check_invalid_role_with_page,
+    check_label_in_name_with_page, check_landmarks_with_page, check_language_extended_with_page,
+    check_language_of_parts_with_page, check_location_with_page,
     check_meaningful_sequence_with_page, check_media_alternative_with_page,
     check_meta_viewport_large_with_page, check_modern_attributes_with_page,
     check_motion_actuation_with_page, check_no_interruptions_with_page, check_no_timing_with_page,
@@ -43,7 +44,8 @@ use super::{
     check_pause_stop_hide_with_page, check_pointer_cancellation_with_page,
     check_pointer_gestures_with_page, check_positive_tabindex_with_page,
     check_presentation_semantic_children_with_page, check_re_authenticate_with_page,
-    check_reduced_motion_with_page, check_redundant_entry_with_page, check_resize_text_with_page,
+    check_reduced_motion_with_page, check_redundant_entry_with_page,
+    check_redundant_role_with_page, check_resize_text_with_page,
     check_same_origin_iframes_with_page, check_server_side_image_map_with_page,
     check_tab_selected_state_with_page, check_table_headers_attr_with_page,
     check_target_size_enhanced_with_page, check_target_size_minimum_with_page,
@@ -251,6 +253,18 @@ pub const PAGE_RULES: &[PageRuleEntry] = &[
         name: "tab selected state",
         min_level: WcagLevel::A,
         check_fn: |p| Box::pin(check_tab_selected_state_with_page(p)),
+    },
+    PageRuleEntry {
+        rule_id: "4.1.2/redundant-role",
+        name: "redundant role",
+        min_level: WcagLevel::A,
+        check_fn: |p| Box::pin(check_redundant_role_with_page(p)),
+    },
+    PageRuleEntry {
+        rule_id: "4.1.2/link-as-button",
+        name: "link as button",
+        min_level: WcagLevel::A,
+        check_fn: |p| Box::pin(check_fake_navigation_link_with_page(p)),
     },
     // 2.5.1-2.5.4 are official WCAG 2.1 Level A criteria (only 2.5.5/2.5.6 are
     // AAA) — previously misclassified as AAA here and in each rule's own
@@ -474,7 +488,9 @@ mod tests {
         // + aria-valid-attr DOM supplement (#567) = 35
         // + video-caption-track (1.2.2, DOM+network caption-track deepening,
         //   #video-caption-checks) = 36
-        assert_eq!(count, 36);
+        // + redundant-role + link-as-button (plan/18, best-practice ARIA
+        //   hygiene checks, both Level A) = 38
+        assert_eq!(count, 38);
     }
 
     #[test]
@@ -493,7 +509,9 @@ mod tests {
         // + conservative language-of-parts heuristic (3.1.2) = 45.
         // + aria-valid-attr DOM supplement (#567, Level A, counted here too since AA >= A) = 46.
         // + video-caption-track (1.2.2, Level A, counted here too since AA >= A) = 47.
-        assert_eq!(count, 47);
+        // + redundant-role + link-as-button (plan/18, Level A, counted here
+        //   too since AA >= A) = 49.
+        assert_eq!(count, 49);
     }
 
     #[test]

@@ -249,6 +249,38 @@ Bewusste, über alle Phasen hinweg getroffene Entscheidung statt einer nachträg
   Differenzprüfungen** statt gespeicherter Pixel-Baselines erkannt, siehe Phase-5-Eintrag unten.
 
 ## Current State (v1.1.0)
+- **plan/18: zwei neue Best-Practice-ARIA-Hygiene-Regeln, 2026-09-06 (letzter Punkt aus dem
+  aktuellen Insights-Artikel-Batch):** `redundant_role.rs` (`4.1.2/redundant-role`, z. B.
+  `<button role="button">`, `<a href="..." role="link">` — fixe, kontextunabhängige
+  Tag-zu-implizite-Rolle-Tabelle; Tags mit vorfahrenabhängiger Rolle wie `<header>`/`<footer>`
+  bewusst ausgeschlossen) und `fake_navigation_link.rs` (`4.1.2/link-as-button`, `<a href="#"
+  onclick="...">`/`href="javascript:..."` als Button-Ersatz — nur inline `onclick`, dieselbe
+  Grenze wie `click_handlers.rs`). Beide `Severity::Low`, `WcagLevel::A`, Tag `"best-practice"`,
+  registriert im normalen `PageRuleEntry`-Mechanismus (`page_rules.rs`), keine neue
+  Infrastruktur. **Zwei reale Bugs beim Live-Verifizieren gefunden und behoben, nicht nur
+  Wording:** (1) erste Fassung baute Selektoren manuell aus Tag+id+class (wie `click_handlers.rs`
+  es vormacht) — bei mehreren gleichnamigen Tags ohne id/class (z. B. zwei `<a>`-Elementen ohne
+  Klasse) kollidierten beide auf denselben Selector-String `"a"`, nicht in der Fixture reproduziert
+  zunächst unbemerkt, aber real: `js_helpers::CSS_SELECTOR_JS`'s eigener Doc-Kommentar warnt
+  explizit davor ("Never falls back to a bare tag name"). Auf den robusteren, bereits
+  vorhandenen `__amsCssSelector`-Helper umgestellt (wie `aria_prohibited_attr.rs`), live
+  verifiziert: `body > a:nth-of-type(1)`/`:nth-of-type(3)`/`:nth-of-type(4)` bleiben jetzt
+  unterscheidbar. (2) Naive String-Konkatenation von `CSS_SELECTOR_JS` (eine Top-Level
+  `function`-Deklaration) direkt gefolgt vom eigenen, selbständigen `(function(){...})()` erzeugte
+  einen echten Live-Fehler (`TypeError: (intermediate value)(intermediate value)... is not a
+  function`) — `Runtime.evaluate` parst ein führendes `function`-Token an Ausdrucksposition als
+  Funktionsausdruck statt als Deklaration, wodurch die folgende IIFE als Funktionsaufruf-Argument
+  interpretiert wird statt als eigenständiges Statement. Behoben nach demselben Muster wie
+  `aria_prohibited_attr.rs`: beides in ein explizites äußeres `(function() { ... })()` einbetten,
+  statt zwei unabhängige Top-Level-Snippets zu verketten — beim ersten Versuch übersehen, weil
+  `click_handlers.rs` (das ursprüngliche Vorbild) `CSS_SELECTOR_JS` gar nicht nutzt und dieses
+  Konkatenationsproblem daher dort nie auftritt. Live gegen eine lokale `file://`-Fixture
+  verifiziert (5 Testfälle: 3× redundante Rolle, 2× Fake-Navigation, 2× korrekt nicht geflaggte
+  legitime Fälle) — beide Regeln feuern exakt wie erwartet, keine False Positives. Zwei
+  hartcodierte Page-Rule-Zähler-Regressionstests (`level_a_filter_includes_only_level_a_rules`,
+  `level_aa_filter_includes_aa_plus_a_rules`, `page_rules.rs`) entsprechend hochgezählt
+  (36→38, 47→49). Kein neuer Detection-Corpus-Fixture-Eintrag (#556-Format) — passend zum
+  bestehenden Präzedenzfall reiner DOM-JS-Regeln ohne Offline-Unit-Test in diesem Modul.
 - **plan/17: 4.1.3-Vertiefung — Live-Region-Spät-Einfügung erkannt, 2026-09-06:** neuer
   `InteractiveFindingKind::FormErrorLiveRegionLateInsertion` (Severity::Low, Advisory) in
   `src/a11y_journey/form_error.rs` — Erweiterung der bestehenden Form-Error-Journey statt neuer
