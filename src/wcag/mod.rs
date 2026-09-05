@@ -2,6 +2,7 @@
 //!
 //! Provides WCAG 2.1 rule checking against the Accessibility Tree.
 
+pub mod bik_guide;
 pub mod coverage;
 pub mod en301549;
 pub mod engine;

@@ -77,6 +77,7 @@ pub(super) fn build_batch_detail(normalized: &NormalizedReport) -> PageDetail {
     PageDetail {
         fix_guidance: build_fix_guidance(normalized),
         en301549_annex: build_en301549_annex(normalized),
+        bik_guide: build_bik_guide_annex(normalized, &[], &[], false),
         modules: ModuleBlob::default(),
         confidence_summary: Vec::new(),
         capabilities: Vec::new(),
@@ -97,6 +98,7 @@ pub(super) fn build_detail_cached(
     PageDetail {
         fix_guidance: build_fix_guidance(normalized),
         en301549_annex: build_en301549_annex(normalized),
+        bik_guide: build_bik_guide_annex(normalized, &[], &[], false),
         modules: ModuleBlob::default(),
         confidence_summary: Vec::new(),
         capabilities: Vec::new(),
@@ -316,9 +318,27 @@ pub(super) fn build_detail(ctx: &AuditContext<'_>, detail_ctx: DetailContext) ->
         commerce: ctx.raw_commerce.map(|m| m.to_json()),
     };
 
+    let design_quality_findings: &[crate::design_quality::DesignQualityFinding] = ctx
+        .raw_design_quality
+        .map(|m| m.findings.as_slice())
+        .unwrap_or(&[]);
+    let seo_technical_issues: Vec<crate::seo::technical::TechnicalIssue> = ctx
+        .raw_seo
+        .map(|m| crate::seo::collect_technical_issues(&m.technical, true))
+        .unwrap_or_default();
+    let easy_language_detected = ctx
+        .raw_patterns
+        .is_some_and(|m| m.recognized.iter().any(|p| p.pattern == "EasyLanguage"));
+
     PageDetail {
         fix_guidance: build_fix_guidance(normalized),
         en301549_annex: build_en301549_annex(normalized),
+        bik_guide: build_bik_guide_annex(
+            normalized,
+            design_quality_findings,
+            &seo_technical_issues,
+            easy_language_detected,
+        ),
         modules,
         confidence_summary: vm
             .methodology

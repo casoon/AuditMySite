@@ -398,6 +398,44 @@ pub struct En301549BatchClauseRollup {
     pub affected_pages: usize,
 }
 
+/// "BIK für Alle" editorial accessibility guide chapter mapping — a
+/// re-grouping of already-computed findings, no new checks (see
+/// `wcag::bik_guide` module doc). Canonical English (#406); always present on
+/// single-report `detail` (same "always present, cheap, additive" rule as
+/// `en301549_annex`). The PDF section built from the same data IS flag-gated
+/// (see `--annex bik`). Single-report only for now — see the module doc for
+/// why a batch-wide roll-up is not built (`design_quality`/SEO-technical/
+/// easy-language sources are not retained past a cached or batch run, so a
+/// batch roll-up for those chapters would silently under-report).
+#[derive(Debug, Serialize)]
+pub struct BikGuideAnnex {
+    pub guide: &'static str,
+    pub chapters: Vec<BikChapterEntry>,
+}
+
+#[derive(Debug, Serialize)]
+pub struct BikChapterEntry {
+    pub id: &'static str,
+    pub title: &'static str,
+    pub status: BikChapterStatusKind,
+    #[serde(skip_serializing_if = "Vec::is_empty")]
+    pub findings: Vec<BikFindingRefEntry>,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize)]
+#[serde(rename_all = "snake_case")]
+pub enum BikChapterStatusKind {
+    FindingsPresent,
+    NoFindingsDetected,
+    NotChecked,
+}
+
+#[derive(Debug, Serialize)]
+pub struct BikFindingRefEntry {
+    pub label: String,
+    pub occurrences: usize,
+}
+
 #[derive(Debug, Serialize)]
 pub struct AccessibilityScoreComponent {
     pub area: String,
@@ -560,6 +598,9 @@ pub struct PageDetail {
     /// AND batch reports (same "always present" rule as `fix_guidance`,
     /// issue #256). See `En301549Annex` doc comment.
     pub en301549_annex: En301549Annex,
+    /// "BIK für Alle" editorial accessibility guide chapter mapping — always
+    /// present. See `BikGuideAnnex` doc comment.
+    pub bik_guide: BikGuideAnnex,
     pub modules: ModuleBlob,
     #[serde(skip_serializing_if = "Vec::is_empty")]
     pub confidence_summary: Vec<OutputConfidenceSignal>,

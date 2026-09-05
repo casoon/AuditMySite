@@ -930,6 +930,85 @@ fn test_en301549_annex_en_guard_no_umlauts() {
 }
 
 #[test]
+fn test_bik_guide_present_on_single_detail() {
+    use crate::taxonomy::Severity;
+    use crate::wcag::Violation;
+
+    let mut results = WcagResults::new();
+    results.add_violation(Violation::new(
+        "1.1.1",
+        "Non-text Content",
+        WcagLevel::A,
+        Severity::High,
+        "Missing alt",
+        "n1",
+    ));
+    let report = AuditReport::new(
+        "https://example.com".to_string(),
+        WcagLevel::AA,
+        results,
+        500,
+    );
+    let normalized = normalize(&report);
+    let unified = UnifiedReport::single(&normalized, &report);
+    let page = first_page(&unified);
+    let detail = page.detail.as_ref().expect("single report has detail");
+    let guide = &detail.bik_guide;
+
+    assert_eq!(guide.guide, crate::wcag::bik_guide::BIK_GUIDE_SOURCE);
+    assert_eq!(guide.chapters.len(), 6);
+
+    let images = guide
+        .chapters
+        .iter()
+        .find(|c| c.id == "images")
+        .expect("images chapter present");
+    assert_eq!(
+        images.status,
+        crate::output::json::BikChapterStatusKind::FindingsPresent
+    );
+    assert_eq!(images.findings.len(), 1);
+
+    // A chapter with no active detector at all (Pdf) must still render its
+    // documented "not checked" state, never omitted from the six chapters.
+    let pdf = guide
+        .chapters
+        .iter()
+        .find(|c| c.id == "pdf")
+        .expect("pdf chapter present");
+    assert_eq!(
+        pdf.status,
+        crate::output::json::BikChapterStatusKind::NotChecked
+    );
+    assert!(pdf.findings.is_empty());
+}
+
+/// English-locale guard (#406): the BIK guide mapping's per-chapter data
+/// (titles, ids, findings) must contain no German umlauts/ß in the
+/// single-report JSON. Scoped to `chapters`, not the whole annex — `guide`
+/// intentionally carries the source guide's own German proper name ("BIK für
+/// Alle"), an untranslated citation, not generated prose.
+#[test]
+fn test_bik_guide_en_guard_no_umlauts() {
+    let report = AuditReport::new(
+        "https://example.com".to_string(),
+        WcagLevel::AA,
+        WcagResults::new(),
+        500,
+    );
+    let normalized = normalize(&report);
+    let unified = UnifiedReport::single(&normalized, &report);
+    let page = first_page(&unified);
+    let chapters_json =
+        serde_json::to_string(&page.detail.as_ref().unwrap().bik_guide.chapters).unwrap();
+    let has_umlaut = |s: &str| s.chars().any(|c| "äöüÄÖÜß".contains(c));
+    assert!(
+        !has_umlaut(&chapters_json),
+        "bik_guide.chapters must be canonical English, found umlaut/ß in: {chapters_json}"
+    );
+}
+
+#[test]
 fn test_collection_errors_absent_when_empty() {
     let report = AuditReport::new(
         "https://example.com".to_string(),
@@ -965,6 +1044,7 @@ fn test_collection_errors_serialized_when_present() {
         schema_version: "2.0",
         report_type: "batch",
         tool_version: env!("CARGO_PKG_VERSION"),
+        build_id: env!("AUDITMYSITE_BUILD_SHA"),
         metadata: ReportMetadata {
             tool: "test".to_string(),
             timestamp: chrono::DateTime::<chrono::Utc>::UNIX_EPOCH,

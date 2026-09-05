@@ -6,6 +6,7 @@
 mod appendix;
 mod batch;
 mod batch_report;
+mod bik_guide;
 mod cover;
 pub(crate) mod design;
 mod detail_modules;

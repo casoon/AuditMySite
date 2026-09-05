@@ -15,6 +15,7 @@ use renderreport::prelude::*;
 use super::design;
 
 use super::appendix::build_cli_snapshot_table;
+use super::bik_guide::render_bik_guide_annex;
 use super::detail_modules::{
     render_a11y_journey_findings, render_ai_transparency, render_ai_visibility,
     render_best_practices, render_budget_violations, render_commerce, render_content_visibility,
@@ -799,6 +800,44 @@ pub(super) fn render_appendix_full(
                 builder,
                 findings,
                 &report.accessibility.wcag_results.rule_outcomes,
+                i18n,
+            );
+        }
+
+        // BIK-für-Alle guide chapter mapping — opt-in only (see `--annex bik`).
+        if config.annex == Some(AnnexKind::Bik) {
+            let design_quality_findings: &[crate::design_quality::DesignQualityFinding] = report
+                .experience
+                .design_quality
+                .as_ref()
+                .map(|m| m.findings.as_slice())
+                .unwrap_or(&[]);
+            let seo_technical_issues: Vec<crate::seo::technical::TechnicalIssue> = report
+                .discoverability
+                .seo
+                .as_ref()
+                .map(|s| crate::seo::collect_technical_issues(&s.technical, en))
+                .unwrap_or_default();
+            let easy_language_detected = report
+                .patterns
+                .as_ref()
+                .is_some_and(|p| p.recognized.iter().any(|r| r.pattern == "EasyLanguage"));
+            let screen_reader_issues: &[crate::screen_reader::SrAuditIssue] = report
+                .screen_reader_audit
+                .as_ref()
+                .map(|sr| sr.issues.as_slice())
+                .unwrap_or(&[]);
+            let accessibility_assessments =
+                crate::audit::normalized::normalize_assessments(&report.accessibility.wcag_results);
+            builder = render_bik_guide_annex(
+                builder,
+                findings,
+                &report.interactive_findings,
+                screen_reader_issues,
+                design_quality_findings,
+                &seo_technical_issues,
+                easy_language_detected,
+                &accessibility_assessments,
                 i18n,
             );
         }

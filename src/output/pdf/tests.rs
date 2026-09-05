@@ -3,7 +3,7 @@
 mod tests {
     use super::super::*;
     use crate::audit::{AuditReport, BatchReport, PageScreenshots, ScreenshotStatus};
-    use crate::cli::{ReportLevel, WcagLevel};
+    use crate::cli::{AnnexKind, ReportLevel, WcagLevel};
     use crate::util::truncate_url;
     use crate::wcag::{Severity, Violation, WcagResults};
     use std::path::PathBuf;
@@ -31,6 +31,23 @@ mod tests {
 
         let pdf = generate_pdf(&report, &config).expect("PDF should render");
 
+        assert_pdf_smoke(&pdf, 20_000);
+    }
+
+    #[test]
+    fn test_single_pdf_smoke_renders_with_bik_guide_annex() {
+        // Opt-in "BIK für Alle" chapter mapping (--annex bik). The fixture's
+        // 1.1.1 violation should land in the annex's "Images & alt text"
+        // chapter; this is a rendering smoke test only (structure/content is
+        // covered by `wcag::bik_guide`'s own unit tests).
+        let report = pdf_fixture_report();
+        let config = ReportConfig {
+            level: ReportLevel::Technical,
+            annex: Some(AnnexKind::Bik),
+            ..ReportConfig::default()
+        };
+
+        let pdf = generate_pdf(&report, &config).expect("PDF with BIK annex should render");
         assert_pdf_smoke(&pdf, 20_000);
     }
 

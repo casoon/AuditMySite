@@ -171,7 +171,7 @@ pub struct AccessibilityAssessment {
     pub evidence: Vec<crate::wcag::ViolationEvidence>,
 }
 
-fn normalize_assessments(results: &WcagResults) -> Vec<AccessibilityAssessment> {
+pub(crate) fn normalize_assessments(results: &WcagResults) -> Vec<AccessibilityAssessment> {
     let sources = [
         ("warning", results.warnings.as_slice()),
         ("manual_review", results.not_testables.as_slice()),

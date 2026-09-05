@@ -313,15 +313,19 @@ pub struct Args {
     #[arg(long, value_name = "PATH")]
     pub export_snapshot: Option<PathBuf>,
 
-    /// Include an additional regulatory appendix section in the PDF report.
+    /// Include an additional regulatory/editorial appendix section in the PDF report.
     ///
     /// Opt-in only — this section is not part of the default report ("Zusatz").
     /// `en301549` adds an EN 301 549 (chapter 9, "Web") clause mapping: which
     /// clauses have automatically detected violations, which were checked
     /// automatically with no violations found, and which require manual
     /// review, plus a disclaimer and the chapters outside this tool's scope.
-    /// The underlying `en301549_annex` JSON data is always included regardless
-    /// of this flag — it only gates the optional PDF section.
+    /// `bik` adds a chapter mapping onto the "BIK für Alle" editorial
+    /// accessibility guide (Bilder/Alt-Text, Linktext, Struktur, Leichte
+    /// Sprache, PDFs, Videos) — a re-grouping of already-computed findings,
+    /// no new checks. The underlying `en301549_annex`/`bik_guide` JSON data
+    /// is always included regardless of this flag — it only gates the
+    /// optional PDF section.
     #[arg(long, value_enum)]
     pub annex: Option<AnnexKind>,
 
@@ -459,13 +463,16 @@ impl InteractiveMode {
     }
 }
 
-/// Optional regulatory PDF appendix sections (opt-in, see `--annex`).
+/// Optional regulatory/editorial PDF appendix sections (opt-in, see `--annex`).
 #[derive(ValueEnum, Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
 pub enum AnnexKind {
     /// EN 301 549 (chapter 9, "Web") clause mapping annex.
     #[value(name = "en301549")]
     En301549,
+    /// "BIK für Alle" editorial accessibility guide chapter mapping.
+    #[value(name = "bik")]
+    Bik,
 }
 
 impl std::fmt::Display for WcagLevel {

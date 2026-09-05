@@ -133,6 +133,81 @@ pub(super) fn build_en301549_batch_rollup(
         .collect()
 }
 
+fn bik_status_kind(
+    status: crate::wcag::bik_guide::BikChapterStatus,
+) -> crate::output::json::BikChapterStatusKind {
+    use crate::output::json::BikChapterStatusKind as Kind;
+    use crate::wcag::bik_guide::BikChapterStatus;
+    match status {
+        BikChapterStatus::FindingsPresent => Kind::FindingsPresent,
+        BikChapterStatus::NoFindingsDetected => Kind::NoFindingsDetected,
+        BikChapterStatus::NotChecked => Kind::NotChecked,
+    }
+}
+
+fn bik_chapter_id_str(id: crate::wcag::bik_guide::BikChapterId) -> &'static str {
+    use crate::wcag::bik_guide::BikChapterId;
+    match id {
+        BikChapterId::Images => "images",
+        BikChapterId::LinkText => "link_text",
+        BikChapterId::Structure => "structure",
+        BikChapterId::EasyLanguage => "easy_language",
+        BikChapterId::Pdf => "pdf",
+        BikChapterId::Videos => "videos",
+    }
+}
+
+/// Build the per-page "BIK für Alle" guide mapping — always present, single
+/// AND batch (same rule as `fix_guidance`/`en301549_annex`). Pure projection;
+/// nothing stored in `NormalizedReport`. `design_quality_findings`/
+/// `seo_technical_issues`/`easy_language_detected` are only available from a
+/// live single-report audit's raw module data — callers without it (cached,
+/// batch) pass empty slices / `false`, see `wcag::bik_guide` module doc.
+pub(super) fn build_bik_guide_annex(
+    normalized: &NormalizedReport,
+    design_quality_findings: &[crate::design_quality::DesignQualityFinding],
+    seo_technical_issues: &[crate::seo::technical::TechnicalIssue],
+    easy_language_detected: bool,
+) -> crate::output::json::BikGuideAnnex {
+    use crate::output::json::{BikChapterEntry, BikFindingRefEntry, BikGuideAnnex};
+    use crate::wcag::bik_guide::{derive_bik_chapters, BIK_GUIDE_SOURCE};
+
+    let screen_reader_issues: &[crate::screen_reader::SrAuditIssue] = normalized
+        .screen_reader
+        .as_ref()
+        .map(|sr| sr.issues.as_slice())
+        .unwrap_or(&[]);
+    let chapters = derive_bik_chapters(
+        &normalized.findings,
+        &normalized.interactive_findings,
+        screen_reader_issues,
+        design_quality_findings,
+        seo_technical_issues,
+        easy_language_detected,
+        &normalized.accessibility_assessments,
+    )
+    .into_iter()
+    .map(|r| BikChapterEntry {
+        id: bik_chapter_id_str(r.chapter.id),
+        title: r.chapter.title_en,
+        status: bik_status_kind(r.status),
+        findings: r
+            .findings
+            .into_iter()
+            .map(|f| BikFindingRefEntry {
+                label: f.label,
+                occurrences: f.occurrences,
+            })
+            .collect(),
+    })
+    .collect();
+
+    BikGuideAnnex {
+        guide: BIK_GUIDE_SOURCE,
+        chapters,
+    }
+}
+
 pub(super) fn build_wcag_coverage_for_level(level: &str) -> WcagCoverageSummary {
     let (automated, total) = crate::wcag::coverage::coverage_stats();
     WcagCoverageSummary {
