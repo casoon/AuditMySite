@@ -1,8 +1,14 @@
-//! Build-time git short-SHA capture.
+//! Build-time git short-SHA + dirty-state capture.
 //!
 //! Emits `AUDITMYSITE_BUILD_SHA` for compile-time embedding via `env!(...)`.
 //! Falls back to `"unknown"` when `git`/`.git` isn't available (e.g. a
 //! `cargo install` from a crates.io tarball, which has no `.git` directory).
+//! Appends a `-dirty` suffix when the working tree has uncommitted changes,
+//! so two builds off the same commit but different uncommitted local edits
+//! remain distinguishable in a report's `build_id` field (plan/21) — this
+//! project's usual workflow is to work uncommitted for a while before
+//! committing, so the bare commit SHA alone previously stayed identical
+//! across builds that actually contained different fixes.
 
 use std::fs;
 use std::process::Command;
@@ -15,8 +21,13 @@ fn main() {
         .filter(|output| output.status.success())
         .and_then(|output| String::from_utf8(output.stdout).ok())
         .map(|s| s.trim().to_string())
-        .filter(|s| !s.is_empty())
-        .unwrap_or_else(|| "unknown".to_string());
+        .filter(|s| !s.is_empty());
+
+    let sha = match sha {
+        Some(sha) if is_dirty() => format!("{sha}-dirty"),
+        Some(sha) => sha,
+        None => "unknown".to_string(),
+    };
 
     println!("cargo:rustc-env=AUDITMYSITE_BUILD_SHA={sha}");
 
@@ -28,4 +39,24 @@ fn main() {
             println!("cargo:rerun-if-changed=.git/{ref_path}");
         }
     }
+    // The dirty check can flip on *any* working-tree edit, not just a
+    // HEAD/ref move, so it must be re-evaluated on every build rather than
+    // only when the two paths above change. A `rerun-if-changed` path that
+    // never exists is a documented way to force Cargo to always re-run this
+    // script (verified: cargo cannot establish a baseline mtime for it, so
+    // it never counts as "unchanged").
+    println!("cargo:rerun-if-changed=.auditmysite-build-rs-always-rerun-marker");
+}
+
+/// True when `git status --porcelain` reports any uncommitted change.
+/// `git` missing, no `.git` directory, or any other failure is treated as
+/// "not dirty" — mirrors the existing no-git fallback above (`sha =
+/// "unknown"`), never a hard build failure.
+fn is_dirty() -> bool {
+    Command::new("git")
+        .args(["status", "--porcelain"])
+        .output()
+        .ok()
+        .filter(|output| output.status.success())
+        .is_some_and(|output| !output.stdout.is_empty())
 }

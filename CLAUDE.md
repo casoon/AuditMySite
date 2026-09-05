@@ -249,6 +249,21 @@ Bewusste, über alle Phasen hinweg getroffene Entscheidung statt einer nachträg
   Differenzprüfungen** statt gespeicherter Pixel-Baselines erkannt, siehe Phase-5-Eintrag unten.
 
 ## Current State (v1.1.0)
+- **`build_id` bekommt `-dirty`-Suffix bei uncommittetem Arbeitsstand (plan/21, 2026-09-05):**
+  `build.rs` las den `build_id` bisher nur aus `git rev-parse --short HEAD` — solange (wie in
+  diesem Projekt üblich) uncommittet gearbeitet wird, blieb der eingebettete SHA über mehrere
+  tatsächlich unterschiedliche Builds hinweg identisch und machte zwei Live-Reports mit
+  unterschiedlichem Fix-Stand nicht unterscheidbar (live an drei Reports vom 2026-09-05
+  bestätigt, alle mit `build_id: "be9aed2"` trotz seither committeter Änderungen). Neue
+  `is_dirty()`-Prüfung (`git status --porcelain`, gleicher No-Git-Fallback wie beim
+  SHA-Lookup — Fehler/kein Git ⇒ nicht dirty, kein Hard-Fail) hängt bei uncommittetem Stand
+  `-dirty` an, z. B. `44e7480-dirty`. Da der Dirty-Status sich bei jeder beliebigen
+  Arbeitsbaum-Änderung ändern kann, nicht nur bei einem HEAD-/Ref-Wechsel, reicht das bestehende
+  `rerun-if-changed=.git/HEAD` allein nicht — zusätzlicher `rerun-if-changed` auf einen
+  garantiert nicht existierenden Pfad zwingt Cargo, das Build-Script bei jedem Build neu
+  auszuführen (empirisch gegen ein Scratch-Projekt verifiziert: 3 Builds → 3 Skript-Läufe).
+  Live gegen den eigenen, absichtlich uncommittet gehaltenen Arbeitsstand verifiziert (`strings`
+  auf der gebauten Binary zeigt `44e7480-dirty`).
 - **Verifiziert: 1.3.6-Fundzahl auf casoon.de kein Zählfehler (plan/22, 2026-09-05):** ein
   Live-Report hatte 200 Vorkommen für WCAG 1.3.6 auf einer einzigen Seite gezeigt, als niedrig
   priorisierte Beobachtung ohne Verdacht auf konkreten Bug angelegt. Verifiziert gegen einen
