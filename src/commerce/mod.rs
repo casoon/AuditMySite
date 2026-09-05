@@ -10,11 +10,22 @@
 //!   expected pages (Impressum, AGB, Widerruf/Retoure, Versand, Zahlungsarten,
 //!   Kontakt), detected from the screen-reader link inventory's anchor texts.
 //!   The batch layer aggregates these per-page booleans into a site-wide view.
+//! - **BFSGV §19 Nr. 3 scope signal**: whether this page exposes an
+//!   identification/authentication function (a form control whose
+//!   `autocomplete` token is `current-password`/`new-password`/
+//!   `one-time-code`/`username`), detected from the screen-reader form
+//!   control inventory. Presence-only, never an automated pass/fail — see
+//!   `screen_reader::bfsg`'s module doc comment for why only this one
+//!   sub-item of §19 is incorporated (Nr. 1/Nr. 2 stay explicitly out of
+//!   scope).
 //!
 //! Localization (#406): stored struct is canonical English; findings carry a
 //! `kind` enum and `commerce_finding_text(kind, en)` is the single text source.
 //! Honest wording: absence means "not exposed as structured data" / "not linked
-//! from this page", never a claim of legal (non-)compliance.
+//! from this page", never a claim of legal (non-)compliance. The §19 signal
+//! follows the same convention: `identification_function_detected == false`
+//! never claims no such function exists on the page, only that none was
+//! identified via the tracked `autocomplete` signal.
 
 pub mod module;
 
@@ -37,6 +48,22 @@ pub struct CommerceAnalysis {
     pub product: Option<ProductCommerce>,
     /// Which mandatory/trust pages this page links to.
     pub trust_pages: TrustPages,
+    /// Whether this page exposes an identification/authentication function
+    /// (a form control with an `autocomplete` purpose of
+    /// `current-password`/`new-password`/`one-time-code`/`username`) —
+    /// brings this page into BFSGV §19 Nr. 3's additional e-commerce
+    /// accessibility scope. Presence-only: this tool has no session state to
+    /// exercise the actual identification/authentication flow end-to-end, so
+    /// this is never an automated pass/fail, only a flag that this page's
+    /// WCAG findings additionally fall under §19 Nr. 3 and that a manual
+    /// review of the flow's perceivability/operability/understandability/
+    /// robustness is warranted. `false` never claims no such function exists
+    /// on the page — see this module's doc comment.
+    pub identification_function_detected: bool,
+    /// BFSGV citation for `identification_function_detected`, present only
+    /// when that signal is `true` (out of scope for this page otherwise).
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub identification_function_bfsg_reference: Option<String>,
     /// Findings across all groups.
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub findings: Vec<CommerceFinding>,
@@ -235,13 +262,17 @@ const EXPECTED_PRODUCT_SIGNALS: u32 = 5;
 
 /// Analyze commerce signals. `anchor_texts` are the page's link anchor texts
 /// (from the screen-reader link inventory); `is_ecommerce_stack` is true when a
-/// shop system (Shopify/WooCommerce/…) was detected. Returns `None` for pages
-/// with neither product schema nor a shop stack (non-shop pages).
+/// shop system (Shopify/WooCommerce/…) was detected; `has_identification_control`
+/// is true when the screen-reader form control inventory found an
+/// identification/authentication-purpose field (BFSGV §19 Nr. 3 signal, see
+/// this module's doc comment). Returns `None` for pages with neither product
+/// schema nor a shop stack (non-shop pages).
 pub fn analyze_commerce(
     url: &str,
     structured_data: &StructuredData,
     anchor_texts: &[String],
     is_ecommerce_stack: bool,
+    has_identification_control: bool,
 ) -> Option<CommerceAnalysis> {
     let product = analyze_product(structured_data);
     if product.is_none() && !is_ecommerce_stack {
@@ -257,10 +288,15 @@ pub fn analyze_commerce(
     }
     push_trust_findings(&trust_pages, &mut findings);
 
+    let identification_function_bfsg_reference = has_identification_control
+        .then(|| crate::screen_reader::bfsg::BFSG_PARAGRAPH_ECOMMERCE.to_string());
+
     Some(CommerceAnalysis {
         page_kind,
         product,
         trust_pages,
+        identification_function_detected: has_identification_control,
+        identification_function_bfsg_reference,
         findings,
     })
 }
@@ -597,7 +633,7 @@ mod tests {
     #[test]
     fn non_shop_page_returns_none() {
         let sd = structured(serde_json::json!({"@type": "Article", "headline": "x"}));
-        assert!(analyze_commerce("https://x.de/blog/post", &sd, &[], false).is_none());
+        assert!(analyze_commerce("https://x.de/blog/post", &sd, &[], false, false).is_none());
     }
 
     #[test]
@@ -607,6 +643,7 @@ mod tests {
             &empty(),
             &["Impressum".into(), "Kontakt".into()],
             true,
+            false,
         )
         .expect("ecommerce stack activates commerce");
         assert_eq!(c.page_kind, CommercePageKind::Category);
@@ -619,6 +656,25 @@ mod tests {
             .findings
             .iter()
             .any(|f| f.kind == CommerceFindingKind::MissingWiderrufLink));
+        assert!(!c.identification_function_detected);
+        assert!(c.identification_function_bfsg_reference.is_none());
+    }
+
+    #[test]
+    fn identification_control_sets_bfsgv19_scope_signal() {
+        let c = analyze_commerce(
+            "https://shop.de/mein-konto/anmelden",
+            &empty(),
+            &[],
+            true,
+            true,
+        )
+        .expect("ecommerce stack activates commerce");
+        assert!(c.identification_function_detected);
+        assert_eq!(
+            c.identification_function_bfsg_reference.as_deref(),
+            Some("§ 19 Nr. 3 BFSGV")
+        );
     }
 
     #[test]
@@ -646,8 +702,14 @@ mod tests {
         .iter()
         .map(|s| s.to_string())
         .collect();
-        let c = analyze_commerce("https://shop.de/produkt/widget", &sd, &anchors, false)
-            .expect("product");
+        let c = analyze_commerce(
+            "https://shop.de/produkt/widget",
+            &sd,
+            &anchors,
+            false,
+            false,
+        )
+        .expect("product");
         assert_eq!(c.page_kind, CommercePageKind::ProductDetail);
         assert_eq!(c.product.unwrap().score, 100);
         assert!(c.findings.is_empty());

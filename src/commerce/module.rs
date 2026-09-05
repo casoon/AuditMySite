@@ -52,6 +52,14 @@ impl AuditModule for CommerceModule {
             })
             .unwrap_or_default();
 
+        // BFSGV §19 Nr. 3 scope signal (see `commerce` module doc comment).
+        let has_identification_control = report.screen_reader_audit.as_ref().is_some_and(|sr| {
+            sr.navigation_views
+                .form_controls
+                .iter()
+                .any(|f| f.is_identification_control)
+        });
+
         let is_ecommerce_stack = report
             .discoverability
             .tech_stack
@@ -70,6 +78,7 @@ impl AuditModule for CommerceModule {
                 &seo.structured_data,
                 &anchor_texts,
                 is_ecommerce_stack,
+                has_identification_control,
             )
         });
         Ok(())

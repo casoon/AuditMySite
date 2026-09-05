@@ -71,9 +71,36 @@ pub struct FormControlNavItem {
     pub label: Option<String>,
     pub control_type: String,
     pub required: bool,
+    /// True when this control's `autocomplete` token identifies it as an
+    /// identification/authentication field (`current-password`,
+    /// `new-password`, `one-time-code`, `username`) — a BFSGV §19 Nr. 3
+    /// scope signal (see `commerce::analyze_commerce`). Presence-only and
+    /// necessarily incomplete: a login/registration field without a
+    /// declared `autocomplete` purpose is invisible to this signal, so
+    /// `false` never means "no such field exists on this page".
+    pub is_identification_control: bool,
     pub seq: usize,
     pub node_id: String,
     pub quality: FormControlQuality,
+}
+
+/// `autocomplete` tokens (HTML Standard §Autofill) that identify a field as
+/// serving an identification/authentication purpose.
+const IDENTIFICATION_AUTOCOMPLETE_TOKENS: &[&str] = &[
+    "current-password",
+    "new-password",
+    "one-time-code",
+    "username",
+];
+
+fn is_identification_control(states: &[String]) -> bool {
+    // The HTML autofill spec allows multi-token autocomplete values (e.g.
+    // "section-billing new-password") — the actual field purpose is always
+    // the last token, matching `wcag::rules::input_purpose`'s handling.
+    state_value(states, "autocomplete").is_some_and(|value| {
+        let last_token = value.split_whitespace().last().unwrap_or("");
+        IDENTIFICATION_AUTOCOMPLETE_TOKENS.contains(&last_token)
+    })
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
@@ -241,6 +268,7 @@ fn form_controls(items: &[ReadingItem]) -> Vec<FormControlNavItem> {
                 label: item.name.clone(),
                 control_type: role.to_string(),
                 required: has_state(&item.states, "required"),
+                is_identification_control: is_identification_control(&item.states),
                 seq: item.seq,
                 node_id: item.node_id.clone(),
                 quality: if is_empty(&item.name) {
@@ -448,5 +476,32 @@ mod tests {
             views.tables[0].header_strategy,
             TableHeaderStrategy::RowOrColumnHeaders
         );
+    }
+
+    #[test]
+    fn detects_identification_control_via_autocomplete_token() {
+        let views = navigation_views(&[
+            item(
+                0,
+                "textbox",
+                Some("Passwort"),
+                vec!["autocomplete=current-password"],
+            ),
+            // Multi-token autocomplete: purpose is the last token.
+            item(
+                1,
+                "textbox",
+                Some("Neues Passwort"),
+                vec!["autocomplete=section-billing new-password"],
+            ),
+            item(2, "textbox", Some("E-Mail"), vec!["autocomplete=email"]),
+            item(3, "textbox", Some("Suche"), vec![]),
+        ]);
+
+        assert_eq!(views.form_controls.len(), 4);
+        assert!(views.form_controls[0].is_identification_control);
+        assert!(views.form_controls[1].is_identification_control);
+        assert!(!views.form_controls[2].is_identification_control);
+        assert!(!views.form_controls[3].is_identification_control);
     }
 }

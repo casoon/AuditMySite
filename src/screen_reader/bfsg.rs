@@ -18,11 +18,47 @@
 //! Nr. 3 -- confirmed against the primary source
 //! (<https://www.gesetze-im-internet.de/bfsgv/__12.html>). Still flagged
 //! unverified: confirmed via automated web-fetch summarization, not a legal
-//! review: get a legal review before relying on this exact citation. BFSGV
-//! §19 (electronic-commerce-specific identification/authentication/payment
-//! accessibility) is a distinct, additional requirement for shop pages that
-//! this module has no detection logic for at all -- not incorporated here,
-//! see the report-quality-review plan doc for that follow-up.
+//! review: get a legal review before relying on this exact citation.
+//!
+//! BFSGV §19 ("Zusätzliche Anforderungen an Dienstleistungen im
+//! elektronischen Geschäftsverkehr") -- confirmed verbatim against the
+//! primary source (<https://www.gesetze-im-internet.de/bfsgv/__19.html>),
+//! 2026-09-04 -- has three numbered requirements. Only Nr. 3 is incorporated,
+//! and only as a presence-only, manual-review scope signal (see
+//! `commerce::CommerceAnalysis::identification_function_detected` and
+//! `BFSG_PARAGRAPH_ECOMMERCE`), never an automated pass/fail:
+//! - **Nr. 1** ("Informationen zur Barrierefreiheit der ... Produkte ...,
+//!   soweit diese ... vom verantwortlichen Wirtschaftsakteur zur Verfügung
+//!   gestellt werden") is conditional on information the operator may or may
+//!   not possess about a *specific product's* accessibility properties --
+//!   there is no DOM signal that can tell "operator has such info but
+//!   withheld it" apart from "product genuinely has nothing to disclose".
+//!   Deliberately not incorporated: a presence-only check here would
+//!   systematically false-flag every product without accessibility features
+//!   to disclose, which is not a defect.
+//! - **Nr. 2** ("Identifizierungs-, Authentifizierungs-, Sicherheits- und
+//!   Zahlungsfunktionen, wenn diese ... im Rahmen einer Dienstleistung
+//!   bereitgestellt werden") largely overlaps with Nr. 3 in DOM terms but
+//!   adds the qualifier "as part of a service, not a product" and explicitly
+//!   includes payment functions -- this tool's stateless single-page model
+//!   essentially never reaches a live payment UI cold (same reasoning as the
+//!   `CommercePageKind::Cart`/`::Checkout` removal), and distinguishing
+//!   "service" from "product" delivery of an identification/security
+//!   function from a single rendered page is not reliably possible.
+//!   Deliberately not incorporated.
+//! - **Nr. 3** ("Identifizierungsmethoden, Authentifizierungsmethoden,
+//!   elektronische Signaturen und Zahlungsdienste ... wahrnehmbar, bedienbar,
+//!   verständlich und robust") is the one sub-item with a concrete,
+//!   deterministic DOM signal reachable from a single rendered page: a form
+//!   control whose `autocomplete` token identifies it as
+//!   `current-password`/`new-password`/`one-time-code`/`username`
+//!   (`screen_reader::navigator::FormControlNavItem::is_identification_control`).
+//!   Payment-method detection (`cc-number` etc.) was deliberately left out
+//!   of scope for the same cold-reachability reason as Nr. 2. The signal is
+//!   necessarily incomplete (a login field without a declared `autocomplete`
+//!   purpose stays invisible), so it is only ever a positive-evidence
+//!   presence flag, never a negative "no such field exists" conclusion --
+//!   same honesty convention as `commerce::CommerceFinding`.
 
 use serde::{Deserialize, Serialize};
 
@@ -36,6 +72,11 @@ pub struct BfsgMapping {
 }
 
 pub const BFSG_PARAGRAPH_WEB: &str = "§ 12 Nr. 3 BFSGV";
+
+/// Citation for the BFSGV §19 Nr. 3 e-commerce identification/authentication
+/// signal (`commerce::CommerceAnalysis::identification_function_detected`).
+/// See this module's doc comment for the full sub-item scoping decision.
+pub const BFSG_PARAGRAPH_ECOMMERCE: &str = "§ 19 Nr. 3 BFSGV";
 
 pub fn map_to_bfsg(wcag: &str) -> Option<BfsgMapping> {
     wcag_21_aa_criteria()

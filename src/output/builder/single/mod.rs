@@ -940,6 +940,8 @@ mod tests {
                 zahlungsarten: true,
                 kontakt: true,
             },
+            identification_function_detected: false,
+            identification_function_bfsg_reference: None,
             findings: vec![
                 crate::commerce::CommerceFinding {
                     kind: crate::commerce::CommerceFindingKind::MissingShippingDetails,
@@ -1175,6 +1177,8 @@ mod tests {
                 zahlungsarten: true,
                 kontakt: true,
             },
+            identification_function_detected: false,
+            identification_function_bfsg_reference: None,
             findings: vec![],
         });
 
