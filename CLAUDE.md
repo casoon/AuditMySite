@@ -249,6 +249,27 @@ Bewusste, über alle Phasen hinweg getroffene Entscheidung statt einer nachträg
   Differenzprüfungen** statt gespeicherter Pixel-Baselines erkannt, siehe Phase-5-Eintrag unten.
 
 ## Current State (v1.1.0)
+- **plan/13 (Drei-Stufen-Konfidenz-Kennzeichnung) als bereits erfüllt geschlossen, 2026-09-06:**
+  der aus einem Insights-Artikel abgeleitete Plan-Punkt wollte ein neues `DetectionConfidence`-
+  Enum (`Certain`/`HeuristicSuspicion`/`ManualOnly`) plus Registry-Klassifikation pro `rule_id`
+  und ein neues PDF-Badge einführen. Bei der Umsetzung geprüft und verworfen: `NormalizedFinding`
+  trägt bereits `confidence`/`false_positive_risk`/`verification` (heuristisch pro Regel via
+  `derive_confidence`/`derive_false_positive_risk`/`derive_verification`,
+  `src/audit/normalized.rs`), und jede Finding-Karte im PDF zeigt **unconditional**
+  "Erkennungssicherheit"/"Falschpositiv-Risiko" im "Prüfmetadaten"-Block
+  (`src/output/pdf/findings.rs`) — nicht nur für Verdachtsfälle. Ein erster Versuch, das
+  bestehende (aus `false_positive_risk` 1:1 abgeleitete) `verification`-Feld zusätzlich
+  symmetrisch als weitere Zeile zu zeigen, wurde wieder verworfen: das hätte dieselbe
+  Information ein drittes Mal in anderen Worten auf derselben Karte gezeigt — echte Redundanz
+  statt Erkenntniswert, das Gegenteil dessen, was `report-lint`/`report-critic` in diesem
+  Projekt verhindern sollen. Die "nur kontextuell entscheidbare" dritte Stufe (Media-Alternative,
+  Kontrast bei Bild-Hintergrund) läuft bereits sichtbar getrennt unter der PDF-Sektion
+  "Manuelle Prüfpunkte und heuristische Hinweise" (`render_assessment_and_execution_notes`) mit
+  eigenem "Manuelle Prüfung"-Label. Keine Code-Änderung — der Plan-Punkt war beim genauen
+  Abgleich bereits durch bestehende, anders benannte Infrastruktur erfüllt. Der Plan-Text
+  enthielt zudem einen inneren Widerspruch (Punkt 1 vs. Punkt 4 zur Einordnung von
+  Media-Alternative als `ManualOnly` vs. `HeuristicSuspicion`), der beim Nutzer geklärt wurde
+  (Punkt 1/`ManualOnly` ist korrekt).
 - **`build_id` bekommt `-dirty`-Suffix bei uncommittetem Arbeitsstand (plan/21, 2026-09-05):**
   `build.rs` las den `build_id` bisher nur aus `git rev-parse --short HEAD` — solange (wie in
   diesem Projekt üblich) uncommittet gearbeitet wird, blieb der eingebettete SHA über mehrere
