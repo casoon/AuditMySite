@@ -249,6 +249,25 @@ Bewusste, über alle Phasen hinweg getroffene Entscheidung statt einer nachträg
   Differenzprüfungen** statt gespeicherter Pixel-Baselines erkannt, siehe Phase-5-Eintrag unten.
 
 ## Current State (v1.1.0)
+- **plan/17: 4.1.3-Vertiefung — Live-Region-Spät-Einfügung erkannt, 2026-09-06:** neuer
+  `InteractiveFindingKind::FormErrorLiveRegionLateInsertion` (Severity::Low, Advisory) in
+  `src/a11y_journey/form_error.rs` — Erweiterung der bestehenden Form-Error-Journey statt neuer
+  Erkennungspfad, wie im Plan gefordert: `check_error_state` erfasste bereits `live_before`
+  (vor Submit) und `live_after` (nach Submit), `new_live = live_after && !live_before` wurde
+  bisher nur intern zur Ableitung von `FormErrorInvalidWithoutLiveRegion` genutzt, nie selbst als
+  eigener Befund gemeldet. Neuer Check: wenn `new_live` wahr ist (Live-Region hat korrekt
+  angekündigt, war aber initial nicht im DOM), wird das jetzt als eigenständiger Advisory-Befund
+  gemeldet — klar getrennt vom bestehenden "gar keine Ankündigung"-Fall
+  (`FormErrorInvalidWithoutLiveRegion`/Silent-Failure, die beide `!new_live` voraussetzen, also
+  nie gleichzeitig mit dem neuen Befund feuern) und vom Politur-Konflikt-Check in
+  `status_messages.rs` (unverändert). Bewusst Advisory/Low statt High: die Ankündigung hat in
+  diesem Lauf funktioniert, es ist eine Robustheits-Empfehlung für andere Browser-/AT-Kombinationen,
+  kein bestätigter Fehler. Live gegen casoon.de (Startseite + /kontakt) geprüft — dort wurde kein
+  Form-Error-Journey-Kandidat erkannt (keine passende Formular-/Submit-Struktur auf diesen zwei
+  Seiten), der neue Codepfad ist daher nur durch Build/Clippy/die volle Testsuite (1318 Tests) und
+  den EN-Locale-Umlaut-Guard verifiziert, nicht durch einen live beobachteten Treffer — wie alle
+  anderen `FormError*`-Befunde in dieser Datei hat `form_error.rs` keine eigene Unit-Test-Infra
+  (Chrome-`Page`-Interaktion, kein Mocking-Präzedenzfall in diesem Modul).
 - **plan/16: konkrete AT-Selbsttest-Anleitungen statt generischem "manuell prüfen", 2026-09-06:**
   neue `manual_recheck_instruction(wcag_criterion, en)` (`src/output/pdf/helpers.rs`), keyed nach
   WCAG-Kriterium, mit VoiceOver-Rotor-/NVDA-Elementliste-Tastenkürzeln für die vier Kriterien, bei

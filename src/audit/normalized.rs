@@ -758,6 +758,7 @@ pub enum InteractiveFindingKind {
     FormErrorInvalidWithoutLiveRegion,
     FormErrorUnlinkedFields,
     FormErrorFocusNotManaged,
+    FormErrorLiveRegionLateInsertion,
     AddToCartNoStatusAnnouncement,
     AddToCartNoFeedbackDetected,
     QuantityStepperKeyboardInoperable,
@@ -1356,6 +1357,35 @@ pub fn interactive_finding_text(
             } else {
                 "Fokus nach einem fehlgeschlagenen Absenden zum ersten ungültigen Feld \
                  oder zu einer Fehlerzusammenfassung (z. B. role=\"alert\") bewegen."
+                    .to_string()
+            }),
+        ),
+        FormErrorLiveRegionLateInsertion => (
+            if en {
+                "The live region (role=\"alert\" or aria-live) announcing the error was not \
+                 present on initial page load — it was only inserted into the DOM after form \
+                 submission. Screen readers register live regions when the accessibility tree \
+                 is first built; some browser/assistive-technology combinations do not reliably \
+                 announce a live region that appears only after the page has already loaded."
+                    .to_string()
+            } else {
+                "Die den Fehler ankündigende Live-Region (role=\"alert\" oder aria-live) war \
+                 beim initialen Laden der Seite nicht vorhanden — sie wurde erst nach dem \
+                 Absenden des Formulars ins DOM eingefügt. Screenreader registrieren \
+                 Live-Regions beim initialen Aufbau des Accessibility Tree; manche \
+                 Kombinationen aus Browser und Screenreader kündigen eine erst nachträglich \
+                 eingefügte Live-Region nicht zuverlässig an."
+                    .to_string()
+            },
+            Some(if en {
+                "Render the live-region container empty in the initial markup (e.g. \
+                 <div role=\"status\"></div>) and only fill its text content on submission, \
+                 instead of inserting the container itself after the interaction."
+                    .to_string()
+            } else {
+                "Den Live-Region-Container bereits im initialen Markup leer rendern (z. B. \
+                 <div role=\"status\"></div>) und nur den Textinhalt beim Absenden befüllen, \
+                 statt den Container selbst erst nach der Interaktion einzufügen."
                     .to_string()
             }),
         ),
@@ -3474,6 +3504,7 @@ mod tests {
             FormErrorInvalidWithoutLiveRegion,
             FormErrorUnlinkedFields,
             FormErrorFocusNotManaged,
+            FormErrorLiveRegionLateInsertion,
             AddToCartNoStatusAnnouncement,
             AddToCartNoFeedbackDetected,
             QuantityStepperKeyboardInoperable,

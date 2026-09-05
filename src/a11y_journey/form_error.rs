@@ -154,6 +154,29 @@ pub async fn test(
         snapshot_label: Some("after_submit_click".to_string()),
     });
 
+    // The live-region container itself was not present on initial page load
+    // and was only inserted into the DOM after submission (plan/17). This is
+    // distinct from `FormErrorInvalidWithoutLiveRegion`/the silent-failure
+    // check below (both of which fire when NO live region appears at all) —
+    // here a live region did end up announcing the error, but screen readers
+    // register live regions when the accessibility tree is first built, so a
+    // container inserted only after the interaction is not reliably
+    // announced by every browser/AT combination. Advisory severity: this is
+    // a robustness recommendation, not a confirmed failure (the region did
+    // announce correctly in this run).
+    if new_live {
+        findings.push(InteractiveFinding::new(
+            "FormError",
+            InteractiveFindingKind::FormErrorLiveRegionLateInsertion,
+            None,
+            Severity::Low,
+            journey_name.clone(),
+            Some("before_submit".to_string()),
+            Some("after_submit_click".to_string()),
+            InteractiveFindingValues::default(),
+        ));
+    }
+
     // If neither live region nor aria-invalid appeared, the form submits
     // silently — errors are not announced at all.
     if !new_live && !new_invalid {
