@@ -249,6 +249,20 @@ Bewusste, über alle Phasen hinweg getroffene Entscheidung statt einer nachträg
   Differenzprüfungen** statt gespeicherter Pixel-Baselines erkannt, siehe Phase-5-Eintrag unten.
 
 ## Current State (v1.1.0)
+- **plan/15: feste "Strukturell nur manuell prüfbare Kriterien"-Liste im PDF, 2026-09-06:** neue
+  `render_manual_only_criteria_note` (`src/output/pdf/single_report.rs`), direkt nach der
+  WCAG-Coverage-Sektion, unconditional (kein `--annex`-Flag, gleiches Report-Level-Gate wie die
+  Coverage-Sektion selbst). Fünf feste, seiten-unabhängige Zeilen (2.4.3 Fokusreihenfolge, 3.3.1
+  Fehlerkennzeichnung, 1.4.4/1.4.10 Zoom & Reflow, 1.1.1 Alt-Text-Korrektheit, 1.2.1/1.2.2
+  Video-Inhaltszusammenfassung) — bewusst NICHT aus den Findings dieser Seite abgeleitet wie
+  EN-301-549-/BIK-Annex, weil genau die dritte, "unsichtbare" Konfidenzkategorie aus dem
+  Insights-Artikel (plan/13) sonst bei einem 0-Findings-Report komplett unsichtbar bliebe. Live
+  gegen casoon.de verifiziert (`--debug-typ`): rendert korrekt, ohne Status-Punkt (kein
+  good/warn/bad-Urteil, reine Scope-Aussage). Beim Umsetzen entdeckt: es gibt bereits eine
+  separate, ähnlich benannte "So testen Sie manuell"-Sektion (`src/output/pdf/wcag_coverage.rs`)
+  mit AT-Testanleitungen (Tastaturnavigation, Screenreader, 400%-Zoom, Reduced Motion, …) — andere
+  Funktion (Anleitung "wie testen" statt Erklärung "warum strukturell nicht automatisierbar"),
+  bewusst nicht zusammengelegt, aber relevanter Ankerpunkt für plan/16.
 - **plan/14: "Prozess statt Zertifikat"-Satz im Disclaimer ergänzt, 2026-09-06:** Prüfung ergab,
   dass der Scope-Vorbehalt selbst ("kein vollständiger Konformitätsnachweis", "ersetzt keine
   manuelle Prüfung") bereits im bestehenden `disclaimer`-Text (`build_methodology`,

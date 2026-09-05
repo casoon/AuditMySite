@@ -793,6 +793,7 @@ pub(super) fn render_appendix_full(
     // WCAG Coverage (issue #37)
     if vm.meta.report_level != ReportLevel::Executive {
         builder = render_wcag_coverage_section(builder, report, i18n);
+        builder = render_manual_only_criteria_note(builder, i18n);
 
         // EN 301 549 clause annex — opt-in only (see `--annex en301549`).
         if config.annex == Some(AnnexKind::En301549) {
@@ -866,6 +867,87 @@ pub(super) fn render_appendix_full(
     builder = render_appendix_section(builder, vm, i18n);
 
     builder
+}
+
+/// Fixed list (plan/15) of WCAG A/AA criteria that stay outside automated
+/// testing on structural grounds, not merely "not yet implemented" — the
+/// contentual sensibleness of a focus order (2.4.3), the intelligibility of
+/// an error message (3.3.1), the practical usability of 400% zoom (1.4.4/
+/// 1.4.10), the factual correctness of an alt text (1.1.1) or a video's
+/// caption/transcript summary (1.2.1/1.2.2) can never be judged from markup
+/// alone, however good the tool. Deliberately not derived from this page's
+/// findings (unlike the EN 301 549/BIK annexes) — a 0-finding report would
+/// otherwise leave this fully invisible, which is exactly the transparency
+/// gap this section closes. Renders unconditionally (no `--annex` flag),
+/// same report-level gate as the WCAG coverage section it follows.
+fn render_manual_only_criteria_note(
+    builder: renderreport::engine::ReportBuilder,
+    i18n: &I18n,
+) -> renderreport::engine::ReportBuilder {
+    let en = i18n.locale() == "en";
+    let rows = if en {
+        vec![
+            ChecklistRow::new(
+                "2.4.3 · Focus Order",
+                "Whether the technical focus order makes sense in context depends on the page's \
+                 content and cannot be assessed automatically.",
+            ),
+            ChecklistRow::new(
+                "3.3.1 · Error Identification",
+                "Whether an error message is actually understandable to people is a content \
+                 question, not a structural check.",
+            ),
+            ChecklistRow::new(
+                "1.4.4 / 1.4.10 · Resize Text & Reflow",
+                "Whether the page stays practically usable at 400% zoom goes beyond the \
+                 technical reflow structure and requires manual review.",
+            ),
+            ChecklistRow::new(
+                "1.1.1 · Non-text Content",
+                "Whether alt text correctly describes the image content can only be judged by \
+                 a person; automated checks can only confirm that alt text is present at all.",
+            ),
+            ChecklistRow::new(
+                "1.2.1 / 1.2.2 · Time-based Media",
+                "Whether a caption or transcript summary correctly reflects a video's content \
+                 cannot be checked automatically.",
+            ),
+        ]
+    } else {
+        vec![
+            ChecklistRow::new(
+                "2.4.3 · Fokusreihenfolge",
+                "Ob die technische Fokusreihenfolge inhaltlich sinnvoll ist, hängt vom \
+                 Seitenaufbau ab und lässt sich nicht automatisiert bewerten.",
+            ),
+            ChecklistRow::new(
+                "3.3.1 · Fehlerkennzeichnung",
+                "Ob eine Fehlermeldung für Menschen tatsächlich verständlich ist, ist eine \
+                 inhaltliche Frage und kein struktureller Check.",
+            ),
+            ChecklistRow::new(
+                "1.4.4 / 1.4.10 · Textgröße & Reflow",
+                "Ob die Seite bei 400 % Zoom praktisch bedienbar bleibt, geht über die \
+                 technische Reflow-Struktur hinaus und erfordert eine manuelle Prüfung.",
+            ),
+            ChecklistRow::new(
+                "1.1.1 · Nicht-Text-Inhalte",
+                "Ob ein Alternativtext den Bildinhalt korrekt beschreibt, kann nur ein Mensch \
+                 beurteilen; automatisiert prüfbar ist nur, ob überhaupt ein Alternativtext \
+                 vorhanden ist.",
+            ),
+            ChecklistRow::new(
+                "1.2.1 / 1.2.2 · Zeitbasierte Medien",
+                "Ob eine Untertitel- oder Transkript-Zusammenfassung den Videoinhalt inhaltlich \
+                 korrekt wiedergibt, lässt sich nicht automatisiert prüfen.",
+            ),
+        ]
+    };
+    builder.add_component(ChecklistPanel::new(rows).with_title(if en {
+        "Structurally manual-only criteria"
+    } else {
+        "Strukturell nur manuell prüfbare Kriterien"
+    }))
 }
 
 fn render_assessment_and_execution_notes(
