@@ -235,6 +235,18 @@ pub fn derive_bik_chapters(
             }
             BikChapterId::Structure => {
                 let mut map = std::collections::BTreeMap::new();
+                // Occurrences sum `affected_node_ids.len()` across every
+                // `1.3.6`-tagged issue on the page, not just one — a page can
+                // have several independent `detect_announcement_deserts`
+                // "long section without a landmark" findings, each
+                // contributing its own (already sanitized, see
+                // `analyzer::analyze_reading_sequence`'s `is_real_node_id`
+                // filter) node count. Verified against a live casoon.de run
+                // (2026-09-05, plan/22): a page-level total of 200 was the
+                // exact sum of 14 separate desert findings' filtered node
+                // counts, not a double-count across viewports or an
+                // overly-broad selector — `build_sr_audit_report` runs once
+                // per report on a single AXTree.
                 for issue in screen_reader_issues.iter().filter(|i| {
                     i.wcag_criterion
                         .as_deref()

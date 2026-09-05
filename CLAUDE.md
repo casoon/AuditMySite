@@ -249,6 +249,23 @@ Bewusste, über alle Phasen hinweg getroffene Entscheidung statt einer nachträg
   Differenzprüfungen** statt gespeicherter Pixel-Baselines erkannt, siehe Phase-5-Eintrag unten.
 
 ## Current State (v1.1.0)
+- **Verifiziert: 1.3.6-Fundzahl auf casoon.de kein Zählfehler (plan/22, 2026-09-05):** ein
+  Live-Report hatte 200 Vorkommen für WCAG 1.3.6 auf einer einzigen Seite gezeigt, als niedrig
+  priorisierte Beobachtung ohne Verdacht auf konkreten Bug angelegt. Verifiziert gegen einen
+  frischen Live-Lauf (`--format json` gegen www.casoon.de): kein Doppelzählungs-Bug über
+  Desktop-/Mobile-Viewport hinweg (`build_sr_audit_report` läuft nur einmal pro Report, auf einem
+  einzigen AXTree) und keine echte Diskrepanz durch den `is_real_node_id`-Sanitizing-Filter
+  (`analyzer.rs`s `analyze_reading_sequence` entfernt leere/synthetische IDs aus
+  `affected_node_ids` **nach** der Analyse — Meldungstexte wie "18 entries" zählen bewusst die
+  ungefilterte Rohmenge, während `affected_node_ids.len()` danach kleiner sein kann, z. B. 8).
+  `derive_bik_chapters`s Structure-Kapitel summiert `issue.affected_node_ids.len()` über **alle**
+  `1.3.6`-getaggten Funde einer Seite (identisches, bereits bestehendes Aggregationsmuster wie in
+  jedem anderen Kapitel/Kriterium) — auf casoon.de sind das 14 separate, durch
+  `detect_announcement_deserts` gefundene "long section ohne Landmark/Heading/Fokusziel"-Stellen,
+  deren gefilterte `affected_node_ids`-Längen sich exakt zu 200 aufsummieren. Reale, verifizierte
+  Struktureigenschaft der Seite (viele lange Content-Abschnitte ohne Orientierungspunkt dazwischen),
+  kein Tool-Bug — keine Verhaltensänderung nötig. Klärender Kommentar in `bik_guide.rs` ergänzt,
+  damit künftige Reviewer die Summenbildung nicht erneut als Zählfehler missverstehen.
 - **#406-Fix: NotTestable/Warning-Findings zeigten rohen Englisch-Text im PDF (plan/20,
   2026-09-05):** live in DE-Reports bestätigter Lokalisierungs-Verstoß (casoon-de,
   satower-mosterei-de, inros-lackner-de) — `render_assessment_and_execution_notes`
