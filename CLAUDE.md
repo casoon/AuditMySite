@@ -249,6 +249,36 @@ Bewusste, über alle Phasen hinweg getroffene Entscheidung statt einer nachträg
   Differenzprüfungen** statt gespeicherter Pixel-Baselines erkannt, siehe Phase-5-Eintrag unten.
 
 ## Current State (v1.1.0)
+- **CI seit mehreren Wochen durchgehend rot — echte Ursache gefunden und gefixt, 2026-09-06
+  (Repo-Aufräum-Session):** beim Aufräumen `gh run list` geprüft (vorher nie gemacht — lokal
+  wurde immer nur `cargo check --all-features` per Pre-Push-Hook verifiziert, nie der tatsächliche
+  CI-Status) und festgestellt, dass praktisch jeder Push seit mindestens 2026-07-16 in CI
+  fehlschlug. Ursache: `src/seo/schema.rs`s Test `astro_structured_data_exports_work_...` lädt
+  seine Fixture per `include_str!("../../tests/fixtures/astro_structured_data_components.json")`
+  — diese Datei lag lokal auf der Platte, war aber **nie in Git getrackt** (von `.gitignore`s
+  pauschalem `*.json` erfasst, keine Whitelist-Ausnahme wie bei den anderen Fixture-Verzeichnissen).
+  `cargo check` (der Pre-Push-Hook) kompiliert keine Test-Targets und hat das nie bemerkt; jeder
+  `cargo test`/`cargo clippy --all-targets`-Lauf in CI brach dagegen mit einem harten
+  `include_str!`-Compile-Fehler ab, bevor auch nur ein Test lief — betraf praktisch alle
+  CI-Jobs (Check & Test, PDF Smoke Tests, Coverage). Gleiche Fehlerklasse wie der
+  `detection_corpus_nonwcag/*/*.html`-Gitignore-Gap aus plan/11 (Symptom: lokal vorhandene,
+  aber nie committete Fixture-Datei), hier aber mit echtem CI-Impact statt nur "würde beim
+  nächsten Hinzufügen verlorengehen". `.gitignore` um `!tests/fixtures/astro_structured_data_components.json`
+  ergänzt, Datei eingecheckt. Dabei zusätzlich `tests/wcag_fixtures/*.html` (7 Dateien, von
+  `tests/coverage_matrix.rs` per Laufzeit-Verzeichnis-Scan genutzt, kein `include_str!` — daher
+  kein CI-Blocker, aber derselbe Tracking-Gap) mitgefixt. Lokal mit den exakten CI-Befehlen
+  verifiziert: `cargo clippy --all-targets --all-features -- -D warnings`,
+  `cargo clippy --no-default-features -- -D warnings`, `cargo test --no-default-features` —
+  alle grün.
+- **Repo-Konsolidierung, 2026-09-06:** verwaisten Worktree + Branch `worktree-agent-*` entfernt
+  (0 eigene Commits, die nicht schon in main waren — reiner Leftover eines alten
+  `isolation: "worktree"`-Agent-Laufs). `archive/main-history` (lokal + origin) auf expliziten
+  Nutzerwunsch gelöscht, nur noch `main` existiert. Streudateien im Projekt-Root entfernt
+  (`delete.html`, ein liegengebliebener Shopify-Seiten-Dump; ein eigener Test-Rest-JSON aus einer
+  vorherigen Session). `reports/` (68 MB) und `tmp/pdfs/` (lokale, gitignorte Testreport-Ausgaben)
+  auf Nutzerwunsch komplett geleert — regenerierbar, kein Git-Tracking betroffen. Lokaler
+  `target/`-Ordner-Rest bereinigt (`CARGO_TARGET_DIR` zeigt eigentlich nach `~/.cargo/target`,
+  siehe `reference_cargo_target_dir.md`).
 - **plan/11: Non-WCAG-Detection-Corpus für vulnerable_libs/schema_rules befüllt, 2026-09-06
   (Rest-Scope von #558 abgeschlossen — Security-Domain war bereits fertig):** beide Domänen
   brauchen echtes Chrome/CDP (anders als Security, das nur HTTP-Fetch ist), daher zwei neue

@@ -25,12 +25,14 @@ Cargo.lock
 *.json
 *.html
 !tests/fixtures/*.html
+!tests/wcag_fixtures/*.html
 !tests/fixtures/detection_corpus/*.html
 !tests/fixtures/detection_corpus_nonwcag/*/*.html
 !tests/lint_fixtures/*.json
 !tests/regression_corpus/*.json
 !tests/fixtures/detection_corpus/*.json
 !tests/fixtures/detection_corpus_nonwcag/*/*.json
+!tests/fixtures/astro_structured_data_components.json
 !scripts/package-lock.json
 
 # Logs

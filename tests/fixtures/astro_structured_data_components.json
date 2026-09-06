@@ -1,0 +1,50 @@
+{
+  "source": "astro-structured-data exported components, reviewed 2026-07-16",
+  "components": [
+    "Schema", "ArticleSchema", "FAQSchema", "ProductSchema", "BreadcrumbSchema",
+    "AutoBreadcrumbSchema", "LocalBusinessSchema", "EventSchema", "CollectionPageSchema",
+    "SchemaGraph", "OrganizationSchema", "WebSiteSchema", "WebPageSchema",
+    "ProfilePageSchema", "JobPostingSchema", "SoftwareAppSchema", "RecipeSchema", "VideoSchema"
+  ],
+  "inline": [
+    {"component":"Schema","payload":{"@context":"https://schema.org","@type":"Thing","name":"Generic item"}},
+    {"component":"ArticleSchema","payload":{"@context":"https://schema.org","@type":"Article","headline":"Article","author":{"@type":"Person","name":"Ada"},"datePublished":"2026-01-01","dateModified":"2026-01-02","image":"https://example.com/article.jpg"}},
+    {"component":"FAQSchema","payload":{"@context":"https://schema.org","@type":"FAQPage","mainEntity":[{"@type":"Question","name":"Question?","acceptedAnswer":{"@type":"Answer","text":"Answer."}}]}},
+    {"component":"ProductSchema","payload":{"@context":"https://schema.org","@type":"Product","name":"Product","image":"https://example.com/product.jpg","offers":{"@type":"Offer","price":"10","priceCurrency":"EUR"}}},
+    {"component":"BreadcrumbSchema","payload":{"@context":"https://schema.org","@type":"BreadcrumbList","itemListElement":[{"@type":"ListItem","position":1,"name":"Home","item":"https://example.com/"},{"@type":"ListItem","position":2,"name":"Page"}]}},
+    {"component":"AutoBreadcrumbSchema","payload":{"@context":"https://schema.org","@type":"BreadcrumbList","itemListElement":[{"@type":"ListItem","position":1,"name":"Home","item":"https://example.com/"},{"@type":"ListItem","position":2,"name":"Auto"}]}},
+    {"component":"LocalBusinessSchema","payload":{"@context":"https://schema.org","@type":"LocalBusiness","name":"Business","address":{"@type":"PostalAddress","streetAddress":"Main 1","addressLocality":"Berlin","postalCode":"10115","addressCountry":"DE"}}},
+    {"component":"EventSchema","payload":{"@context":"https://schema.org","@type":"Event","name":"Event","startDate":"2026-10-01","location":{"@type":"Place","name":"Hall","address":{"@type":"PostalAddress","streetAddress":"Main 1","addressLocality":"Berlin","postalCode":"10115","addressCountry":"DE"}}}},
+    {"component":"CollectionPageSchema","payload":{"@context":"https://schema.org","@type":"CollectionPage","name":"Collection","url":"https://example.com/collection","mainEntity":{"@type":"ItemList","itemListElement":[{"@type":"ListItem","position":1,"url":"https://example.com/item"}]}}},
+    {"component":"OrganizationSchema","payload":{"@context":"https://schema.org","@type":"Organization","@id":"https://example.com/#organization","name":"Organization","url":"https://example.com/"}},
+    {"component":"WebSiteSchema","payload":{"@context":"https://schema.org","@type":"WebSite","@id":"https://example.com/#website","name":"Website","url":"https://example.com/","publisher":{"@id":"https://example.com/#organization"}}},
+    {"component":"WebPageSchema","payload":{"@context":"https://schema.org","@type":"WebPage","@id":"https://example.com/page#webpage","name":"Page","url":"https://example.com/page","isPartOf":{"@id":"https://example.com/#website"}}},
+    {"component":"ProfilePageSchema","payload":{"@context":"https://schema.org","@type":"ProfilePage","mainEntity":{"@type":"Person","name":"Ada"},"dateCreated":"2026-01-01","dateModified":"2026-01-02"}},
+    {"component":"JobPostingSchema","payload":{"@context":"https://schema.org","@type":"JobPosting","title":"Engineer","datePosted":"2026-01-01","description":"<p>Role</p>","hiringOrganization":{"@type":"Organization","name":"Organization"},"jobLocation":{"@type":"Place","address":{"@type":"PostalAddress","addressCountry":"DE"}}}},
+    {"component":"SoftwareAppSchema","payload":{"@context":"https://schema.org","@type":"SoftwareApplication","name":"App","offers":{"@type":"Offer","price":0},"aggregateRating":{"@type":"AggregateRating","ratingValue":5,"ratingCount":1},"applicationCategory":"BusinessApplication","operatingSystem":"Web"}},
+    {"component":"RecipeSchema","payload":{"@context":"https://schema.org","@type":"Recipe","name":"Soup","image":"https://example.com/soup.jpg","recipeIngredient":["water"],"recipeInstructions":[{"@type":"HowToStep","text":"Cook"}]}},
+    {"component":"VideoSchema","payload":{"@context":"https://schema.org","@type":"VideoObject","name":"Video","thumbnailUrl":"https://example.com/video.jpg","uploadDate":"2026-01-01","contentUrl":"https://example.com/video.mp4"}}
+  ],
+  "useGraph": {
+    "@context": "https://schema.org",
+    "@graph": [
+      {"@type":"Thing","name":"Generic item"},
+      {"@type":"Article","headline":"Article","author":{"@type":"Person","name":"Ada"},"datePublished":"2026-01-01","dateModified":"2026-01-02","image":"https://example.com/article.jpg"},
+      {"@type":"FAQPage","mainEntity":[{"@type":"Question","name":"Question?","acceptedAnswer":{"@type":"Answer","text":"Answer."}}]},
+      {"@type":"Product","name":"Product","image":"https://example.com/product.jpg","offers":{"@type":"Offer","price":"10","priceCurrency":"EUR"}},
+      {"@type":"BreadcrumbList","itemListElement":[{"@type":"ListItem","position":1,"name":"Home","item":"https://example.com/"},{"@type":"ListItem","position":2,"name":"Page"}]},
+      {"@type":"BreadcrumbList","itemListElement":[{"@type":"ListItem","position":1,"name":"Home","item":"https://example.com/"},{"@type":"ListItem","position":2,"name":"Auto"}]},
+      {"@type":"LocalBusiness","name":"Business","address":{"@type":"PostalAddress","streetAddress":"Main 1","addressLocality":"Berlin","postalCode":"10115","addressCountry":"DE"}},
+      {"@type":"Event","name":"Event","startDate":"2026-10-01","location":{"@type":"Place","name":"Hall","address":{"@type":"PostalAddress","streetAddress":"Main 1","addressLocality":"Berlin","postalCode":"10115","addressCountry":"DE"}}},
+      {"@type":"CollectionPage","name":"Collection","url":"https://example.com/collection","mainEntity":{"@type":"ItemList","itemListElement":[{"@type":"ListItem","position":1,"url":"https://example.com/item"}]}},
+      {"@type":"Organization","@id":"https://example.com/#organization","name":"Organization","url":"https://example.com/"},
+      {"@type":"WebSite","@id":"https://example.com/#website","name":"Website","url":"https://example.com/","publisher":{"@id":"https://example.com/#organization"}},
+      {"@type":"WebPage","@id":"https://example.com/page#webpage","name":"Page","url":"https://example.com/page","isPartOf":{"@id":"https://example.com/#website"}},
+      {"@type":"ProfilePage","mainEntity":{"@type":"Person","name":"Ada"},"dateCreated":"2026-01-01","dateModified":"2026-01-02"},
+      {"@type":"JobPosting","title":"Engineer","datePosted":"2026-01-01","description":"<p>Role</p>","hiringOrganization":{"@type":"Organization","name":"Organization"},"jobLocation":{"@type":"Place","address":{"@type":"PostalAddress","addressCountry":"DE"}}},
+      {"@type":"SoftwareApplication","name":"App","offers":{"@type":"Offer","price":0},"aggregateRating":{"@type":"AggregateRating","ratingValue":5,"ratingCount":1},"applicationCategory":"BusinessApplication","operatingSystem":"Web"},
+      {"@type":"Recipe","name":"Soup","image":"https://example.com/soup.jpg","recipeIngredient":["water"],"recipeInstructions":[{"@type":"HowToStep","text":"Cook"}]},
+      {"@type":"VideoObject","name":"Video","thumbnailUrl":"https://example.com/video.jpg","uploadDate":"2026-01-01","contentUrl":"https://example.com/video.mp4"}
+    ]
+  }
+}

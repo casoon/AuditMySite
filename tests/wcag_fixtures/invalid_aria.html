@@ -1,0 +1,18 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Invalid ARIA - WCAG 4.1.2 Fixture</title>
+</head>
+<body>
+    <main>
+        <h1>ARIA Test</h1>
+        <!-- VIOLATION: "superbutton" is not a valid ARIA role — violates WCAG 4.1.2 -->
+        <div role="superbutton">Click me</div>
+        <!-- VIOLATION: listitem outside a list context — violates WCAG 4.1.2 required context -->
+        <div role="listitem">Orphaned list item</div>
+        <!-- Control: valid role passes -->
+        <div role="button">Valid Button</div>
+    </main>
+</body>
+</html>

@@ -1,0 +1,27 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Low Contrast - WCAG 1.4.3 Fixture</title>
+    <style>
+        /* VIOLATION: light grey text on white background — contrast ratio ~1.6:1, requires 4.5:1 */
+        .low-contrast {
+            color: #cccccc;
+            background-color: #ffffff;
+            font-size: 16px;
+        }
+        /* Control: black on white passes easily */
+        .good-contrast {
+            color: #111111;
+            background-color: #ffffff;
+        }
+    </style>
+</head>
+<body>
+    <main>
+        <h1>Contrast Test</h1>
+        <p class="low-contrast">This text has insufficient contrast against the background.</p>
+        <p class="good-contrast">This text has sufficient contrast.</p>
+    </main>
+</body>
+</html>

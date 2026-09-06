@@ -1,0 +1,18 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Empty Links - WCAG 2.4.4 Fixture</title>
+</head>
+<body>
+    <main>
+        <h1>Link Purpose Test</h1>
+        <!-- VIOLATION: anchor with no text content and no aria-label — violates WCAG 2.4.4 -->
+        <a href="/page1"></a>
+        <!-- VIOLATION: image link with no alt text provides no accessible name -->
+        <a href="/page2"><img src="icon.png"></a>
+        <!-- Control: descriptive link text passes -->
+        <a href="/about">About our company</a>
+    </main>
+</body>
+</html>
