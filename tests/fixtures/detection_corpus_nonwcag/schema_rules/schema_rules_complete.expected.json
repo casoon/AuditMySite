@@ -1,0 +1,22 @@
+{
+  "case": "schema_rules_complete",
+  "expectations": [
+    { "rule_id": "article", "verdict": "pass" },
+    { "rule_id": "product_snippet", "verdict": "pass" },
+    { "rule_id": "merchant_listing", "verdict": "needs_review" },
+    { "rule_id": "breadcrumb", "verdict": "pass" },
+    { "rule_id": "organization", "verdict": "pass" },
+    { "rule_id": "local_business", "verdict": "pass" },
+    { "rule_id": "faq", "verdict": "pass" },
+    { "rule_id": "event", "verdict": "pass" },
+    { "rule_id": "recipe", "verdict": "pass" },
+    { "rule_id": "video", "verdict": "pass" },
+    { "rule_id": "job_posting", "verdict": "pass" },
+    { "rule_id": "software_application", "verdict": "pass" },
+    { "rule_id": "profile_page", "verdict": "pass" },
+    { "rule_id": "item_list", "verdict": "pass" },
+    { "rule_id": "web_page", "verdict": "pass" },
+    { "rule_id": "web_site", "verdict": "pass" },
+    { "rule_id": "person", "verdict": "pass" }
+  ]
+}
