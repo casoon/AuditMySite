@@ -26,6 +26,7 @@ Cargo.lock
 *.html
 !tests/fixtures/*.html
 !tests/fixtures/detection_corpus/*.html
+!tests/fixtures/detection_corpus_nonwcag/*/*.html
 !tests/lint_fixtures/*.json
 !tests/regression_corpus/*.json
 !tests/fixtures/detection_corpus/*.json

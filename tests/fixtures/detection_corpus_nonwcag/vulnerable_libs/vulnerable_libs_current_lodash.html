@@ -1,0 +1,21 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <title>Vulnerable libs corpus — current jQuery/Bootstrap/AngularJS/Handlebars/Lodash</title>
+  <script>
+    // Same libraries as vulnerable_libs_outdated_lodash.html, at the current
+    // patched version each library's safe_version boundary names.
+    window.jQuery = { fn: { jquery: "3.7.1" } };
+    window.angular = { version: { full: "1.8.3" } };
+    window.Handlebars = { VERSION: "4.7.8" };
+    // Boundary case: exactly 4.17.21 is the first safe Lodash version
+    // (check_vulnerability flags `v < (4, 17, 21)`).
+    window._ = { VERSION: "4.17.21", runInContext: function () {} };
+  </script>
+</head>
+<body>
+  <h1>Vulnerable libs corpus fixture (current, Lodash variant)</h1>
+  <div data-bs-version="5.3.2"></div>
+</body>
+</html>
