@@ -249,6 +249,38 @@ Bewusste, über alle Phasen hinweg getroffene Entscheidung statt einer nachträg
   Differenzprüfungen** statt gespeicherter Pixel-Baselines erkannt, siehe Phase-5-Eintrag unten.
 
 ## Current State (v1.1.0)
+- **plan/11: Non-WCAG-Detection-Corpus für vulnerable_libs/schema_rules befüllt, 2026-09-06
+  (Rest-Scope von #558 abgeschlossen — Security-Domain war bereits fertig):** beide Domänen
+  brauchen echtes Chrome/CDP (anders als Security, das nur HTTP-Fetch ist), daher zwei neue
+  `#[ignore]`-gegatete Tests analog `tests/detection_corpus_test.rs`.
+  **vulnerable_libs (8/8 covered):** `tests/vulnerable_libs_detection_corpus_test.rs` diffed
+  `analyze_vulnerable_libraries`'s echten Output gegen 4 kombinierte HTML-Fixtures (nicht mehr,
+  da minimale globale Stubs reichen — `window.jQuery.fn.jquery` etc., keine echte
+  Bibliotheksfunktionalität nötig). Auf 4 statt 2 Dateien aufgeteilt wegen eines echten,
+  vom Modul selbst dokumentierten Constraints: Lodash und Underscore teilen sich das globale `_`
+  und würden sich bei gemeinsamer Nutzung gegenseitig überschreiben. Prototype/MooTools sind im
+  Code unconditional als vulnerable markiert (unmaintained), haben also nur einen Violation-,
+  keinen Pass-Fixture. **Dabei einen echten, vorbestehenden Bug gefunden und gefixt:**
+  `.gitignore`s `*.html`-Sperre hatte eine Ausnahme für `tests/fixtures/detection_corpus/*.html`
+  (WCAG-Corpus), aber keine für das gleichrangige `detection_corpus_nonwcag/*/*.html` — neue
+  Fixtures in dieser Domäne wären lokal vorhanden, aber nie eingecheckt worden, unbemerkt.
+  **schema_rules (17/17 covered):** vor dem Bau des vollen Corpus geprüft und festgestellt, dass
+  `schema_rules.rs`s reine `assess_node`-Regellogik bereits für 14 von 17 Features sehr
+  ausführliche Pure-Rust-Unit-Tests hat (Grenzfälle wie EventRescheduled, Remote-Jobs,
+  Merchant-vs-Editorial-Context) — dem Nutzer vorgelegt, der sich trotzdem für den vollen
+  Chrome-Corpus entschieden (Tracking-Konsistenz mit der Security-/vulnerable_libs-Domäne wichtiger
+  als Redundanzvermeidung). `tests/schema_rules_detection_corpus_test.rs` diffed
+  `detect_structured_data`s echten Output gegen 2 kombinierte Fixtures (alle 17 Typen
+  vollständig/gültig → erwartet "pass"; die 11 Typen, die überhaupt Pflichtfelder haben können,
+  unvollständig → erwartet "violation"). `merchant_listing` erwartet bewusst `needs_review`, nicht
+  pass/violation: `detect_structured_data` wertet Regeln immer mit
+  `ProductRuleContext::Indeterminate`, der echte Seiten-Intent-Kontext wird erst später von
+  `seo::module`s `derive`-Schritt über `schema_fit`/`refresh_rule_assessments` gesetzt — das ist
+  reales, korrektes Verhalten dieses Einstiegspunkts, keine Testlücke. Fünf Features
+  (Article/Organization/WebPage/WebSite/Person) haben in `assess_node` keine Pflichtfelder und
+  können strukturell nie "violation" werden — im "complete"-Fixture als "pass" mitgetestet, kein
+  eigener Violation-Fixture nötig. Beide neuen Tests per absichtlich verfälschtem
+  `expected.json` verifiziert, dass sie einen echten Diff erkennen (danach zurückgesetzt).
 - **plan/18: zwei neue Best-Practice-ARIA-Hygiene-Regeln, 2026-09-06 (letzter Punkt aus dem
   aktuellen Insights-Artikel-Batch):** `redundant_role.rs` (`4.1.2/redundant-role`, z. B.
   `<button role="button">`, `<a href="..." role="link">` — fixe, kontextunabhängige
